@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --blue: #2563eb;
+  --blue2: #1d4ed8;
+  --blue-l: #eff6ff;
+  --blue-m: #bfdbfe;
+  --green: #16a34a;
+  --green-l: #f0fdf4;
+  --amber: #d97706;
+  --amber-l: #fffbeb;
+  --red: #dc2626;
+  --red-l: #fef2f2;
+  --purple: #7c3aed;
+  --purple-l: #f5f3ff;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --bg: #f8fafc;
+  --r: 10px;
+  --r2: 14px;
+}
+
+@keyframes bounce-dots {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+html { scroll-behavior: smooth; }
+body { overflow-x: hidden; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+.typing-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #94a3b8;
+  animation: bounce-dots 0.8s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+.ai-pulse { animation: pulse-dot 1.5s infinite; }
+
+.panel-open { animation: slide-in-right 0.25s ease; }
+

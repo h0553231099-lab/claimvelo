@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)"
+    ]
+  },
+  "env": {
+    "AVIATIONSTACK_API_KEY": "0b79c29ee9e7d2a7cf469b44c522c28c"
+  }
+}

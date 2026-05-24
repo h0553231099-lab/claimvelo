@@ -1,0 +1,29 @@
+[build]
+  # Full prerendering enabled on Netlify — JSDOMRenderer runs in Node.js,
+  # baking SEO meta tags, hreflang links, OG/Twitter tags, and page titles
+  # directly into the HTML of every public page before JS executes.
+  command = "npm run build:prod"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Prerendering is enabled by default (SKIP_PRERENDER not set).
+  # Set SKIP_PRERENDER=true in Netlify UI to get a fast SPA-only build.
+
+[[headers]]
+  # Cache static assets aggressively (content-hashed filenames)
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  # Cache brand images for 30 days
+  for = "/images/*"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000"
+
+[[headers]]
+  # No-cache for HTML files so updated prerendered pages are always fresh
+  for = "*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

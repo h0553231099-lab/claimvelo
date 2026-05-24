@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f2744;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#1e3a5f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2563eb;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="badge" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0891b2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid lines -->
+  <g stroke="white" stroke-opacity="0.04" stroke-width="1">
+    <line x1="0" y1="105" x2="1200" y2="105"/>
+    <line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="0" y1="315" x2="1200" y2="315"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="525" x2="1200" y2="525"/>
+    <line x1="200" y1="0" x2="200" y2="630"/>
+    <line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="1000" y1="0" x2="1000" y2="630"/>
+  </g>
+
+  <!-- Decorative arc -->
+  <circle cx="950" cy="630" r="420" fill="none" stroke="white" stroke-opacity="0.05" stroke-width="80"/>
+  <circle cx="950" cy="630" r="280" fill="none" stroke="white" stroke-opacity="0.05" stroke-width="60"/>
+
+  <!-- Logo mark -->
+  <rect x="72" y="72" width="80" height="80" rx="18" fill="#2563eb"/>
+  <path d="M96 112 L120 100 L156 94 L158 98 L124 114 L130 130 L122 132 L116 118 L100 126 Z" fill="white"/>
+
+  <!-- Brand name -->
+  <text x="170" y="128" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="42" font-weight="800" fill="white" letter-spacing="-1">ClaimVelo</text>
+
+  <!-- Divider -->
+  <rect x="72" y="192" width="520" height="3" rx="2" fill="url(#badge)" opacity="0.7"/>
+
+  <!-- Headline -->
+  <text x="72" y="272" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="62" font-weight="900" fill="white" letter-spacing="-2">Delayed or Cancelled</text>
+  <text x="72" y="346" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="62" font-weight="900" fill="white" letter-spacing="-2">Flight?</text>
+
+  <!-- Accent headline -->
+  <text x="72" y="414" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="52" font-weight="900" letter-spacing="-1">
+    <tspan fill="#60a5fa">Claim Up to </tspan><tspan fill="#34d399">€600</tspan>
+  </text>
+
+  <!-- Subtext -->
+  <text x="72" y="470" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="26" font-weight="400" fill="white" opacity="0.7">No win, no fee · EU261 · UK261 · Free check in 60 seconds</text>
+
+  <!-- Badge pills -->
+  <rect x="72" y="510" width="180" height="48" rx="24" fill="url(#badge)"/>
+  <text x="162" y="541" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="700" fill="white" text-anchor="middle">Free Check</text>
+
+  <rect x="268" y="510" width="220" height="48" rx="24" fill="white" fill-opacity="0.12"/>
+  <text x="378" y="541" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="700" fill="white" text-anchor="middle">No Win No Fee</text>
+
+  <rect x="504" y="510" width="180" height="48" rx="24" fill="white" fill-opacity="0.12"/>
+  <text x="594" y="541" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="700" fill="white" text-anchor="middle">Up to €600</text>
+
+  <!-- Plane silhouette (decorative) -->
+  <g transform="translate(820, 220) rotate(-15)" opacity="0.12">
+    <path d="M0 60 L80 20 L200 0 L204 8 L100 60 L116 110 L100 116 L88 74 L20 100 Z" fill="white" transform="scale(1.8)"/>
+  </g>
+</svg>

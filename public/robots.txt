@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Private routes — not indexed
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /loa
+# Block language-prefixed private routes
+Disallow: /*/admin
+Disallow: /*/dashboard
+Disallow: /*/loa
+
+Sitemap: https://claimvelo.com/sitemap.xml

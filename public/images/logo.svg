@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#2563eb"/>
+  <g fill="white">
+    <!-- Plane body -->
+    <path d="M320 180 L192 256 L220 268 L244 316 L264 304 L256 272 L352 240 Z" fill="white" opacity="0.95"/>
+    <!-- Wing -->
+    <path d="M280 220 L160 196 L172 212 L268 232 Z" fill="white" opacity="0.8"/>
+    <!-- Tail -->
+    <path d="M248 288 L232 332 L248 324 L268 340 L272 308 Z" fill="white" opacity="0.85"/>
+  </g>
+  <!-- Stylised plane icon centered -->
+  <path d="M140 260 L220 224 L372 196 L380 204 L252 264 L272 316 L252 324 L236 284 L180 308 Z" fill="white"/>
+</svg>

@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <!-- HOME -->
+  <url>
+    <loc>https://claimvelo.com/</loc>
+    <lastmod>2026-05-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://claimvelo.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://claimvelo.com/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://claimvelo.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://claimvelo.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://claimvelo.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://claimvelo.com/pt/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://claimvelo.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://claimvelo.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://claimvelo.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="ro" href="https://claimvelo.com/ro/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://claimvelo.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://claimvelo.com/cs/"/>
+    <xhtml:link rel="alternate" hreflang="da" href="https://claimvelo.com/da/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://claimvelo.com/sv/"/>
+    <xhtml:link rel="alternate" hreflang="no" href="https://claimvelo.com/no/"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://claimvelo.com/fi/"/>
+    <xhtml:link rel="alternate" hreflang="el" href="https://claimvelo.com/el/"/>
+    <xhtml:link rel="alternate" hreflang="hr" href="https://claimvelo.com/hr/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://claimvelo.com/hu/"/>
+    <xhtml:link rel="alternate" hreflang="bg" href="https://claimvelo.com/bg/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://claimvelo.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://claimvelo.com/uk/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://claimvelo.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://claimvelo.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="sq" href="https://claimvelo.com/sq/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://claimvelo.com/pt-br/"/>
+  </url>
+
+  <!-- CLAIM -->
+  <url>
+    <loc>https://claimvelo.com/claim</loc>
+    <lastmod>2026-05-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://claimvelo.com/claim"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://claimvelo.com/claim"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://claimvelo.com/es/claim"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://claimvelo.com/de/claim"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://claimvelo.com/fr/claim"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://claimvelo.com/pt/claim"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://claimvelo.com/it/claim"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://claimvelo.com/nl/claim"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://claimvelo.com/pl/claim"/>
+    <xhtml:link rel="alternate" hreflang="ro" href="https://claimvelo.com/ro/claim"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://claimvelo.com/ru/claim"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://claimvelo.com/cs/claim"/>
+    <xhtml:link rel="alternate" hreflang="da" href="https://claimvelo.com/da/claim"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://claimvelo.com/sv/claim"/>
+    <xhtml:link rel="alternate" hreflang="no" href="https://claimvelo.com/no/claim"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://claimvelo.com/fi/claim"/>
+    <xhtml:link rel="alternate" hreflang="el" href="https://claimvelo.com/el/claim"/>
+    <xhtml:link rel="alternate" hreflang="hr" href="https://claimvelo.com/hr/claim"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://claimvelo.com/hu/claim"/>
+    <xhtml:link rel="alternate" hreflang="bg" href="https://claimvelo.com/bg/claim"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://claimvelo.com/tr/claim"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://claimvelo.com/uk/claim"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://claimvelo.com/ar/claim"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://claimvelo.com/zh/claim"/>
+    <xhtml:link rel="alternate" hreflang="sq" href="https://claimvelo.com/sq/claim"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://claimvelo.com/pt-br/claim"/>
+  </url>
+
+  <!-- HOW IT WORKS -->
+  <url>
+    <loc>https://claimvelo.com/how-it-works</loc>
+    <lastmod>2026-05-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://claimvelo.com/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://claimvelo.com/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://claimvelo.com/es/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://claimvelo.com/de/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://claimvelo.com/fr/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://claimvelo.com/pt/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://claimvelo.com/it/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://claimvelo.com/nl/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://claimvelo.com/pl/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="ro" href="https://claimvelo.com/ro/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://claimvelo.com/ru/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://claimvelo.com/cs/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="da" href="https://claimvelo.com/da/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://claimvelo.com/sv/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="no" href="https://claimvelo.com/no/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://claimvelo.com/fi/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="el" href="https://claimvelo.com/el/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="hr" href="https://claimvelo.com/hr/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://claimvelo.com/hu/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="bg" href="https://claimvelo.com/bg/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://claimvelo.com/tr/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://claimvelo.com/uk/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://claimvelo.com/ar/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://claimvelo.com/zh/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="sq" href="https://claimvelo.com/sq/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://claimvelo.com/pt-br/how-it-works"/>
+  </url>
+
+  <!-- FEES -->
+  <url>
+    <loc>https://claimvelo.com/fees</loc>
+    <lastmod>2026-05-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://claimvelo.com/fees"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://claimvelo.com/fees"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://claimvelo.com/es/fees"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://claimvelo.com/de/fees"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://claimvelo.com/fr/fees"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://claimvelo.com/pt/fees"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://claimvelo.com/it/fees"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://claimvelo.com/nl/fees"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://claimvelo.com/pl/fees"/>
+    <xhtml:link rel="alternate" hreflang="ro" href="https://claimvelo.com/ro/fees"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://claimvelo.com/ru/fees"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://claimvelo.com/cs/fees"/>
+    <xhtml:link rel="alternate" hreflang="da" href="https://claimvelo.com/da/fees"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://claimvelo.com/sv/fees"/>
+    <xhtml:link rel="alternate" hreflang="no" href="https://claimvelo.com/no/fees"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://claimvelo.com/fi/fees"/>
+    <xhtml:link rel="alternate" hreflang="el" href="https://claimvelo.com/el/fees"/>
+    <xhtml:link rel="alternate" hreflang="hr" href="https://claimvelo.com/hr/fees"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://claimvelo.com/hu/fees"/>
+    <xhtml:link rel="alternate" hreflang="bg" href="https://claimvelo.com/bg/fees"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://claimvelo.com/tr/fees"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://claimvelo.com/uk/fees"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://claimvelo.com/ar/fees"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://claimvelo.com/zh/fees"/>
+    <xhtml:link rel="alternate" hreflang="sq" href="https://claimvelo.com/sq/fees"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://claimvelo.com/pt-br/fees"/>
+  </url>
+
+  <!-- ABOUT -->
+  <url>
+    <loc>https://claimvelo.com/about</loc>
+    <lastmod>2026-05-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://claimvelo.com/about"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://claimvelo.com/about"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://claimvelo.com/es/about"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://claimvelo.com/de/about"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://claimvelo.com/fr/about"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://claimvelo.com/pt/about"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://claimvelo.com/it/about"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://claimvelo.com/nl/about"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://claimvelo.com/pl/about"/>
+    <xhtml:link rel="alternate" hreflang="ro" href="https://claimvelo.com/ro/about"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://claimvelo.com/ru/about"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://claimvelo.com/cs/about"/>
+    <xhtml:link rel="alternate" hreflang="da" href="https://claimvelo.com/da/about"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://claimvelo.com/sv/about"/>
+    <xhtml:link rel="alternate" hreflang="no" href="https://claimvelo.com/no/about"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://claimvelo.com/fi/about"/>
+    <xhtml:link rel="alternate" hreflang="el" href="https://claimvelo.com/el/about"/>
+    <xhtml:link rel="alternate" hreflang="hr" href="https://claimvelo.com/hr/about"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://claimvelo.com/hu/about"/>
+    <xhtml:link rel="alternate" hreflang="bg" href="https://claimvelo.com/bg/about"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://claimvelo.com/tr/about"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://claimvelo.com/uk/about"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://claimvelo.com/ar/about"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://claimvelo.com/zh/about"/>
+    <xhtml:link rel="alternate" hreflang="sq" href="https://claimvelo.com/sq/about"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://claimvelo.com/pt-br/about"/>
+  </url>
+
+  <!-- PRIVACY -->
+  <url>
+    <loc>https://claimvelo.com/privacy</loc>
+    <lastmod>2026-05-17</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://claimvelo.com/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://claimvelo.com/privacy"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://claimvelo.com/es/privacy"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://claimvelo.com/de/privacy"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://claimvelo.com/fr/privacy"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://claimvelo.com/pt/privacy"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://claimvelo.com/it/privacy"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://claimvelo.com/nl/privacy"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://claimvelo.com/pl/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ro" href="https://claimvelo.com/ro/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://claimvelo.com/ru/privacy"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://claimvelo.com/cs/privacy"/>
+    <xhtml:link rel="alternate" hreflang="da" href="https://claimvelo.com/da/privacy"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://claimvelo.com/sv/privacy"/>
+    <xhtml:link rel="alternate" hreflang="no" href="https://claimvelo.com/no/privacy"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://claimvelo.com/fi/privacy"/>
+    <xhtml:link rel="alternate" hreflang="el" href="https://claimvelo.com/el/privacy"/>
+    <xhtml:link rel="alternate" hreflang="hr" href="https://claimvelo.com/hr/privacy"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://claimvelo.com/hu/privacy"/>
+    <xhtml:link rel="alternate" hreflang="bg" href="https://claimvelo.com/bg/privacy"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://claimvelo.com/tr/privacy"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://claimvelo.com/uk/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://claimvelo.com/ar/privacy"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://claimvelo.com/zh/privacy"/>
+    <xhtml:link rel="alternate" hreflang="sq" href="https://claimvelo.com/sq/privacy"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://claimvelo.com/pt-br/privacy"/>
+  </url>
+
+</urlset>
