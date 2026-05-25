@@ -26,6 +26,7 @@ const CompensationChecker = lazy(() => import('./components/CompensationChecker'
 const AgentDashboardPage = lazy(() => import('./pages/AgentDashboardPage'));
 const SalesManagerPage = lazy(() => import('./pages/SalesManagerPage'));
 const AgentSignInPage = lazy(() => import('./pages/AgentSignInPage'));
+const SalesSignInPage = lazy(() => import('./pages/SalesSignInPage'));
 
 const emptyForm = (): ClaimFormData => ({
   firstName: '', lastName: '', email: '', phone: '', address: '', country: 'United Kingdom', countryOther: '', dob: '',
@@ -167,6 +168,7 @@ export default function App() {
           {page === 'fees' && <FeesPage onNav={nav} />}
           {page === 'signin' && <SignInPage onAuth={handleAuth} onNav={nav} />}
           {page === 'agent-signin' && <AgentSignInPage onAuth={handleAuth} onNav={nav} />}
+          {page === 'sales-signin' && <SalesSignInPage onAuth={handleAuth} onNav={nav} />}
           {page === 'privacy' && <PrivacyPolicyPage onNav={nav} />}
           {page === 'agent-dashboard' && <AgentDashboardPage onNav={nav} user={user} onSignOut={handleSignOut} />}
           {page === 'sales-dashboard' && <SalesManagerPage onNav={nav} user={user} onSignOut={handleSignOut} />}

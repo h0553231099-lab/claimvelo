@@ -571,12 +571,19 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [workerSaving, setWorkerSaving] = useState(false);
   const [workerError, setWorkerError] = useState('');
 
-  // Sales people state
+  // Sales managers state
   const [showAddSales, setShowAddSales] = useState(false);
   const [salesForm, setSalesForm] = useState({ email: '', full_name: '' });
   const [salesSaving, setSalesSaving] = useState(false);
   const [salesError, setSalesError] = useState('');
   const [salesSuccess, setSalesSuccess] = useState('');
+
+  // Agents state
+  const [showAddAgent, setShowAddAgent] = useState(false);
+  const [agentForm, setAgentForm] = useState({ email: '', full_name: '', agent_code: '' });
+  const [agentSaving, setAgentSaving] = useState(false);
+  const [agentError, setAgentError] = useState('');
+  const [agentSuccess, setAgentSuccess] = useState('');
 
   // Claim files state
   const [claimFiles, setClaimFiles] = useState<ClaimFile[]>([]);
@@ -743,6 +750,41 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
       setSalesError(e instanceof Error ? e.message : 'Something went wrong');
     }
     setSalesSaving(false);
+  }
+
+  async function addAgent() {
+    if (!agentForm.email.trim() || !agentForm.full_name.trim()) {
+      setAgentError('Email and full name are required.');
+      return;
+    }
+    setAgentSaving(true);
+    setAgentError('');
+    setAgentSuccess('');
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+        body: JSON.stringify({
+          email: agentForm.email.trim(),
+          fullName: agentForm.full_name.trim(),
+          role: 'agent',
+          agentCode: agentForm.agent_code.trim().toUpperCase() || undefined,
+        }),
+      });
+      const result = await res.json();
+      if (!result.ok) throw new Error(result.error || 'Failed to create account');
+      setAgentSuccess(`Agent account created! Welcome email sent to ${agentForm.email.trim()}.`);
+      setAgentForm({ email: '', full_name: '', agent_code: '' });
+      setShowAddAgent(false);
+      // Refresh worker list
+      const { data } = await supabase.from('worker_profiles').select('*').order('created_at', { ascending: false });
+      if (data) setWorkers(data as WorkerProfile[]);
+    } catch (e: unknown) {
+      setAgentError(e instanceof Error ? e.message : 'Something went wrong');
+    }
+    setAgentSaving(false);
   }
 
   async function deleteClaim(id: string) {
@@ -1404,18 +1446,20 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
             </div>
           )}
 
-          {/* SALES PEOPLE (inside users view) */}
+          {/* SALES MANAGERS (inside users view) */}
           {av === 'users' && !isWorker && (
-            <div className="max-w-[780px] mt-4">
+            <div className="max-w-[780px] mt-4 flex flex-col gap-4">
+
+              {/* Sales Managers card */}
               <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4">
                 <div className="flex items-center mb-3.5">
-                  <span className="font-bold text-[13px]">Sales People</span>
-                  <span className="ml-2 text-[10px] text-[#64748b]">External partners</span>
+                  <span className="font-bold text-[13px]">Sales Managers</span>
+                  <span className="ml-2 text-[10px] text-[#64748b]">External sales partners</span>
                   <button
                     onClick={() => { setShowAddSales(true); setSalesError(''); setSalesSuccess(''); }}
                     className="ml-auto flex items-center gap-1.5 px-2.5 py-1 bg-[#0369a1] text-white border-none rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#075985]"
                   >
-                    <UserPlus className="w-3.5 h-3.5" /> Add Sales Person
+                    <UserPlus className="w-3.5 h-3.5" /> Add Sales Manager
                   </button>
                 </div>
 
@@ -1425,7 +1469,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
 
                 {showAddSales && (
                   <div className="mb-4 p-3.5 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]">
-                    <div className="font-semibold text-[12px] text-[#0f172a] mb-1">New Sales Person</div>
+                    <div className="font-semibold text-[12px] text-[#0f172a] mb-1">New Sales Manager</div>
                     <div className="text-[11px] text-[#64748b] mb-3">A welcome email with a temporary password will be sent automatically.</div>
                     <div className="grid grid-cols-2 gap-2.5 mb-2.5">
                       <div className="flex flex-col gap-1">
@@ -1468,11 +1512,90 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 )}
 
                 {!showAddSales && !salesSuccess && (
-                  <div className="text-[12px] text-[#94a3b8] py-4 text-center">
-                    Sales people receive their own login, a temporary password, and — if they have a referral code — their QR code, all via email.
+                  <div className="text-[12px] text-[#94a3b8] py-3 text-center">
+                    Sales managers get their own login portal and a temporary password via email.
                   </div>
                 )}
               </div>
+
+              {/* Agents card */}
+              <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4">
+                <div className="flex items-center mb-3.5">
+                  <span className="font-bold text-[13px]">Agents</span>
+                  <span className="ml-2 text-[10px] text-[#64748b]">Referral agents</span>
+                  <button
+                    onClick={() => { setShowAddAgent(true); setAgentError(''); setAgentSuccess(''); }}
+                    className="ml-auto flex items-center gap-1.5 px-2.5 py-1 bg-[#16a34a] text-white border-none rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#15803d]"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" /> Add Agent
+                  </button>
+                </div>
+
+                {agentSuccess && (
+                  <div className="mb-3 px-3 py-2.5 bg-[#f0fdf4] border border-[#86efac] text-[#166534] text-[12px] rounded-[8px]">{agentSuccess}</div>
+                )}
+
+                {showAddAgent && (
+                  <div className="mb-4 p-3.5 bg-[#f0fdf4] border border-[#86efac] rounded-[8px]">
+                    <div className="font-semibold text-[12px] text-[#0f172a] mb-1">New Agent</div>
+                    <div className="text-[11px] text-[#64748b] mb-3">A welcome email with their temp password and referral QR code will be sent automatically.</div>
+                    <div className="grid grid-cols-3 gap-2.5 mb-2.5">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">Full Name</label>
+                        <input
+                          value={agentForm.full_name}
+                          onChange={e => setAgentForm(f => ({ ...f, full_name: e.target.value }))}
+                          placeholder="Jane Smith"
+                          className="px-2.5 py-2 border border-[#86efac] rounded-[7px] text-[12px] outline-none focus:border-[#16a34a] bg-white"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">Email Address</label>
+                        <input
+                          value={agentForm.email}
+                          onChange={e => setAgentForm(f => ({ ...f, email: e.target.value }))}
+                          placeholder="jane@example.com"
+                          type="email"
+                          className="px-2.5 py-2 border border-[#86efac] rounded-[7px] text-[12px] outline-none focus:border-[#16a34a] bg-white"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">Agent / Referral Code</label>
+                        <input
+                          value={agentForm.agent_code}
+                          onChange={e => setAgentForm(f => ({ ...f, agent_code: e.target.value.toUpperCase() }))}
+                          placeholder="e.g. AGT-001"
+                          maxLength={12}
+                          className="px-2.5 py-2 border border-[#86efac] rounded-[7px] text-[12px] outline-none focus:border-[#16a34a] bg-white font-mono"
+                        />
+                      </div>
+                    </div>
+                    {agentError && <div className="text-[11px] text-[#dc2626] mb-2">{agentError}</div>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={addAgent}
+                        disabled={agentSaving}
+                        className="px-3 py-1.5 bg-[#16a34a] text-white border-none rounded-[7px] text-[12px] font-semibold cursor-pointer hover:bg-[#15803d] disabled:opacity-60"
+                      >
+                        {agentSaving ? 'Sending...' : 'Create & Send Welcome Email'}
+                      </button>
+                      <button
+                        onClick={() => { setShowAddAgent(false); setAgentError(''); setAgentForm({ email: '', full_name: '', agent_code: '' }); }}
+                        className="px-3 py-1.5 bg-white text-[#64748b] border border-[#e2e8f0] rounded-[7px] text-[12px] font-semibold cursor-pointer hover:bg-[#f8fafc]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!showAddAgent && !agentSuccess && (
+                  <div className="text-[12px] text-[#94a3b8] py-3 text-center">
+                    Agents get their own login, a temporary password, and their referral QR code via email.
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 
