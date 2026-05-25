@@ -158,11 +158,6 @@ Deno.serve(async (req: Request) => {
   try {
     const payload: EmailPayload = await req.json();
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     const subject =
       payload.type === "claim_submitted"
         ? `Your claim ${payload.claimRef} has been received — ClaimVelo`
@@ -172,11 +167,6 @@ Deno.serve(async (req: Request) => {
       payload.type === "claim_submitted"
         ? buildSubmitHtml(payload)
         : buildStatusHtml(payload);
-
-    const { error } = await supabaseAdmin.auth.admin.generateLink({
-      type: "magiclink",
-      email: payload.to,
-    });
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
 
@@ -202,8 +192,6 @@ Deno.serve(async (req: Request) => {
       console.log(`[EMAIL] To: ${payload.to} | Subject: ${subject}`);
       console.log(`[EMAIL] Body preview: ${html.slice(0, 200)}`);
     }
-
-    void error;
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
