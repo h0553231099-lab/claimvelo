@@ -571,6 +571,13 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [workerSaving, setWorkerSaving] = useState(false);
   const [workerError, setWorkerError] = useState('');
 
+  // Sales people state
+  const [showAddSales, setShowAddSales] = useState(false);
+  const [salesForm, setSalesForm] = useState({ email: '', full_name: '' });
+  const [salesSaving, setSalesSaving] = useState(false);
+  const [salesError, setSalesError] = useState('');
+  const [salesSuccess, setSalesSuccess] = useState('');
+
   // Claim files state
   const [claimFiles, setClaimFiles] = useState<ClaimFile[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
@@ -709,6 +716,33 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   async function removeWorker(id: string) {
     await supabase.from('worker_profiles').delete().eq('id', id);
     setWorkers(w => w.filter(x => x.id !== id));
+  }
+
+  async function addSalesPerson() {
+    if (!salesForm.email.trim() || !salesForm.full_name.trim()) {
+      setSalesError('Email and full name are required.');
+      return;
+    }
+    setSalesSaving(true);
+    setSalesError('');
+    setSalesSuccess('');
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+        body: JSON.stringify({ email: salesForm.email.trim(), fullName: salesForm.full_name.trim(), role: 'sales_manager' }),
+      });
+      const result = await res.json();
+      if (!result.ok) throw new Error(result.error || 'Failed to create account');
+      setSalesSuccess(`Account created! Welcome email sent to ${salesForm.email.trim()}.`);
+      setSalesForm({ email: '', full_name: '' });
+      setShowAddSales(false);
+    } catch (e: unknown) {
+      setSalesError(e instanceof Error ? e.message : 'Something went wrong');
+    }
+    setSalesSaving(false);
   }
 
   async function deleteClaim(id: string) {
@@ -1365,6 +1399,78 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                       ))}
                     </tbody>
                   </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* SALES PEOPLE (inside users view) */}
+          {av === 'users' && !isWorker && (
+            <div className="max-w-[780px] mt-4">
+              <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4">
+                <div className="flex items-center mb-3.5">
+                  <span className="font-bold text-[13px]">Sales People</span>
+                  <span className="ml-2 text-[10px] text-[#64748b]">External partners</span>
+                  <button
+                    onClick={() => { setShowAddSales(true); setSalesError(''); setSalesSuccess(''); }}
+                    className="ml-auto flex items-center gap-1.5 px-2.5 py-1 bg-[#0369a1] text-white border-none rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#075985]"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" /> Add Sales Person
+                  </button>
+                </div>
+
+                {salesSuccess && (
+                  <div className="mb-3 px-3 py-2.5 bg-[#f0fdf4] border border-[#86efac] text-[#166534] text-[12px] rounded-[8px]">{salesSuccess}</div>
+                )}
+
+                {showAddSales && (
+                  <div className="mb-4 p-3.5 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]">
+                    <div className="font-semibold text-[12px] text-[#0f172a] mb-1">New Sales Person</div>
+                    <div className="text-[11px] text-[#64748b] mb-3">A welcome email with a temporary password will be sent automatically.</div>
+                    <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">Full Name</label>
+                        <input
+                          value={salesForm.full_name}
+                          onChange={e => setSalesForm(f => ({ ...f, full_name: e.target.value }))}
+                          placeholder="Jane Smith"
+                          className="px-2.5 py-2 border border-[#bae6fd] rounded-[7px] text-[12px] outline-none focus:border-[#0369a1] bg-white"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">Email Address</label>
+                        <input
+                          value={salesForm.email}
+                          onChange={e => setSalesForm(f => ({ ...f, email: e.target.value }))}
+                          placeholder="jane@example.com"
+                          type="email"
+                          className="px-2.5 py-2 border border-[#bae6fd] rounded-[7px] text-[12px] outline-none focus:border-[#0369a1] bg-white"
+                        />
+                      </div>
+                    </div>
+                    {salesError && <div className="text-[11px] text-[#dc2626] mb-2">{salesError}</div>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={addSalesPerson}
+                        disabled={salesSaving}
+                        className="px-3 py-1.5 bg-[#0369a1] text-white border-none rounded-[7px] text-[12px] font-semibold cursor-pointer hover:bg-[#075985] disabled:opacity-60"
+                      >
+                        {salesSaving ? 'Sending...' : 'Create & Send Welcome Email'}
+                      </button>
+                      <button
+                        onClick={() => { setShowAddSales(false); setSalesError(''); setSalesForm({ email: '', full_name: '' }); }}
+                        className="px-3 py-1.5 bg-white text-[#64748b] border border-[#e2e8f0] rounded-[7px] text-[12px] font-semibold cursor-pointer hover:bg-[#f8fafc]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!showAddSales && !salesSuccess && (
+                  <div className="text-[12px] text-[#94a3b8] py-4 text-center">
+                    Sales people receive their own login, a temporary password, and — if they have a referral code — their QR code, all via email.
+                  </div>
                 )}
               </div>
             </div>
