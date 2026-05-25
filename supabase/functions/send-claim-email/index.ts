@@ -1,5 +1,4 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -168,25 +167,25 @@ Deno.serve(async (req: Request) => {
         ? buildSubmitHtml(payload)
         : buildStatusHtml(payload);
 
-    const resendKey = Deno.env.get("RESEND_API_KEY");
+    const brevoKey = Deno.env.get("BREVO_API_KEY");
 
-    if (resendKey) {
-      const res = await fetch("https://api.resend.com/emails", {
+    if (brevoKey) {
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${resendKey}`,
+          "api-key": brevoKey,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "ClaimVelo <support@claimvelo.com>",
-          to: [payload.to],
+          sender: { name: "ClaimVelo", email: "support@claimvelo.com" },
+          to: [{ email: payload.to, name: payload.passengerName }],
           subject,
-          html,
+          htmlContent: html,
         }),
       });
       if (!res.ok) {
         const err = await res.text();
-        throw new Error(`Resend error: ${err}`);
+        throw new Error(`Brevo error: ${err}`);
       }
     } else {
       console.log(`[EMAIL] To: ${payload.to} | Subject: ${subject}`);
