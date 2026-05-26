@@ -1,5 +1,5 @@
 import { Page } from '../types';
-import { Shield, Mail, Globe, Building, ArrowRight } from 'lucide-react';
+import { Shield, Mail, Globe, Building, ArrowRight, Phone } from 'lucide-react';
 
 interface Props { onNav: (p: Page) => void; }
 
@@ -49,8 +49,11 @@ export default function PrivacyPolicyPage({ onNav }: Props) {
             <p className="text-[13px] text-[#64748b]">4604 New Utrecht Ave #1008, Brooklyn, NY 11219, United States</p>
           </div>
           <div className="space-y-2 text-[13px]">
-            <a href="mailto:info@claimvelo.com" className="flex items-center gap-2 text-[#2563eb] hover:underline">
-              <Mail className="w-3.5 h-3.5" /> info@claimvelo.com
+            <a href="mailto:support@claimvelo.com" className="flex items-center gap-2 text-[#2563eb] hover:underline">
+              <Mail className="w-3.5 h-3.5" /> support@claimvelo.com
+            </a>
+            <a href="tel:+13477688926" className="flex items-center gap-2 text-[#2563eb] hover:underline">
+              <Phone className="w-3.5 h-3.5" /> 347 768 8926
             </a>
             <a href="https://claimvelo.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[#2563eb] hover:underline">
               <Globe className="w-3.5 h-3.5" /> claimvelo.com
