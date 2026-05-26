@@ -46,7 +46,7 @@ export default function PrivacyPolicyPage({ onNav }: Props) {
               <span className="font-extrabold text-[15px] text-[#0f172a]">ClaimVelo Ltd.</span>
             </div>
             <p className="text-[13px] text-[#64748b]">New York State LLC – DOS ID: 7794857</p>
-            <p className="text-[13px] text-[#64748b]">4604 New Utrecht Ave #1008, Brooklyn, NY 11219, United States</p>
+            <p className="text-[13px] text-[#64748b]">1265 55th St, Brooklyn, NY 11219, United States</p>
           </div>
           <div className="space-y-2 text-[13px]">
             <a href="mailto:support@claimvelo.com" className="flex items-center gap-2 text-[#2563eb] hover:underline">

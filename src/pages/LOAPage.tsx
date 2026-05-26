@@ -51,7 +51,7 @@ export default function LOAPage({ onNav }: Props) {
       <div class="brand-name">ClaimVelo</div>
       <div class="brand-sub">Flight Compensation Specialists</div>
     </div>
-    <div class="address">ClaimVelo Ltd.<br />12 Aviation House, London EC1A 1BB<br />support@claimvelo.com<br />${today}</div>
+    <div class="address">ClaimVelo Ltd.<br />1265 55th St, Brooklyn, NY 11219<br />support@claimvelo.com<br />${today}</div>
   </div>
   <h1>Letter of Authority &amp; Assignment of Rights</h1>
   <p>I, <span class="highlight">${fullName}</span>, hereby authorise <strong>ClaimVelo Ltd.</strong> ("the Company") to act as my authorised representative in connection with my flight compensation claim against <span class="highlight">${form.airline || '___________________'}</span> ("the Airline").</p>
