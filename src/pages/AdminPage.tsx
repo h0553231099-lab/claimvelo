@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { Claim, ClaimStatus, AdminView, UserProfile } from '../types';
 import { supabase, sendClaimEmail, insertNotification } from '../lib/supabase';
 import { Page } from '../types';
-import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail } from 'lucide-react';
 
 interface FinanceTransaction {
   id: string;
@@ -115,7 +115,7 @@ function timeAgo(iso: string) {
 }
 
 function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
-  const [tab, setTab] = useState<'inbox' | 'staff'>('inbox');
+  const [tab, setTab] = useState<'inbox' | 'support' | 'staff'>('inbox');
 
   // @claimvelo.com emails
   const [emails, setEmails] = useState<StaffEmail[]>([]);
@@ -204,18 +204,25 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
   }
 
   const q = search.toLowerCase();
-  const filteredEmails = emails.filter(e =>
+  const myAddress = currentUser?.claimvelo_email || '';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
+
+  const personalEmails = emails.filter(e => e.to_address !== 'support@claimvelo.com');
+  const supportEmails = emails.filter(e => e.to_address === 'support@claimvelo.com');
+
+  const activeEmailList = tab === 'support' ? supportEmails : personalEmails;
+  const filteredEmails = activeEmailList.filter(e =>
     !q || [e.subject, e.from_name, e.from_address, e.body_text].join(' ').toLowerCase().includes(q)
   );
   const filteredMsgs = messages.filter(m =>
     !q || [m.subject, m.body, m.from_name].join(' ').toLowerCase().includes(q)
   );
 
-  const emailUnread = emails.filter(e => !e.read_by.includes(currentUser?.id || '')).length;
+  const emailUnread = personalEmails.filter(e => !e.read_by.includes(currentUser?.id || '')).length;
+  const supportUnread = supportEmails.filter(e => !e.read_by.includes(currentUser?.id || '')).length;
   const msgUnread = messages.filter(m => !m.read_by.includes(currentUser?.id || '')).length;
 
-  const myAddress = currentUser?.claimvelo_email || '';
-  const showDetailPane = tab === 'inbox' ? !!selectedEmail : (!!selectedMsg || composing);
+  const showDetailPane = (tab === 'inbox' || tab === 'support') ? !!selectedEmail : (!!selectedMsg || composing);
 
   return (
     <div className="flex h-full bg-white rounded-[10px] border border-[#e2e8f0] overflow-hidden">
@@ -236,13 +243,23 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
         {/* Tabs */}
         <div className="flex border-b border-[#e2e8f0]">
           <button
-            onClick={() => { setTab('inbox'); setSelectedMsg(null); setComposing(false); }}
+            onClick={() => { setTab('inbox'); setSelectedMsg(null); setComposing(false); setSelectedEmail(null); }}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-semibold border-none cursor-pointer transition-colors ${tab === 'inbox' ? 'text-[#2563eb] border-b-2 border-[#2563eb] bg-white' : 'text-[#64748b] bg-[#f8fafc] hover:bg-white'}`}
           >
             <Inbox className="w-3.5 h-3.5" />
-            Inbox
+            My Inbox
             {emailUnread > 0 && <span className="ml-0.5 bg-[#2563eb] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{emailUnread}</span>}
           </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setTab('support'); setSelectedMsg(null); setComposing(false); setSelectedEmail(null); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-semibold border-none cursor-pointer transition-colors ${tab === 'support' ? 'text-[#2563eb] border-b-2 border-[#2563eb] bg-white' : 'text-[#64748b] bg-[#f8fafc] hover:bg-white'}`}
+            >
+              <Mail className="w-3.5 h-3.5" />
+              Support
+              {supportUnread > 0 && <span className="ml-0.5 bg-[#16a34a] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{supportUnread}</span>}
+            </button>
+          )}
           <button
             onClick={() => { setTab('staff'); setSelectedEmail(null); }}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-semibold border-none cursor-pointer transition-colors ${tab === 'staff' ? 'text-[#2563eb] border-b-2 border-[#2563eb] bg-white' : 'text-[#64748b] bg-[#f8fafc] hover:bg-white'}`}
@@ -281,15 +298,17 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto divide-y divide-[#f1f5f9]">
-          {tab === 'inbox' && (
+          {(tab === 'inbox' || tab === 'support') && (
             emailsLoading ? (
               <div className="p-6 text-center text-[#94a3b8] text-[12px]">Loading...</div>
             ) : filteredEmails.length === 0 ? (
               <div className="p-8 text-center">
                 <Inbox className="w-8 h-8 text-[#e2e8f0] mx-auto mb-2" />
                 <div className="text-[12px] text-[#94a3b8]">{search ? 'No emails match your search.' : 'No emails yet.'}</div>
-                {!search && myAddress && (
-                  <div className="mt-2 text-[11px] text-[#64748b]">Emails sent to <span className="font-semibold text-[#2563eb]">{myAddress}</span> will appear here.</div>
+                {!search && (
+                  <div className="mt-2 text-[11px] text-[#64748b]">
+                    Emails sent to <span className="font-semibold text-[#2563eb]">{tab === 'support' ? 'support@claimvelo.com' : myAddress}</span> will appear here.
+                  </div>
                 )}
               </div>
             ) : filteredEmails.map(e => {
@@ -355,7 +374,7 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
       </div>
 
       {/* Detail / Compose pane */}
-      {tab === 'inbox' && selectedEmail && (
+      {(tab === 'inbox' || tab === 'support') && selectedEmail && (
         <div className="flex-1 flex flex-col min-w-0">
           <div className="px-5 py-3.5 border-b border-[#e2e8f0] flex items-start justify-between gap-3">
             <div className="font-bold text-[14px] text-[#0f172a] leading-snug">{selectedEmail.subject || '(no subject)'}</div>
@@ -498,7 +517,7 @@ function LOAPreview({ claim }: { claim: Claim }) {
           <div className="text-[10px] text-[#64748b]">Flight Compensation Specialists</div>
         </div>
         <div className="text-right text-[10px] text-[#64748b]" style={{ fontFamily: 'sans-serif' }}>
-          ClaimVelo Ltd.<br />12 Aviation House, London EC1A 1BB<br />support@claimvelo.com<br />{today}
+          ClaimVelo Ltd.<br />1265 55th St, Brooklyn, NY 11219<br />support@claimvelo.com<br />{today}
         </div>
       </div>
 
