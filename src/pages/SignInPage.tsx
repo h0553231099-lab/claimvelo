@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Page } from '../types';
 import { Plane, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
@@ -28,6 +28,11 @@ export default function SignInPage({ onAuth, onNav }: Props) {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Reset googleLoading if we return to this page without completing OAuth
+  useEffect(() => {
+    setGoogleLoading(false);
+  }, []);
 
   async function handleGoogleSignIn() {
     setGoogleLoading(true);

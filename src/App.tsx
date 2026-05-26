@@ -113,7 +113,14 @@ export default function App() {
         } else if (event === 'SIGNED_IN' && session.user) {
           const u = session.user;
           const profile = await loadProfile(u.id, u.email || '', u.user_metadata?.full_name || u.user_metadata?.name || '');
-          if (profile) setUser(profile);
+          if (profile) {
+            setUser(profile);
+            // Navigate after Google OAuth redirect (token in URL hash)
+            if (window.location.hash.includes('access_token') || window.location.search.includes('signin=google')) {
+              window.history.replaceState({}, '', window.location.pathname);
+              handleAuth(profile);
+            }
+          }
         }
       })();
     });
