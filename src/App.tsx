@@ -73,21 +73,47 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    async function loadProfile(userId: string, email: string, fullName: string): Promise<UserProfile | null> {
+      let { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      if (!profile) {
+        const { data: newProfile } = await supabase
+          .from('profiles')
+          .insert({ id: userId, role: 'customer', full_name: fullName || email.split('@')[0], email })
+          .select()
+          .single();
+        profile = newProfile;
+      }
+      return profile as UserProfile | null;
+    }
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-        if (profile) setUser(profile as UserProfile);
+        const u = session.user;
+        const profile = await loadProfile(u.id, u.email || '', u.user_metadata?.full_name || u.user_metadata?.name || '');
+        if (profile) {
+          setUser(profile);
+          if (window.location.search.includes('signin=google')) {
+            window.history.replaceState({}, '', window.location.pathname);
+            handleAuth(profile);
+          }
+        }
       }
       setLoadingAuth(false);
     });
 
     supabase.auth.onAuthStateChange((event, session) => {
       (async () => {
-        if (event === 'SIGNED_OUT' || !session) setUser(null);
+        if (event === 'SIGNED_OUT' || !session) {
+          setUser(null);
+        } else if (event === 'SIGNED_IN' && session.user) {
+          const u = session.user;
+          const profile = await loadProfile(u.id, u.email || '', u.user_metadata?.full_name || u.user_metadata?.name || '');
+          if (profile) setUser(profile);
+        }
       })();
     });
   }, []);
