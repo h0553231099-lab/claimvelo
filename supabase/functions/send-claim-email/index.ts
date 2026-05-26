@@ -61,7 +61,7 @@ function buildSubmitHtml(p: EmailPayload): string {
     </div>
     <!-- Footer -->
     <div style="padding:20px 32px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center;">
-      ClaimVelo Ltd. · 12 Aviation House, London EC1A 1BB<br>
+      ClaimVelo Ltd. · 1265 55th St, Brooklyn, NY 11219<br>
       support@claimvelo.com · Registered in England &amp; Wales No. 12345678
     </div>
   </div>
@@ -141,7 +141,7 @@ function buildStatusHtml(p: EmailPayload): string {
       </div>` : ""}
     </div>
     <div style="padding:20px 32px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center;">
-      ClaimVelo Ltd. · 12 Aviation House, London EC1A 1BB<br>
+      ClaimVelo Ltd. · 1265 55th St, Brooklyn, NY 11219<br>
       support@claimvelo.com · Registered in England &amp; Wales No. 12345678
     </div>
   </div>
