@@ -88,6 +88,23 @@ export default function ClaimPage({ onNav, prefill }: Props) {
   const [airlineReason, setAirlineReason] = useState<AirlineReason | ''>('');
   const [reasonBlocked, setReasonBlocked] = useState(false);
 
+  // Prior compensation check
+  type PriorCompType = 'Food & Hotel Vouchers' | 'Cash' | 'Flight Voucher';
+  type PriorSigType = 'Yes' | 'No' | 'Unsure';
+  const [priorComp, setPriorComp] = useState<'No' | 'Yes' | ''>('');
+  const [priorCompType, setPriorCompType] = useState<PriorCompType | ''>('');
+  const [priorSigned, setPriorSigned] = useState<PriorSigType | ''>('');
+
+  const priorHardBlocked =
+    priorComp === 'Yes' &&
+    (priorCompType === 'Cash' || priorCompType === 'Flight Voucher') &&
+    priorSigned === 'Yes';
+
+  const priorReviewFlag =
+    priorComp === 'Yes' &&
+    (priorCompType === 'Cash' || priorCompType === 'Flight Voucher') &&
+    (priorSigned === 'No' || priorSigned === 'Unsure');
+
   // ── STEP 4 ────────────────────────────────────────────────────────────────────
   const [uploadedFiles, setUploadedFiles] = useState<Record<DocKey, File | null>>({ booking: null, passport: null, boarding: null });
   const [fileErrors, setFileErrors] = useState<Record<DocKey, string>>({ booking: '', passport: '', boarding: '' });
@@ -428,6 +445,9 @@ export default function ClaimPage({ onNav, prefill }: Props) {
       agent: agentCode || '—',
       loa_signed: hasSig && loaChecked,
       signature_data: sigDataRef.current,
+      prior_comp_type: priorComp === 'Yes' ? priorCompType || null : null,
+      prior_signed: priorComp === 'Yes' ? priorSigned || null : null,
+      review_required: priorReviewFlag,
     });
 
     if (!error) {
@@ -959,6 +979,90 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                     </div>
                   </div>
 
+                  {/* ── Prior compensation check ─────────────────────────── */}
+                  <div className="mb-5">
+                    <div className="font-bold text-[15px] text-[#0f172a] mb-1">Have you received any compensation, vouchers, or signed a document with the airline? <span className="text-[#dc2626]">*</span></div>
+                    <div className="text-[12px] text-[#64748b] mb-3">This helps us assess your legal eligibility.</div>
+                    <div className="flex flex-col gap-2">
+                      {(['No', 'Yes'] as const).map(opt => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => { setPriorComp(opt); setPriorCompType(''); setPriorSigned(''); }}
+                          className={`flex items-center gap-3 px-5 py-3.5 rounded-xl border-2 text-left cursor-pointer transition-all bg-white ${priorComp === opt ? 'border-[#0f2744] bg-[#f0f4ff]' : 'border-[#e2e8f0] hover:border-[#94a3b8]'}`}
+                        >
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${priorComp === opt ? 'border-[#0f2744]' : 'border-[#cbd5e1]'}`}>
+                            {priorComp === opt && <div className="w-2 h-2 rounded-full bg-[#0f2744]" />}
+                          </div>
+                          <span className="text-[14px] font-medium text-[#0f172a]">{opt}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Conditional fields — only visible when Yes */}
+                    {priorComp === 'Yes' && (
+                      <div className="mt-4 border-2 border-[#e2e8f0] rounded-xl p-4 flex flex-col gap-4 bg-[#fafbfc]">
+                        {/* Type dropdown */}
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[12px] font-semibold text-[#374151]">What did you receive? <span className="text-[#dc2626]">*</span></label>
+                          <select
+                            value={priorCompType}
+                            onChange={e => setPriorCompType(e.target.value as PriorCompType)}
+                            className="px-4 py-3 border-2 border-[#e2e8f0] rounded-xl text-[14px] outline-none focus:border-[#0f2744] bg-white transition-colors appearance-none cursor-pointer"
+                          >
+                            <option value="">Select type...</option>
+                            <option value="Food & Hotel Vouchers">Food &amp; Hotel Vouchers</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Flight Voucher">Flight Voucher</option>
+                          </select>
+                        </div>
+
+                        {/* Signature radio */}
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[12px] font-semibold text-[#374151]">Did you sign a waiver or release form? <span className="text-[#dc2626]">*</span></label>
+                          <div className="flex flex-col gap-2">
+                            {(['Yes', 'No', 'Unsure'] as const).map(opt => (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => setPriorSigned(opt)}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left cursor-pointer transition-all bg-white ${priorSigned === opt ? 'border-[#0f2744] bg-[#f0f4ff]' : 'border-[#e2e8f0] hover:border-[#94a3b8]'}`}
+                              >
+                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${priorSigned === opt ? 'border-[#0f2744]' : 'border-[#cbd5e1]'}`}>
+                                  {priorSigned === opt && <div className="w-2 h-2 rounded-full bg-[#0f2744]" />}
+                                </div>
+                                <span className="text-[14px] font-medium text-[#0f172a]">{opt}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Review flag info */}
+                        {priorReviewFlag && (
+                          <div className="flex items-start gap-3 p-3.5 bg-[#fffbeb] border-2 border-[#fcd34d] rounded-xl">
+                            <AlertTriangle className="w-4 h-4 text-[#d97706] shrink-0 mt-0.5" />
+                            <div className="text-[12px] text-[#92400e] leading-snug">
+                              <strong>Your case will be reviewed.</strong> You may still be eligible — our team will assess whether the prior payment affects your entitlement under EU/UK law.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Prior compensation hard block */}
+                  {priorHardBlocked && (
+                    <div className="flex items-start gap-3 p-4 bg-[#fff1f2] border-2 border-[#fecdd3] rounded-xl mb-5">
+                      <div className="w-9 h-9 rounded-full bg-[#dc2626] flex items-center justify-center shrink-0">
+                        <Ban className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-[14px] text-[#991b1b] mb-1">Claim Cannot Be Processed</div>
+                        <div className="text-[13px] text-[#991b1b]">Since you have already accepted financial compensation and signed a waiver directly with the airline, this case is legally settled. Unfortunately, we cannot process this claim.</div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Extraordinary circumstances hard block */}
                   {reasonBlocked && (
                     <div className="flex items-start gap-3 p-4 bg-[#fff1f2] border-2 border-[#fecdd3] rounded-xl mb-5">
@@ -978,7 +1082,15 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                     </button>
                     <button
                       onClick={goNext}
-                      disabled={!airlineReason || reasonBlocked || !/^[A-Z]{3}$/.test(selectedFlight.depCode) || !/^[A-Z]{3}$/.test(selectedFlight.arrCode)}
+                      disabled={
+                        !airlineReason ||
+                        reasonBlocked ||
+                        priorHardBlocked ||
+                        priorComp === '' ||
+                        (priorComp === 'Yes' && (!priorCompType || !priorSigned)) ||
+                        !/^[A-Z]{3}$/.test(selectedFlight.depCode) ||
+                        !/^[A-Z]{3}$/.test(selectedFlight.arrCode)
+                      }
                       className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#0f2744] hover:bg-[#1a3a5c] text-white rounded-xl text-[14px] font-semibold border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       Continue <ArrowRight className="w-4 h-4" />
