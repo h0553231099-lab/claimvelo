@@ -1,13 +1,24 @@
 User-agent: *
 Allow: /
 
-# Private routes — not indexed
+# Private / internal routes — not indexed
 Disallow: /admin
 Disallow: /dashboard
 Disallow: /loa
+Disallow: /agent
+Disallow: /agent-signin
+Disallow: /sales
+Disallow: /sales-signin
+Disallow: /seo-signin
+
 # Block language-prefixed private routes
 Disallow: /*/admin
 Disallow: /*/dashboard
 Disallow: /*/loa
+Disallow: /*/agent
+Disallow: /*/agent-signin
+Disallow: /*/sales
+Disallow: /*/sales-signin
+Disallow: /*/seo-signin
 
 Sitemap: https://claimvelo.com/sitemap.xml

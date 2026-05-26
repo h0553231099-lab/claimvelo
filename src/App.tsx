@@ -27,6 +27,7 @@ const AgentDashboardPage = lazy(() => import('./pages/AgentDashboardPage'));
 const SalesManagerPage = lazy(() => import('./pages/SalesManagerPage'));
 const AgentSignInPage = lazy(() => import('./pages/AgentSignInPage'));
 const SalesSignInPage = lazy(() => import('./pages/SalesSignInPage'));
+const SeoSignInPage = lazy(() => import('./pages/SeoSignInPage'));
 
 const emptyForm = (): ClaimFormData => ({
   firstName: '', lastName: '', email: '', phone: '', address: '', country: 'United Kingdom', countryOther: '', dob: '',
@@ -128,6 +129,8 @@ export default function App() {
       nav('agent-dashboard');
     } else if (profile.role === 'sales_manager') {
       nav('sales-dashboard');
+    } else if (profile.role === 'seo_worker') {
+      nav('admin');
     } else {
       nav('dashboard');
     }
@@ -187,7 +190,7 @@ export default function App() {
           {page === 'home' && <HomePage onNav={nav} onCheckCompensation={() => setCheckerOpen(true)} />}
           {page === 'claim' && <ClaimPage onNav={nav} prefill={claimPrefill} />}
           {page === 'dashboard' && <DashboardPage onNav={nav} user={user} />}
-          {page === 'admin' && user && (user.role === 'admin' || user.role === 'worker') && <AdminPage onNav={nav} user={user} onSignOut={handleSignOut} />}
+          {page === 'admin' && user && (user.role === 'admin' || user.role === 'worker' || user.role === 'seo_worker') && <AdminPage onNav={nav} user={user} onSignOut={handleSignOut} />}
           {page === 'loa' && <LOAPage onNav={nav} form={form} sigData={sigData} />}
           {page === 'about' && <AboutPage onNav={nav} />}
           {page === 'how-it-works' && <HowItWorksPage onNav={nav} />}
@@ -195,6 +198,7 @@ export default function App() {
           {page === 'signin' && <SignInPage onAuth={handleAuth} onNav={nav} />}
           {page === 'agent-signin' && <AgentSignInPage onAuth={handleAuth} onNav={nav} />}
           {page === 'sales-signin' && <SalesSignInPage onAuth={handleAuth} onNav={nav} />}
+          {page === 'seo-signin' && <SeoSignInPage onAuth={handleAuth} onNav={nav} />}
           {page === 'privacy' && <PrivacyPolicyPage onNav={nav} />}
           {page === 'agent-dashboard' && <AgentDashboardPage onNav={nav} user={user} onSignOut={handleSignOut} />}
           {page === 'sales-dashboard' && <SalesManagerPage onNav={nav} user={user} onSignOut={handleSignOut} />}

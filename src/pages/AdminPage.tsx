@@ -654,7 +654,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [txError, setTxError] = useState('');
   const [confirmDeleteTx, setConfirmDeleteTx] = useState<string | null>(null);
 
-  const isWorker = user?.role === 'worker';
+  const isWorker = user?.role === 'worker' || user?.role === 'seo_worker';
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   // Notifications state

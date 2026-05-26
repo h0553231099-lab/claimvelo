@@ -27,7 +27,7 @@ export interface Claim {
   updated_at: string;
 }
 
-export type UserRole = 'admin' | 'worker' | 'customer' | 'agent' | 'sales_manager';
+export type UserRole = 'admin' | 'worker' | 'customer' | 'agent' | 'sales_manager' | 'seo_worker';
 
 export interface UserProfile {
   id: string;
@@ -38,7 +38,7 @@ export interface UserProfile {
   agent_code?: string;
 }
 
-export type Page = 'home' | 'claim' | 'dashboard' | 'admin' | 'loa' | 'about' | 'signin' | 'agent-signin' | 'sales-signin' | 'how-it-works' | 'fees' | 'privacy' | 'agent-dashboard' | 'sales-dashboard';
+export type Page = 'home' | 'claim' | 'dashboard' | 'admin' | 'loa' | 'about' | 'signin' | 'agent-signin' | 'sales-signin' | 'seo-signin' | 'how-it-works' | 'fees' | 'privacy' | 'agent-dashboard' | 'sales-dashboard' | 'seo-dashboard';
 export type AdminView = 'dash' | 'claims' | 'crm' | 'inbox' | 'notifs' | 'analytics' | 'automation' | 'users' | 'settings' | 'finance' | 'qr';
 
 export interface ClaimFormData {
