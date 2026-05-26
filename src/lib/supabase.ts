@@ -12,6 +12,7 @@ export const AI_HEADERS = {
 };
 
 export const EMAIL_URL = `${supabaseUrl}/functions/v1/send-claim-email`;
+export const SEND_STAFF_EMAIL_URL = `${supabaseUrl}/functions/v1/send-staff-email`;
 export const FLIGHT_LOOKUP_URL = `${supabaseUrl}/functions/v1/flight-lookup`;
 
 export type FlightLookupResult = {

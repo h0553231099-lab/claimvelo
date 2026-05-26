@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import { Claim, ClaimStatus, AdminView, UserProfile } from '../types';
-import { supabase, sendClaimEmail, insertNotification } from '../lib/supabase';
+import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
 import { Page } from '../types';
-import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail } from 'lucide-react';
+import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil } from 'lucide-react';
 
 interface FinanceTransaction {
   id: string;
@@ -131,6 +131,13 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
   const [draft, setDraft] = useState({ subject: '', body: '' });
   const [sending, setSending] = useState(false);
 
+  // Email compose/reply state
+  const [emailComposing, setEmailComposing] = useState(false);
+  const [emailReplyTo, setEmailReplyTo] = useState<StaffEmail | null>(null);
+  const [emailDraft, setEmailDraft] = useState({ to: '', subject: '', body: '' });
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSendError, setEmailSendError] = useState('');
+
   const [search, setSearch] = useState('');
 
   useEffect(() => { loadEmails(); loadMessages(); }, []);
@@ -203,6 +210,57 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
     if (selectedMsg?.id === id) setSelectedMsg(null);
   }
 
+  function openReplyEmail(email: StaffEmail) {
+    setEmailReplyTo(email);
+    setEmailComposing(true);
+    setSelectedEmail(null);
+    setEmailDraft({
+      to: email.from_address,
+      subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
+      body: `\n\n--- Original message ---\nFrom: ${email.from_name} <${email.from_address}>\n${email.body_text}`,
+    });
+    setEmailSendError('');
+  }
+
+  function openComposeEmail() {
+    setEmailReplyTo(null);
+    setEmailComposing(true);
+    setSelectedEmail(null);
+    setEmailDraft({ to: '', subject: '', body: '' });
+    setEmailSendError('');
+  }
+
+  async function sendExternalEmail() {
+    if (!emailDraft.to.trim() || !emailDraft.subject.trim() || !emailDraft.body.trim()) return;
+    setEmailSending(true);
+    setEmailSendError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(SEND_STAFF_EMAIL_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          to: emailDraft.to.trim(),
+          subject: emailDraft.subject.trim(),
+          body: emailDraft.body.trim(),
+          fromName: currentUser?.full_name || 'ClaimVelo',
+          fromAddress: currentUser?.claimvelo_email || 'support@claimvelo.com',
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || 'Failed to send');
+      setEmailComposing(false);
+      setEmailReplyTo(null);
+      setEmailDraft({ to: '', subject: '', body: '' });
+    } catch (err) {
+      setEmailSendError(String(err));
+    }
+    setEmailSending(false);
+  }
+
   const q = search.toLowerCase();
   const myAddress = currentUser?.claimvelo_email || '';
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
@@ -222,7 +280,7 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
   const supportUnread = supportEmails.filter(e => !e.read_by.includes(currentUser?.id || '')).length;
   const msgUnread = messages.filter(m => !m.read_by.includes(currentUser?.id || '')).length;
 
-  const showDetailPane = (tab === 'inbox' || tab === 'support') ? !!selectedEmail : (!!selectedMsg || composing);
+  const showDetailPane = (tab === 'inbox' || tab === 'support') ? (!!selectedEmail || emailComposing) : (!!selectedMsg || composing);
 
   return (
     <div className="flex h-full bg-white rounded-[10px] border border-[#e2e8f0] overflow-hidden">
@@ -289,10 +347,18 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
               + New
             </button>
           )}
-          {tab === 'inbox' && (
-            <button onClick={loadEmails} className="shrink-0 px-2.5 py-1.5 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg text-[11px] text-[#64748b] font-semibold border-none cursor-pointer hover:bg-[#e2e8f0]">
-              ↻
-            </button>
+          {(tab === 'inbox' || tab === 'support') && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={openComposeEmail}
+                className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 bg-[#2563eb] text-white rounded-lg text-[11px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8]"
+              >
+                <Pencil className="w-3 h-3" /> Compose
+              </button>
+              <button onClick={loadEmails} className="shrink-0 px-2.5 py-1.5 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg text-[11px] text-[#64748b] font-semibold cursor-pointer hover:bg-[#e2e8f0]">
+                ↻
+              </button>
+            </div>
           )}
         </div>
 
@@ -402,10 +468,86 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
           </div>
           <div className="px-5 py-3 border-t border-[#e2e8f0] flex gap-2">
             <button
+              onClick={() => openReplyEmail(selectedEmail)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563eb] text-white rounded-lg text-[11px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8]"
+            >
+              <Reply className="w-3.5 h-3.5" /> Reply
+            </button>
+            <button
               onClick={() => deleteEmail(selectedEmail.id)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f8fafc] border border-[#e2e8f0] text-[#dc2626] rounded-lg text-[11px] font-semibold cursor-pointer hover:bg-[#fee2e2]"
             >
               <Trash2 className="w-3.5 h-3.5" /> Delete
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(tab === 'inbox' || tab === 'support') && emailComposing && (
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="px-5 py-3.5 border-b border-[#e2e8f0] flex items-center justify-between">
+            <span className="font-bold text-[13px] text-[#0f172a]">
+              {emailReplyTo ? `Reply: ${emailReplyTo.subject}` : 'New Email'}
+            </span>
+            <button onClick={() => { setEmailComposing(false); setEmailReplyTo(null); }} className="bg-transparent border-none cursor-pointer text-[#94a3b8] hover:text-[#64748b]">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex-1 p-5 flex flex-col gap-3 overflow-y-auto">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">From</label>
+              <div className="px-3 py-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg text-[12px] text-[#64748b]">
+                {currentUser?.full_name || 'You'} &lt;{currentUser?.claimvelo_email || 'support@claimvelo.com'}&gt;
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">To</label>
+              <input
+                value={emailDraft.to}
+                onChange={e => setEmailDraft(d => ({ ...d, to: e.target.value }))}
+                placeholder="recipient@example.com"
+                type="email"
+                className="px-3 py-2 border border-[#e2e8f0] rounded-lg text-[13px] outline-none focus:border-[#2563eb] bg-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">Subject</label>
+              <input
+                value={emailDraft.subject}
+                onChange={e => setEmailDraft(d => ({ ...d, subject: e.target.value }))}
+                placeholder="Enter subject..."
+                className="px-3 py-2 border border-[#e2e8f0] rounded-lg text-[13px] outline-none focus:border-[#2563eb] bg-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">Message</label>
+              <textarea
+                value={emailDraft.body}
+                onChange={e => setEmailDraft(d => ({ ...d, body: e.target.value }))}
+                placeholder="Write your message..."
+                className="flex-1 px-3 py-2 border border-[#e2e8f0] rounded-lg text-[13px] outline-none focus:border-[#2563eb] resize-none font-sans min-h-[180px] bg-white"
+              />
+            </div>
+            {emailSendError && (
+              <div className="bg-[#fef2f2] border border-[#fecaca] text-[#dc2626] text-[11px] rounded-lg px-3 py-2">
+                {emailSendError}
+              </div>
+            )}
+          </div>
+          <div className="px-5 py-3 border-t border-[#e2e8f0] flex gap-2">
+            <button
+              onClick={sendExternalEmail}
+              disabled={emailSending || !emailDraft.to || !emailDraft.subject || !emailDraft.body}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#2563eb] text-white rounded-lg text-[12px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8] disabled:opacity-60"
+            >
+              <Send className="w-3.5 h-3.5" />
+              {emailSending ? 'Sending...' : 'Send Email'}
+            </button>
+            <button
+              onClick={() => { setEmailComposing(false); setEmailReplyTo(null); }}
+              className="px-4 py-2 bg-[#f8fafc] border border-[#e2e8f0] text-[#374151] rounded-lg text-[12px] font-semibold cursor-pointer hover:bg-[#e2e8f0]"
+            >
+              Discard
             </button>
           </div>
         </div>
