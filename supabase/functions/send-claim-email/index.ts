@@ -167,25 +167,25 @@ Deno.serve(async (req: Request) => {
         ? buildSubmitHtml(payload)
         : buildStatusHtml(payload);
 
-    const brevoKey = Deno.env.get("BREVO_API_KEY");
+    const resendKey = Deno.env.get("RESEND_API_KEY");
 
-    if (brevoKey) {
-      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    if (resendKey) {
+      const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
-          "api-key": brevoKey,
+          "Authorization": `Bearer ${resendKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          sender: { name: "ClaimVelo", email: "support@claimvelo.com" },
-          to: [{ email: payload.to, name: payload.passengerName }],
+          from: "ClaimVelo <support@claimvelo.com>",
+          to: [payload.to],
           subject,
-          htmlContent: html,
+          html,
         }),
       });
       if (!res.ok) {
         const err = await res.text();
-        throw new Error(`Brevo error: ${err}`);
+        throw new Error(`Resend error: ${err}`);
       }
     } else {
       console.log(`[EMAIL] To: ${payload.to} | Subject: ${subject}`);
