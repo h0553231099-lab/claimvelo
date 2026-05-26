@@ -29,20 +29,32 @@ export default function SignInPage({ onAuth, onNav }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // Reset googleLoading if we return to this page without completing OAuth
   useEffect(() => {
     setGoogleLoading(false);
   }, []);
 
+  // Safety: reset Google button after 8s in case redirect never fires
+  useEffect(() => {
+    if (!googleLoading) return;
+    const t = setTimeout(() => setGoogleLoading(false), 8000);
+    return () => clearTimeout(t);
+  }, [googleLoading]);
+
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
     setError('');
-    const { error: oauthErr } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin + '/?signin=google' },
-    });
-    if (oauthErr) {
-      setError(oauthErr.message);
+    try {
+      const { error: oauthErr } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin + '/?signin=google' },
+      });
+      if (oauthErr) {
+        setError(oauthErr.message);
+        setGoogleLoading(false);
+      }
+      // If no error, the browser is redirecting — loading state stays until navigation
+    } catch {
+      setError('Google sign-in is not available. Please use email and password.');
       setGoogleLoading(false);
     }
   }
