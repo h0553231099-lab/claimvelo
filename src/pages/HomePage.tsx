@@ -199,7 +199,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
           <div className="flex gap-3 justify-center flex-wrap">
             <button
               onClick={() => onNav('claim')}
-              className="bg-white text-[#1e3a8a] px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl hover:bg-[#f0f9ff]"
+              className="bg-[#16a34a] hover:bg-[#15803d] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/30"
             >
               Start Now — It's Free
             </button>
@@ -684,7 +684,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
         <p className="text-[15px] opacity-80 mb-8 max-w-[420px] mx-auto">Free check, no commitment. Thousands of passengers already paid.</p>
         <button
           onClick={() => onNav('claim')}
-          className="bg-white text-[#1e3a8a] px-9 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer hover:bg-[#f0f9ff] transition-all hover:-translate-y-0.5 hover:shadow-xl"
+          className="bg-[#16a34a] hover:bg-[#15803d] text-white px-9 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/30"
         >
           Start Now — It's Free
         </button>

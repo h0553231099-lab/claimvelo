@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Page, UserProfile } from '../types';
-import { Plane, LogIn, LogOut, User } from 'lucide-react';
+import { Plane, LogIn, LogOut, User, Menu, X } from 'lucide-react';
 import LanguagePicker from './LanguagePicker';
 import { useLang } from '../lib/language';
 
@@ -12,6 +13,8 @@ interface NavProps {
 
 export default function Nav({ page, onNav, user, onSignOut }: NavProps) {
   const { t } = useLang();
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const roleLabel = user
     ? user.role === 'admin' ? 'Admin' : user.role === 'worker' ? 'Worker' : 'Passenger'
     : null;
@@ -24,93 +27,191 @@ export default function Nav({ page, onNav, user, onSignOut }: NavProps) {
     ? user.role === 'admin' ? '#fffbeb' : user.role === 'worker' ? '#f0fdf4' : '#eff6ff'
     : '#eff6ff';
 
+  const navLinks = [
+    { id: 'home' as Page, label: t('nav.home') },
+    { id: 'about' as Page, label: t('nav.about') },
+    { id: 'how-it-works' as Page, label: t('nav.how') },
+    { id: 'fees' as Page, label: t('nav.fees') },
+    { id: 'claim' as Page, label: t('nav.claim') },
+  ];
+
+  function handleNav(p: Page) {
+    onNav(p);
+    setMenuOpen(false);
+  }
+
   return (
-    <nav className="bg-white border-b border-[#e2e8f0] h-[58px] flex items-center px-5 gap-1.5 sticky top-0 z-[200] overflow-x-auto">
-      <button
-        onClick={() => onNav('home')}
-        className="font-extrabold text-base text-[#2563eb] flex items-center gap-2 cursor-pointer mr-1 shrink-0 border-none bg-transparent"
-      >
-        <div className="w-[30px] h-[30px] bg-[#2563eb] rounded-[7px] text-white flex items-center justify-center">
-          <Plane className="w-4 h-4" />
-        </div>
-        ClaimVelo
-      </button>
-      <div className="w-px h-6 bg-[#e2e8f0] mx-1.5 shrink-0" />
-
-      {[
-        { id: 'home' as Page, label: t('nav.home') },
-        { id: 'about' as Page, label: t('nav.about') },
-        { id: 'how-it-works' as Page, label: t('nav.how') },
-        { id: 'fees' as Page, label: t('nav.fees') },
-        { id: 'claim' as Page, label: t('nav.claim') },
-      ].map(l => (
+    <>
+      <nav className="bg-white border-b border-[#e2e8f0] h-[58px] flex items-center px-4 gap-1.5 sticky top-0 z-[200]">
+        {/* Logo */}
         <button
-          key={l.id}
-          onClick={() => onNav(l.id)}
-          className={`px-[11px] py-[5px] rounded-[7px] text-xs font-medium whitespace-nowrap border-none cursor-pointer transition-colors ${
-            page === l.id
-              ? 'bg-[#eff6ff] text-[#2563eb]'
-              : 'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'
-          }`}
+          onClick={() => handleNav('home')}
+          className="font-extrabold text-base text-[#2563eb] flex items-center gap-2 cursor-pointer mr-1 shrink-0 border-none bg-transparent"
         >
-          {l.label}
-        </button>
-      ))}
-
-      {(!user || user.role === 'customer') && (
-        <button
-          onClick={() => onNav('dashboard')}
-          className={`px-[11px] py-[5px] rounded-[7px] text-xs font-medium whitespace-nowrap border-none cursor-pointer transition-colors ${
-            page === 'dashboard'
-              ? 'bg-[#eff6ff] text-[#2563eb]'
-              : 'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'
-          }`}
-        >
-          {t('nav.myclaims')}
-        </button>
-      )}
-
-      {/* Admin / Worker CRM link */}
-      {user && (user.role === 'admin' || user.role === 'worker') && (
-        <button
-          onClick={() => onNav('admin')}
-          className={`px-[11px] py-[5px] rounded-[7px] text-xs font-medium whitespace-nowrap border-none cursor-pointer transition-colors ${
-            page === 'admin'
-              ? 'bg-[#eff6ff] text-[#2563eb]'
-              : 'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'
-          }`}
-        >
-          {user.role === 'admin' ? 'Admin CRM' : 'Worker Portal'}
-        </button>
-      )}
-
-      <div className="ml-auto flex items-center gap-2 shrink-0">
-        <LanguagePicker />
-        {user ? (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[7px] text-[11px] font-semibold" style={{ background: roleBg, color: roleColor }}>
-              <User className="w-3 h-3" />
-              {user.full_name || user.email}
-              <span className="opacity-60">·</span>
-              {roleLabel}
-            </div>
-            <button
-              onClick={onSignOut}
-              title="Sign out"
-              className="w-7 h-7 flex items-center justify-center rounded-[7px] bg-[#f8fafc] border border-[#e2e8f0] text-[#64748b] hover:text-[#dc2626] hover:bg-[#fef2f2] cursor-pointer transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
+          <div className="w-[30px] h-[30px] bg-[#2563eb] rounded-[7px] text-white flex items-center justify-center">
+            <Plane className="w-4 h-4" />
           </div>
-        ) : (
+          ClaimVelo
+        </button>
+
+        {/* Desktop nav links */}
+        <div className="hidden md:flex items-center gap-0.5">
+          <div className="w-px h-6 bg-[#e2e8f0] mx-1.5 shrink-0" />
+          {navLinks.map(l => (
+            <button
+              key={l.id}
+              onClick={() => handleNav(l.id)}
+              className={`px-[11px] py-[5px] rounded-[7px] text-xs font-medium whitespace-nowrap border-none cursor-pointer transition-colors ${
+                page === l.id
+                  ? 'bg-[#eff6ff] text-[#2563eb]'
+                  : 'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+
+          {(!user || user.role === 'customer') && (
+            <button
+              onClick={() => handleNav('dashboard')}
+              className={`px-[11px] py-[5px] rounded-[7px] text-xs font-medium whitespace-nowrap border-none cursor-pointer transition-colors ${
+                page === 'dashboard'
+                  ? 'bg-[#eff6ff] text-[#2563eb]'
+                  : 'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'
+              }`}
+            >
+              {t('nav.myclaims')}
+            </button>
+          )}
+
+          {user && (user.role === 'admin' || user.role === 'worker') && (
+            <button
+              onClick={() => handleNav('admin')}
+              className={`px-[11px] py-[5px] rounded-[7px] text-xs font-medium whitespace-nowrap border-none cursor-pointer transition-colors ${
+                page === 'admin'
+                  ? 'bg-[#eff6ff] text-[#2563eb]'
+                  : 'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'
+              }`}
+            >
+              {user.role === 'admin' ? 'Admin CRM' : 'Worker Portal'}
+            </button>
+          )}
+        </div>
+
+        {/* Right side */}
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <LanguagePicker />
+
+          {/* Desktop user / sign in */}
+          <div className="hidden md:flex items-center gap-2">
+            {user ? (
+              <>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[7px] text-[11px] font-semibold" style={{ background: roleBg, color: roleColor }}>
+                  <User className="w-3 h-3" />
+                  {user.full_name || user.email}
+                  <span className="opacity-60">·</span>
+                  {roleLabel}
+                </div>
+                <button
+                  onClick={onSignOut}
+                  title="Sign out"
+                  className="w-7 h-7 flex items-center justify-center rounded-[7px] bg-[#f8fafc] border border-[#e2e8f0] text-[#64748b] hover:text-[#dc2626] hover:bg-[#fef2f2] cursor-pointer transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => handleNav('signin')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[7px] text-[11px] font-semibold border-none cursor-pointer transition-colors"
+              >
+                <LogIn className="w-3.5 h-3.5" /> {t('nav.signin')}
+              </button>
+            )}
+          </div>
+
+          {/* Mobile hamburger */}
           <button
-            onClick={() => onNav('signin')}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[7px] text-[11px] font-semibold border-none cursor-pointer transition-colors"
+            onClick={() => setMenuOpen(o => !o)}
+            className="md:hidden w-8 h-8 flex items-center justify-center rounded-[7px] bg-[#f8fafc] border border-[#e2e8f0] text-[#374151] cursor-pointer transition-colors hover:bg-[#eff6ff] hover:text-[#2563eb]"
+            aria-label="Menu"
           >
-            <LogIn className="w-3.5 h-3.5" /> {t('nav.signin')}
+            {menuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           </button>
-        )}
-      </div>
-    </nav>
+        </div>
+      </nav>
+
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div className="md:hidden fixed top-[58px] left-0 right-0 z-[199] bg-white border-b border-[#e2e8f0] shadow-lg">
+          <div className="px-4 py-3 flex flex-col gap-1">
+            {navLinks.map(l => (
+              <button
+                key={l.id}
+                onClick={() => handleNav(l.id)}
+                className={`px-4 py-2.5 rounded-[8px] text-[13px] font-medium text-left border-none cursor-pointer transition-colors ${
+                  page === l.id
+                    ? 'bg-[#eff6ff] text-[#2563eb] font-semibold'
+                    : 'bg-transparent text-[#374151] hover:bg-[#f8fafc]'
+                }`}
+              >
+                {l.label}
+              </button>
+            ))}
+
+            {(!user || user.role === 'customer') && (
+              <button
+                onClick={() => handleNav('dashboard')}
+                className={`px-4 py-2.5 rounded-[8px] text-[13px] font-medium text-left border-none cursor-pointer transition-colors ${
+                  page === 'dashboard'
+                    ? 'bg-[#eff6ff] text-[#2563eb] font-semibold'
+                    : 'bg-transparent text-[#374151] hover:bg-[#f8fafc]'
+                }`}
+              >
+                {t('nav.myclaims')}
+              </button>
+            )}
+
+            {user && (user.role === 'admin' || user.role === 'worker') && (
+              <button
+                onClick={() => handleNav('admin')}
+                className={`px-4 py-2.5 rounded-[8px] text-[13px] font-medium text-left border-none cursor-pointer transition-colors ${
+                  page === 'admin'
+                    ? 'bg-[#eff6ff] text-[#2563eb] font-semibold'
+                    : 'bg-transparent text-[#374151] hover:bg-[#f8fafc]'
+                }`}
+              >
+                {user.role === 'admin' ? 'Admin CRM' : 'Worker Portal'}
+              </button>
+            )}
+
+            <div className="h-px bg-[#e2e8f0] my-1" />
+
+            {user ? (
+              <div className="flex items-center justify-between px-4 py-2.5">
+                <div className="flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: roleColor }}>
+                  <User className="w-3.5 h-3.5" />
+                  {user.full_name || user.email}
+                  <span className="opacity-50">· {roleLabel}</span>
+                </div>
+                <button
+                  onClick={() => { onSignOut?.(); setMenuOpen(false); }}
+                  className="flex items-center gap-1.5 text-[12px] font-semibold text-[#dc2626] bg-transparent border-none cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" /> Sign out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => handleNav('signin')}
+                className="flex items-center justify-center gap-2 mx-1 py-2.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[8px] text-[13px] font-semibold border-none cursor-pointer transition-colors"
+              >
+                <LogIn className="w-4 h-4" /> {t('nav.signin')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
