@@ -24,9 +24,14 @@ Deno.serve(async (req: Request) => {
     // { type: "email.received", data: { to: [{email, name}], from: {email, name}, subject, text, html, ... } }
     const data = payload?.data || payload;
 
-    const toList: Array<{ email: string; name?: string }> = data?.to || [];
-    const fromAddr: string = data?.from?.email || data?.from || "";
-    const fromName: string = data?.from?.name || fromAddr;
+    // Resend sends `to` as a plain string array e.g. ["support@claimvelo.com"]
+    const rawTo: unknown[] = data?.to || [];
+    const toList: Array<{ email: string }> = rawTo.map((t) =>
+      typeof t === "string" ? { email: t } : (t as { email: string })
+    );
+    const rawFrom = data?.from || "";
+    const fromAddr: string = typeof rawFrom === "object" ? (rawFrom as { email: string }).email : rawFrom;
+    const fromName: string = typeof rawFrom === "object" ? ((rawFrom as { name?: string }).name || fromAddr) : fromAddr;
     const subject: string = data?.subject || "(no subject)";
     const bodyText: string = data?.text || data?.body_text || "";
     const bodyHtml: string = data?.html || data?.body_html || "";
