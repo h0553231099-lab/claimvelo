@@ -33,8 +33,8 @@ Deno.serve(async (req: Request) => {
     const fromAddr: string = typeof rawFrom === "object" ? (rawFrom as { email: string }).email : rawFrom;
     const fromName: string = typeof rawFrom === "object" ? ((rawFrom as { name?: string }).name || fromAddr) : fromAddr;
     const subject: string = data?.subject || "(no subject)";
-    const bodyText: string = data?.text || data?.body_text || "";
-    const bodyHtml: string = data?.html || data?.body_html || "";
+    const bodyText: string = data?.text || data?.body_text || data?.plain || data?.content || "";
+    const bodyHtml: string = data?.html || data?.body_html || data?.html_content || "";
 
     if (toList.length === 0) {
       return new Response(JSON.stringify({ error: "No recipients found" }), {

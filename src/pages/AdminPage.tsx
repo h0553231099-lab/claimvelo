@@ -100,6 +100,7 @@ interface StaffEmail {
   body_html: string;
   read_by: string[];
   received_at: string;
+  raw_payload?: { data?: { attachments?: { filename: string; content_type: string }[] } };
 }
 
 function timeAgo(iso: string) {
@@ -463,8 +464,29 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {selectedEmail.body_html ? (
               <div className="text-[13px] text-[#374151] leading-relaxed prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: selectedEmail.body_html }} />
+            ) : selectedEmail.body_text ? (
+              <div className="text-[13px] text-[#374151] whitespace-pre-line leading-relaxed">{selectedEmail.body_text}</div>
             ) : (
-              <div className="text-[13px] text-[#374151] whitespace-pre-line leading-relaxed">{selectedEmail.body_text || '(empty)'}</div>
+              <div className="flex flex-col gap-3">
+                <div className="text-[12px] text-[#94a3b8] italic">No message body available.</div>
+                {(() => {
+                  const attachments = selectedEmail.raw_payload?.data?.attachments;
+                  return attachments && attachments.length > 0 ? (
+                    <div>
+                      <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-1.5">Attachments ({attachments.length})</div>
+                      <div className="flex flex-col gap-1.5">
+                        {attachments.map((a, i) => (
+                          <div key={i} className="flex items-center gap-2 px-3 py-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg">
+                            <Paperclip className="w-3.5 h-3.5 text-[#64748b] shrink-0" />
+                            <span className="text-[12px] text-[#374151] font-medium truncate">{a.filename}</span>
+                            <span className="text-[10px] text-[#94a3b8] shrink-0">{a.content_type}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
             )}
           </div>
           <div className="px-5 py-3 border-t border-[#e2e8f0] flex gap-2">
