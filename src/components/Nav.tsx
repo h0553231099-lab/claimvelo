@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Page, UserProfile } from '../types';
 import { Plane, LogIn, LogOut, User, Menu, X } from 'lucide-react';
-import LanguagePicker from './LanguagePicker';
 import { useLang } from '../lib/language';
 
 interface NavProps {
@@ -100,8 +99,6 @@ export default function Nav({ page, onNav, user, onSignOut }: NavProps) {
 
         {/* Right side */}
         <div className="ml-auto flex items-center gap-2 shrink-0">
-          <LanguagePicker />
-
           {/* Desktop user / sign in */}
           <div className="hidden md:flex items-center gap-2">
             {user ? (
