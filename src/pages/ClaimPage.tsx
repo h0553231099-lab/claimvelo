@@ -1050,15 +1050,13 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                     )}
                   </div>
 
-                  {/* Prior compensation hard block */}
+                  {/* Prior compensation warning (non-blocking) */}
                   {priorHardBlocked && (
-                    <div className="flex items-start gap-3 p-4 bg-[#fff1f2] border-2 border-[#fecdd3] rounded-xl mb-5">
-                      <div className="w-9 h-9 rounded-full bg-[#dc2626] flex items-center justify-center shrink-0">
-                        <Ban className="w-5 h-5 text-white" />
-                      </div>
+                    <div className="flex items-start gap-3 p-4 bg-[#fffbeb] border-2 border-[#fcd34d] rounded-xl mb-5">
+                      <AlertTriangle className="w-5 h-5 text-[#d97706] shrink-0 mt-0.5" />
                       <div>
-                        <div className="font-bold text-[14px] text-[#991b1b] mb-1">Claim Cannot Be Processed</div>
-                        <div className="text-[13px] text-[#991b1b]">Since you have already accepted financial compensation and signed a waiver directly with the airline, this case is legally settled. Unfortunately, we cannot process this claim.</div>
+                        <div className="font-bold text-[14px] text-[#92400e] mb-1">You May Not Be Eligible</div>
+                        <div className="text-[13px] text-[#92400e]">You indicated you received compensation and signed a waiver. You can still submit your claim and our team will review whether you remain eligible under EU/UK law.</div>
                       </div>
                     </div>
                   )}
@@ -1085,7 +1083,6 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                       disabled={
                         !airlineReason ||
                         reasonBlocked ||
-                        priorHardBlocked ||
                         priorComp === '' ||
                         (priorComp === 'Yes' && (!priorCompType || !priorSigned)) ||
                         !/^[A-Z]{3}$/.test(selectedFlight.depCode) ||
