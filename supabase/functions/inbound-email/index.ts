@@ -20,11 +20,12 @@ Deno.serve(async (req: Request) => {
 
     const payload = await req.json();
 
-    // Resend inbound email webhook payload shape:
-    // { type: "email.received", data: { to: [{email, name}], from: {email, name}, subject, text, html, ... } }
+    // Resend webhook: { type: "email.received", data: { email_id, to, from, subject, attachments, ... } }
+    // Body is NOT included in the webhook — must be fetched via GET /emails/receiving/:email_id
     const data = payload?.data || payload;
 
-    // Resend sends `to` as a plain string array e.g. ["support@claimvelo.com"]
+    const emailId: string = data?.email_id || "";
+
     const rawTo: unknown[] = data?.to || [];
     const toList: Array<{ email: string }> = rawTo.map((t) =>
       typeof t === "string" ? { email: t } : (t as { email: string })
@@ -33,14 +34,45 @@ Deno.serve(async (req: Request) => {
     const fromAddr: string = typeof rawFrom === "object" ? (rawFrom as { email: string }).email : rawFrom;
     const fromName: string = typeof rawFrom === "object" ? ((rawFrom as { name?: string }).name || fromAddr) : fromAddr;
     const subject: string = data?.subject || "(no subject)";
-    const bodyText: string = data?.text || data?.body_text || data?.plain || data?.content || "";
-    const bodyHtml: string = data?.html || data?.body_html || data?.html_content || "";
 
     if (toList.length === 0) {
       return new Response(JSON.stringify({ error: "No recipients found" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Fetch full email body from Resend API using the email_id
+    let bodyText = "";
+    let bodyHtml = "";
+    const resendKey = Deno.env.get("RESEND_API_KEY");
+
+    if (emailId && resendKey) {
+      try {
+        const bodyRes = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
+          headers: { Authorization: `Bearer ${resendKey}` },
+        });
+        if (bodyRes.ok) {
+          const bodyData = await bodyRes.json();
+          bodyText = bodyData?.text || "";
+          // html may be a base64 data URI — extract raw HTML if so
+          const rawHtml: string = bodyData?.html || "";
+          if (rawHtml.startsWith("data:")) {
+            const base64 = rawHtml.split(",")[1] || "";
+            try {
+              bodyHtml = atob(base64);
+            } catch {
+              bodyHtml = rawHtml;
+            }
+          } else {
+            bodyHtml = rawHtml;
+          }
+        } else {
+          console.error("Resend body fetch failed:", bodyRes.status, await bodyRes.text());
+        }
+      } catch (e) {
+        console.error("Error fetching email body:", e);
+      }
     }
 
     const results = [];
