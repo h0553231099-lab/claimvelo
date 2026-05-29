@@ -115,7 +115,8 @@ function timeAgo(iso: string) {
 }
 
 function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
-  const [tab, setTab] = useState<'inbox' | 'support' | 'staff'>('inbox');
+  const isAdminUser = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
+  const [tab, setTab] = useState<'inbox' | 'support' | 'staff'>(isAdminUser ? 'support' : 'inbox');
 
   // @claimvelo.com emails
   const [emails, setEmails] = useState<StaffEmail[]>([]);
@@ -263,7 +264,7 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
 
   const q = search.toLowerCase();
   const myAddress = currentUser?.claimvelo_email || '';
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
+  const isAdmin = isAdminUser;
 
   const personalEmails = emails.filter(e => e.to_address !== 'support@claimvelo.com');
   const supportEmails = emails.filter(e => e.to_address === 'support@claimvelo.com');
