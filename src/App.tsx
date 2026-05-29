@@ -2,7 +2,6 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Page, ClaimFormData, UserProfile } from './types';
 import Nav from './components/Nav';
-import ChatWidget from './components/ChatWidget';
 import SEO from './components/SEO';
 import { supabase } from './lib/supabase';
 import CookieBanner from './components/CookieBanner';
@@ -210,7 +209,6 @@ export default function App() {
           {page === 'agent-dashboard' && <AgentDashboardPage onNav={nav} user={user} onSignOut={handleSignOut} />}
           {page === 'sales-dashboard' && <SalesManagerPage onNav={nav} user={user} onSignOut={handleSignOut} />}
         </Suspense>
-        <ChatWidget />
         <CookieBanner />
       </div>
     </LanguageProvider>
