@@ -799,6 +799,13 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const isWorker = user?.role === 'worker' || user?.role === 'seo_worker';
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
+  // Send email to claimant state
+  const [emailPanelOpen, setEmailPanelOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSendResult, setEmailSendResult] = useState<'success' | 'error' | null>(null);
+
   // Notifications state
   const [notifications, setNotifications] = useState<DbNotification[]>([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
@@ -843,6 +850,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
 
   useEffect(() => {
     setNoteText(panel?.notes || '');
+    setEmailPanelOpen(false);
+    setEmailSubject('');
+    setEmailBody('');
+    setEmailSendResult(null);
   }, [panel?.id]);
 
   useEffect(() => {
@@ -854,6 +865,34 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
         setFilesLoading(false);
       });
   }, [panel]);
+
+  async function sendClaimantEmail() {
+    if (!panel || !emailSubject.trim() || !emailBody.trim()) return;
+    setEmailSending(true);
+    setEmailSendResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(SEND_STAFF_EMAIL_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          to: panel.email,
+          subject: emailSubject.trim(),
+          body: emailBody.trim(),
+          fromName: user?.full_name || 'ClaimVelo Team',
+          fromAddress: user?.claimvelo_email || 'support@claimvelo.com',
+        }),
+      });
+      setEmailSendResult(res.ok ? 'success' : 'error');
+      if (res.ok) { setEmailSubject(''); setEmailBody(''); }
+    } catch {
+      setEmailSendResult('error');
+    }
+    setEmailSending(false);
+  }
 
   async function addWorker() {
     if (!workerForm.email.trim() || !workerForm.full_name.trim()) {
@@ -2216,6 +2255,53 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                     <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Internal Note</div>
                     <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Add a note..." rows={3} className="w-full px-3 py-2 border border-[#e2e8f0] rounded-[7px] text-xs resize-none outline-none font-sans focus:border-[#2563eb]" />
                     <button onClick={saveNote} disabled={noteSaving} className="mt-1.5 px-2.5 py-1 bg-[#2563eb] text-white border-none rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#1d4ed8] disabled:opacity-60">{noteSaving ? 'Saving...' : 'Save Note'}</button>
+                  </div>
+
+                  {/* Send Email to Claimant */}
+                  <div className="mt-5 pt-4 border-t border-[#e2e8f0]">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Email Claimant</div>
+                      <button
+                        onClick={() => { setEmailPanelOpen(p => !p); setEmailSendResult(null); }}
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] rounded-[7px] text-[11px] font-semibold cursor-pointer hover:bg-[#dbeafe] transition-colors"
+                      >
+                        <Mail className="w-3.5 h-3.5" /> {emailPanelOpen ? 'Cancel' : 'New Email'}
+                      </button>
+                    </div>
+                    {panel.email && (
+                      <div className="text-[11px] text-[#64748b] mb-2">To: <span className="font-semibold text-[#0f172a]">{panel.email}</span></div>
+                    )}
+                    {emailPanelOpen && (
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          value={emailSubject}
+                          onChange={e => setEmailSubject(e.target.value)}
+                          placeholder="Subject"
+                          className="w-full px-3 py-2 border border-[#e2e8f0] rounded-[7px] text-xs outline-none focus:border-[#2563eb] font-sans"
+                        />
+                        <textarea
+                          value={emailBody}
+                          onChange={e => setEmailBody(e.target.value)}
+                          placeholder="Write your message..."
+                          rows={5}
+                          className="w-full px-3 py-2 border border-[#e2e8f0] rounded-[7px] text-xs resize-none outline-none focus:border-[#2563eb] font-sans"
+                        />
+                        {emailSendResult === 'success' && (
+                          <div className="text-[11px] text-[#16a34a] font-semibold bg-[#f0fdf4] border border-[#bbf7d0] rounded-[7px] px-3 py-2">Email sent successfully.</div>
+                        )}
+                        {emailSendResult === 'error' && (
+                          <div className="text-[11px] text-[#dc2626] font-semibold bg-[#fef2f2] border border-[#fecaca] rounded-[7px] px-3 py-2">Failed to send. Please try again.</div>
+                        )}
+                        <button
+                          onClick={sendClaimantEmail}
+                          disabled={emailSending || !emailSubject.trim() || !emailBody.trim() || !panel.email}
+                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#2563eb] text-white border-none rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Send className="w-3.5 h-3.5" /> {emailSending ? 'Sending...' : 'Send Email'}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {!isWorker && (
