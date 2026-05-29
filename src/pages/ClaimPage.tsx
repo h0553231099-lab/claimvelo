@@ -577,9 +577,9 @@ export default function ClaimPage({ onNav, prefill }: Props) {
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-4 py-8 md:px-10 md:py-10">
+        <div className="flex-1 overflow-y-auto px-3 py-5 sm:px-4 sm:py-8 md:px-10 md:py-10">
           <div className="max-w-[680px] mx-auto bg-white rounded-2xl shadow-sm border border-slate-200">
-            <div className="p-8 md:p-10">
+            <div className="p-4 sm:p-6 md:p-8 lg:p-10">
 
               {/* ── STEP 1: Contact & Journey ─────────────────────────────────── */}
               {step === 1 && (
@@ -653,7 +653,7 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                     </div>
 
                     {/* Route */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <div className="text-[12px] font-semibold text-[#374151] mb-1.5">Flying From</div>
                         <AirportInput value={dep} onChange={setDep} placeholder="City or airport" />
@@ -805,7 +805,7 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                       ) : (
                         <div className="border-2 border-[#dbeafe] bg-[#f0f4ff] rounded-xl p-4 mb-4">
                           <div className="font-semibold text-[14px] text-[#0f172a] mb-3">Enter Flight Details Manually</div>
-                          <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                             <div>
                               <div className="text-[12px] font-semibold text-[#374151] mb-1.5">Flight Number</div>
                               <input value={manualFlight} onChange={e => setManualFlight(e.target.value)} placeholder="e.g. LY315" className="w-full px-3 py-2.5 border-2 border-[#e2e8f0] rounded-lg text-[13px] outline-none focus:border-[#0f2744] bg-white" />
@@ -1274,7 +1274,7 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                   </div>
 
                   {/* Review summary */}
-                  <div className="grid grid-cols-2 gap-2 mb-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
                     {[
                       ['Passenger', fullName.trim() || '—'],
                       ['Email', email || '—'],

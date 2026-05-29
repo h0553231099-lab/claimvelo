@@ -143,7 +143,7 @@ export default function Nav({ page, onNav, user, onSignOut }: NavProps) {
 
       {/* Mobile dropdown menu */}
       {menuOpen && (
-        <div className="md:hidden fixed top-[58px] left-0 right-0 z-[199] bg-white border-b border-[#e2e8f0] shadow-lg">
+        <div className="md:hidden fixed top-[58px] left-0 right-0 z-[199] bg-white border-b border-[#e2e8f0] shadow-lg max-h-[calc(100dvh-58px)] overflow-y-auto">
           <div className="px-4 py-3 flex flex-col gap-1">
             {navLinks.map(l => (
               <button

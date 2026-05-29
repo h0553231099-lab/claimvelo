@@ -132,10 +132,10 @@ export default function DashboardPage({ onNav, user }: Props) {
 
       {/* Claims list + detail */}
       {user && !loading && claims.length > 0 && (
-        <div className="flex gap-4">
+        <div className="flex flex-col md:flex-row gap-4">
 
-          {/* List */}
-          <div className="w-[260px] shrink-0 flex flex-col gap-2">
+          {/* List — hidden on mobile when a claim is selected */}
+          <div className={`md:w-[260px] md:shrink-0 flex flex-col gap-2 ${selected ? 'hidden md:flex' : 'flex'}`}>
             {claims.map(c => (
               <button
                 key={c.id}
@@ -159,7 +159,14 @@ export default function DashboardPage({ onNav, user }: Props) {
 
           {/* Detail */}
           {selected && (
-            <div className="flex-1 bg-white border border-[#e2e8f0] rounded-[14px] p-6 min-w-0">
+            <div className="flex-1 bg-white border border-[#e2e8f0] rounded-[14px] p-4 sm:p-6 min-w-0">
+              {/* Back button on mobile */}
+              <button
+                onClick={() => setSelected(null)}
+                className="md:hidden mb-3 flex items-center gap-1.5 text-[12px] font-semibold text-[#2563eb] bg-transparent border-none cursor-pointer p-0"
+              >
+                ← Back to claims
+              </button>
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <div className="text-[11px] text-[#64748b] mb-0.5">{selected.claim_ref}</div>
@@ -171,7 +178,7 @@ export default function DashboardPage({ onNav, user }: Props) {
                     {selected.flight_date && ` · ${selected.flight_date}`}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0 ml-2">
                   <span className={`inline-flex px-2.5 py-1 rounded-[10px] text-[11px] font-semibold ${STATUS_STYLE[selected.status]}`}>
                     {selected.status}
                   </span>
@@ -179,18 +186,18 @@ export default function DashboardPage({ onNav, user }: Props) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 mb-5 p-3.5 bg-[#f8fafc] rounded-[10px]">
+              <div className="grid grid-cols-3 gap-2 mb-5 p-3 sm:p-3.5 bg-[#f8fafc] rounded-[10px]">
                 <div>
                   <div className="text-[10px] text-[#64748b] mb-0.5">Filed</div>
-                  <div className="text-[12px] font-semibold">{selected.created_at?.split('T')[0]}</div>
+                  <div className="text-[11px] sm:text-[12px] font-semibold">{selected.created_at?.split('T')[0]}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-[#64748b] mb-0.5">Issue</div>
-                  <div className="text-[12px] font-semibold truncate">{selected.issue_type || '—'}</div>
+                  <div className="text-[11px] sm:text-[12px] font-semibold truncate">{selected.issue_type || '—'}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-[#64748b] mb-0.5">LOA</div>
-                  <div className={`text-[12px] font-semibold ${selected.loa_signed ? 'text-[#16a34a]' : 'text-[#d97706]'}`}>
+                  <div className={`text-[11px] sm:text-[12px] font-semibold ${selected.loa_signed ? 'text-[#16a34a]' : 'text-[#d97706]'}`}>
                     {selected.loa_signed ? '✓ Signed' : 'Not signed'}
                   </div>
                 </div>

@@ -58,7 +58,7 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] font-sans">
+    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] font-sans">
       <button
         onClick={() => setOpen(o => !o)}
         className="w-14 h-14 rounded-full flex items-center justify-center text-2xl text-white cursor-pointer transition-transform hover:scale-110 shadow-lg border-none"
@@ -68,7 +68,7 @@ export default function ChatWidget() {
       </button>
 
       {open && (
-        <div className="absolute bottom-16 right-0 w-[340px] bg-white rounded-2xl shadow-2xl overflow-hidden border border-[#e2e8f0]">
+        <div className="absolute bottom-16 right-0 w-[calc(100vw-32px)] sm:w-[340px] max-w-[340px] bg-white rounded-2xl shadow-2xl overflow-hidden border border-[#e2e8f0]">
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3.5 text-white" style={{ background: 'linear-gradient(135deg,#7c3aed,#2563eb)' }}>
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-base">🤖</div>
@@ -80,7 +80,7 @@ export default function ChatWidget() {
           </div>
 
           {/* Messages */}
-          <div ref={msgsRef} className="h-[280px] overflow-y-auto p-3.5 flex flex-col gap-2.5 bg-[#f8fafc]">
+          <div ref={msgsRef} className="h-[240px] sm:h-[280px] overflow-y-auto p-3.5 flex flex-col gap-2.5 bg-[#f8fafc]">
             {messages.map((m, i) => (
               <div key={i} className={`flex gap-2 items-start ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 text-white ${m.role === 'ai' ? 'bg-[#7c3aed]' : 'bg-[#2563eb]'}`}>

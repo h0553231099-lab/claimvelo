@@ -199,19 +199,19 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
           <div className="flex gap-3 justify-center flex-wrap">
             <button
               onClick={() => onNav('claim')}
-              className="bg-[#16a34a] hover:bg-[#15803d] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/30"
+              className="bg-[#16a34a] hover:bg-[#15803d] text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl text-[14px] sm:text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/30"
             >
               Start Now — It's Free
             </button>
             <button
               onClick={() => onNav('how-it-works')}
-              className="bg-transparent text-white border-2 border-white/30 px-6 py-3.5 rounded-xl text-[14px] font-semibold cursor-pointer hover:bg-white/10 transition-colors"
+              className="bg-transparent text-white border-2 border-white/30 px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl text-[13px] sm:text-[14px] font-semibold cursor-pointer hover:bg-white/10 transition-colors"
             >
               Our Process
             </button>
           </div>
           {/* Stats */}
-          <div className="flex justify-center gap-8 mt-14 flex-wrap">
+          <div className="flex justify-center gap-5 sm:gap-8 mt-10 sm:mt-14 flex-wrap">
             {([
               ['350+', 'Airlines Covered'],
               ['30%', 'Standard Fee Only on Win'],
@@ -335,16 +335,16 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               </div>
 
               <div className="rounded-xl overflow-hidden border border-[#e2e8f0]">
-                <div className="grid grid-cols-3 bg-[#f1f5f9] text-[11px] font-black text-[#475569] uppercase tracking-wider">
-                  <div className="px-4 py-2.5">Distance</div>
-                  <div className="px-4 py-2.5">Min. Delay</div>
-                  <div className="px-4 py-2.5">Compensation</div>
+                <div className="grid grid-cols-3 bg-[#f1f5f9] text-[10px] sm:text-[11px] font-black text-[#475569] uppercase tracking-wider">
+                  <div className="px-3 sm:px-4 py-2.5">Distance</div>
+                  <div className="px-3 sm:px-4 py-2.5">Min. Delay</div>
+                  <div className="px-3 sm:px-4 py-2.5">Compensation</div>
                 </div>
                 {comp.rows.map((row, i) => (
                   <div key={i} className={`grid grid-cols-3 border-t border-[#e2e8f0] ${i % 2 === 0 ? 'bg-white' : 'bg-white'}`}>
-                    <div className="px-4 py-3 text-[13px] font-semibold text-[#0f172a]">{row.range}</div>
-                    <div className="px-4 py-3 text-[13px] text-[#64748b]">{row.hours}</div>
-                    <div className="px-4 py-3 text-[14px] font-black text-[#2563eb]">{row.amount}</div>
+                    <div className="px-3 sm:px-4 py-3 text-[11px] sm:text-[13px] font-semibold text-[#0f172a]">{row.range}</div>
+                    <div className="px-3 sm:px-4 py-3 text-[11px] sm:text-[13px] text-[#64748b]">{row.hours}</div>
+                    <div className="px-3 sm:px-4 py-3 text-[12px] sm:text-[14px] font-black text-[#2563eb]">{row.amount}</div>
                   </div>
                 ))}
               </div>
@@ -440,7 +440,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
           </div>
 
           {/* Fee pillars */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               { icon: '€0', label: 'Zero upfront cost', desc: 'You never pay anything out of pocket. We take on all the risk.' },
               { icon: '⚖', label: 'No win, no fee — guaranteed', desc: "If we don't recover compensation for you, you owe us nothing." },
