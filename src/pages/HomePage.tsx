@@ -187,27 +187,27 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
         <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
         <div className="relative max-w-[720px] mx-auto">
           <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-xs font-semibold mb-6 tracking-wider uppercase">
-            ✈ No Win, No Fee · Free Eligibility Check
+            ✈ {t('hero.badge')}
           </div>
           <h1 className="text-[clamp(2rem,5vw,3.4rem)] font-black leading-[1.1] mb-5">
-            Delayed or Canceled Flight?<br />
-            <span style={{ color: '#60a5fa' }}>Get Up to €600!</span>
+            {t('hero.title1')}<br />
+            <span style={{ color: '#60a5fa' }}>{t('hero.title2')}</span>
           </h1>
           <p className="text-[16px] opacity-85 max-w-[480px] mx-auto mb-8 leading-relaxed">
-            We fight the airlines so you don't have to. Submit in minutes — our experts handle everything.
+            {t('hero.subtitle')}
           </p>
           <div className="flex gap-3 justify-center flex-wrap">
             <button
               onClick={() => onNav('claim')}
               className="bg-[#16a34a] hover:bg-[#15803d] text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl text-[14px] sm:text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/30"
             >
-              Start Now — It's Free
+              {t('hero.cta')}
             </button>
             <button
               onClick={() => onNav('how-it-works')}
               className="bg-transparent text-white border-2 border-white/30 px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl text-[13px] sm:text-[14px] font-semibold cursor-pointer hover:bg-white/10 transition-colors"
             >
-              Our Process
+              {t('hero.how')}
             </button>
           </div>
           {/* Stats */}
@@ -363,30 +363,15 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
       {/* HOW IT WORKS */}
       <div className="py-16 px-5 bg-white">
         <div className="max-w-[1020px] mx-auto text-center">
-          <div className="inline-block bg-[#f0fdf4] text-[#059669] text-[11px] font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">Our Process</div>
-          <h2 className="text-[clamp(1.5rem,3vw,2.2rem)] font-black text-[#0f172a] mb-2">How to Get Compensation</h2>
-          <p className="text-[14px] text-[#64748b] mb-10 max-w-[500px] mx-auto">We've streamlined the process into three simple steps. Let us handle the bureaucracy while you plan your next trip.</p>
+          <div className="inline-block bg-[#f0fdf4] text-[#059669] text-[11px] font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">{t('home.process.badge')}</div>
+          <h2 className="text-[clamp(1.5rem,3vw,2.2rem)] font-black text-[#0f172a] mb-2">{t('home.process.title')}</h2>
+          <p className="text-[14px] text-[#64748b] mb-10 max-w-[500px] mx-auto">{t('home.process.sub')}</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                n: '01',
-                title: 'Submit Your Flight Claim',
-                desc: "It only takes minutes to finish! That way you'll find out your preliminary eligibility — and the size of the compensation.",
-                color: '#2563eb',
-              },
-              {
-                n: '02',
-                title: 'We Fight For Your Rights',
-                desc: 'Our experts check your eligibility in depth, contact the airlines, and work with the authorities on your behalf.',
-                color: '#0891b2',
-              },
-              {
-                n: '03',
-                title: 'Receive Your Compensation',
-                desc: "Once we receive the compensation, we will transfer the money to you, minus our fee. You don't pay if we don't win.",
-                color: '#059669',
-              },
-            ].map((s, i) => (
+            {([
+              { n: '01', title: t('home.process.s1.title'), desc: t('home.process.s1.desc'), color: '#2563eb' },
+              { n: '02', title: t('home.process.s2.title'), desc: t('home.process.s2.desc'), color: '#0891b2' },
+              { n: '03', title: t('home.process.s3.title'), desc: t('home.process.s3.desc'), color: '#059669' },
+            ]).map((s, i) => (
               <div key={s.n} className="bg-white border border-[#e2e8f0] rounded-2xl p-7 text-left relative shadow-sm hover:shadow-md transition-shadow">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-[16px] mb-4" style={{ background: s.color }}>
                   {s.n}
@@ -401,7 +386,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
             onClick={() => onNav('claim')}
             className="mt-8 bg-[#2563eb] text-white px-8 py-3.5 rounded-xl text-[14px] font-black border-none cursor-pointer transition-all hover:bg-[#1d4ed8] hover:-translate-y-0.5 hover:shadow-lg"
           >
-            Check Your Flight Now
+            {t('home.process.btn')}
           </button>
         </div>
       </div>
@@ -619,20 +604,20 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {testimonials.slice(0, 3).map(t => (
-                <div key={t.id} className="bg-white border border-[#e2e8f0] rounded-2xl p-6 text-left hover:shadow-md transition-shadow">
+              {testimonials.slice(0, 3).map(rev => (
+                <div key={rev.id} className="bg-white border border-[#e2e8f0] rounded-2xl p-6 text-left hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="text-[#f59e0b] text-sm">{'★'.repeat(t.stars)}</div>
-                    {t.amount && (
-                      <span className="text-[11px] font-black text-[#059669] bg-[#f0fdf4] border border-[#bbf7d0] rounded-full px-2.5 py-0.5">{t.amount} won</span>
+                    <div className="text-[#f59e0b] text-sm">{'★'.repeat(rev.stars)}</div>
+                    {rev.amount && (
+                      <span className="text-[11px] font-black text-[#059669] bg-[#f0fdf4] border border-[#bbf7d0] rounded-full px-2.5 py-0.5">{rev.amount} {t('home.reviews.won')}</span>
                     )}
                   </div>
-                  <p className="text-[13px] text-[#374151] italic leading-relaxed mb-4">"{t.text}"</p>
+                  <p className="text-[13px] text-[#374151] italic leading-relaxed mb-4">"{rev.text}"</p>
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[#eff6ff] text-[#2563eb] font-black text-[11px] flex items-center justify-center shrink-0">{t.initials}</div>
+                    <div className="w-9 h-9 rounded-full bg-[#eff6ff] text-[#2563eb] font-black text-[11px] flex items-center justify-center shrink-0">{rev.initials}</div>
                     <div>
-                      <div className="font-bold text-[13px] text-[#0f172a]">{t.name}</div>
-                      <div className="text-[11px] text-[#64748b]">{t.route}</div>
+                      <div className="font-bold text-[13px] text-[#0f172a]">{rev.name}</div>
+                      <div className="text-[11px] text-[#64748b]">{rev.route}</div>
                     </div>
                   </div>
                 </div>
@@ -646,19 +631,19 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
       <div className="py-16 px-5 bg-white">
         <div className="max-w-[820px] mx-auto">
           <div className="text-center mb-10">
-            <div className="inline-block bg-[#f1f5f9] text-[#475569] text-[11px] font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">FAQ</div>
-            <h2 className="text-[clamp(1.5rem,3vw,2.2rem)] font-black text-[#0f172a]">Frequently Asked Questions</h2>
+            <div className="inline-block bg-[#f1f5f9] text-[#475569] text-[11px] font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">{t('faq.badge')}</div>
+            <h2 className="text-[clamp(1.5rem,3vw,2.2rem)] font-black text-[#0f172a]">{t('faq.title')}</h2>
           </div>
-          {[
-            { q: 'How much can I claim?', a: 'Up to €600 per passenger under EU261, £520 under UK261, or ₪3,530 under Israeli law — depending on your flight distance and disruption type. These amounts are fixed by regulation and unrelated to your ticket price.' },
-            { q: 'How far back can I claim?', a: 'Up to 6 years in England & Wales, 5 years in Scotland and France, 4 years in Israel, and 3 years in most EU countries. The time limit applies from the date of the disrupted flight — so older flights may still be claimable.' },
-            { q: 'What is "No Win, No Fee"?', a: 'It means you never pay anything upfront or out of pocket. Our 30% standard fee (or 50% if legal action is required) is only deducted from the compensation we recover for you. If we don\'t win, you owe us absolutely nothing.' },
-            { q: 'What if the airline says it was extraordinary circumstances?', a: 'Airlines frequently misuse this exemption. Technical faults, crew shortages, and many "weather" claims are not legally extraordinary. We challenge every invalid rejection — and we usually win.' },
-            { q: 'How long does the process take?', a: 'Most airlines settle within 2–8 weeks. If the airline disputes the claim, escalation to authorities or court can take 3–6 months. We handle everything — you just wait for payment.' },
-            { q: 'Do you take cases to court?', a: 'Yes. If an airline refuses to pay, we escalate to the relevant National Enforcement Body or small claims court. If a lawyer is needed, our fee increases to 50% — still no upfront cost, and only payable if we win.' },
-            { q: 'What documents do I need?', a: 'Just your booking confirmation and flight details to start. You can upload your boarding pass and any other supporting documents via your dashboard — we\'ll guide you on exactly what\'s needed for your specific claim.' },
-            { q: 'Can I claim for a flight that was cancelled last year?', a: 'Yes, as long as it falls within the applicable time limit for your route. Check the country-specific windows above — flights from 2022 and 2023 may still be within the window depending on your jurisdiction.' },
-          ].map((f, i) => {
+          {([
+            { q: t('faq.q1'), a: t('faq.a1') },
+            { q: t('faq.q2'), a: t('faq.a2') },
+            { q: t('faq.q3'), a: t('faq.a3') },
+            { q: t('faq.q4'), a: t('faq.a4') },
+            { q: t('faq.q5'), a: t('faq.a5') },
+            { q: t('faq.q6'), a: t('faq.a6') },
+            { q: t('faq.q7'), a: t('faq.a7') },
+            { q: t('faq.q8'), a: t('faq.a8') },
+          ] as { q: string; a: string }[]).map((f, i) => {
             const isOpen = openFaq === String(i);
             return (
               <div key={i} className="border border-[#e2e8f0] rounded-xl mb-2 overflow-hidden bg-white">
@@ -680,30 +665,30 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
 
       {/* CTA BANNER */}
       <div className="py-16 px-5 text-white text-center" style={{ background: 'linear-gradient(135deg,#0f2744,#1d4ed8)' }}>
-        <h2 className="text-[clamp(1.5rem,3vw,2.4rem)] font-black mb-3">Ready to Claim What's Yours?</h2>
-        <p className="text-[15px] opacity-80 mb-8 max-w-[420px] mx-auto">Free check, no commitment. Thousands of passengers already paid.</p>
+        <h2 className="text-[clamp(1.5rem,3vw,2.4rem)] font-black mb-3">{t('cta.title')}</h2>
+        <p className="text-[15px] opacity-80 mb-8 max-w-[420px] mx-auto">{t('cta.sub')}</p>
         <button
           onClick={() => onNav('claim')}
           className="bg-[#16a34a] hover:bg-[#15803d] text-white px-9 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/30"
         >
-          Start Now — It's Free
+          {t('cta.btn')}
         </button>
       </div>
 
       {/* FOOTER */}
       <footer className="bg-[#0f172a] text-[#94a3b8] py-10 px-5 text-center">
         <div className="font-black text-[16px] text-white mb-1">Claim<span className="text-[#60a5fa]">Velo</span></div>
-        <div className="text-[12px] mb-4 opacity-70">Fighting for passenger rights worldwide</div>
+        <div className="text-[12px] mb-4 opacity-70">{t('home.footer.tagline')}</div>
         <div className="flex gap-5 justify-center flex-wrap mb-5">
-          <button onClick={() => onNav('about')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">About</button>
-          <button onClick={() => onNav('privacy')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">Privacy Policy</button>
+          <button onClick={() => onNav('about')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">{t('home.footer.about')}</button>
+          <button onClick={() => onNav('privacy')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">{t('home.footer.privacy')}</button>
           <a href="mailto:support@claimvelo.com" className="text-[#94a3b8] no-underline text-xs hover:text-white transition-colors">support@claimvelo.com</a>
           <a href="tel:+13477688926" className="text-[#94a3b8] no-underline text-xs hover:text-white transition-colors">347 768 8926</a>
-          <button onClick={() => onNav('how-it-works')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">How It Works</button>
-          <button onClick={() => onNav('fees')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">Our Fees</button>
+          <button onClick={() => onNav('how-it-works')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">{t('home.footer.how')}</button>
+          <button onClick={() => onNav('fees')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">{t('home.footer.fees')}</button>
         </div>
         <div className="text-[11px] border-t border-[#1e293b] pt-4 opacity-60">
-          © 2025 ClaimVelo · Passenger Rights Specialists · No Win, No Fee
+          {t('home.footer.copy')}
         </div>
       </footer>
     </div>

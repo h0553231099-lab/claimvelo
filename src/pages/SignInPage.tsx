@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Page } from '../types';
 import { Plane, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { useLang } from '../lib/language';
 
 interface Props {
   onAuth: (profile: UserProfile) => void;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function SignInPage({ onAuth, onNav }: Props) {
+  const { t } = useLang();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -88,7 +90,7 @@ export default function SignInPage({ onAuth, onNav }: Props) {
         <div className="bg-white rounded-2xl border border-[#e2e8f0] shadow-sm overflow-hidden">
           <div className="px-7 pt-6 pb-2 border-b border-[#e2e8f0]">
             <div className="text-[17px] font-bold text-[#0f172a] mb-1">
-              {isRegister ? 'Create an account' : 'Welcome back'}
+              {isRegister ? t('signin.title.new') : t('signin.title.returning')}
             </div>
             <div className="text-[13px] text-[#64748b] mb-4">
               {isRegister ? 'Register as a passenger to track your claims' : 'Sign in to continue'}
@@ -98,7 +100,7 @@ export default function SignInPage({ onAuth, onNav }: Props) {
           <form onSubmit={handleSubmit} className="px-7 py-5 flex flex-col gap-3.5">
             {isRegister && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider">Full Name</label>
+                <label className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider">{t('signin.name')}</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94a3b8]" />
                   <input
@@ -114,7 +116,7 @@ export default function SignInPage({ onAuth, onNav }: Props) {
             )}
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider">Email</label>
+              <label className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider">{t('signin.email')}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94a3b8]" />
                 <input
@@ -129,7 +131,7 @@ export default function SignInPage({ onAuth, onNav }: Props) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider">Password</label>
+              <label className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider">{t('signin.password')}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94a3b8]" />
                 <input
@@ -163,20 +165,20 @@ export default function SignInPage({ onAuth, onNav }: Props) {
               disabled={loading}
               className="w-full py-2.5 rounded-lg font-semibold text-[13px] text-white border-none cursor-pointer transition-opacity disabled:opacity-60 bg-[#2563eb] hover:bg-[#1d4ed8]"
             >
-              {loading ? 'Please wait...' : isRegister ? 'Create Account' : 'Sign In'}
+              {loading ? 'Please wait...' : isRegister ? t('signin.btn.create') : t('signin.btn.signin')}
             </button>
 
             <div className="text-center text-[12px] text-[#64748b]">
               {isRegister ? (
                 <>Already have an account?{' '}
                   <button type="button" onClick={() => { setIsRegister(false); setError(''); }} className="text-[#2563eb] font-semibold hover:underline cursor-pointer bg-transparent border-none">
-                    Sign in
+                    {t('signin.btn.signin')}
                   </button>
                 </>
               ) : (
                 <>New passenger?{' '}
                   <button type="button" onClick={() => { setIsRegister(true); setError(''); }} className="text-[#2563eb] font-semibold hover:underline cursor-pointer bg-transparent border-none">
-                    Create account
+                    {t('signin.btn.create')}
                   </button>
                 </>
               )}
@@ -186,7 +188,7 @@ export default function SignInPage({ onAuth, onNav }: Props) {
 
         <div className="text-center mt-5 text-[11px] text-[#94a3b8]">
           <button onClick={() => onNav('home')} className="hover:text-[#64748b] cursor-pointer bg-transparent border-none transition-colors">
-            ← Back to website
+            {t('signin.back')} ←
           </button>
         </div>
       </div>

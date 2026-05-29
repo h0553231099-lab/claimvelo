@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Page, UserProfile, Claim, ClaimStatus } from '../types';
 import { supabase } from '../lib/supabase';
+import { useLang } from '../lib/language';
 import { Plane, Plus, RefreshCw } from 'lucide-react';
 
 interface Props { onNav: (p: Page) => void; user?: UserProfile | null; }
@@ -56,6 +57,7 @@ function ClaimTimeline({ status }: { status: ClaimStatus }) {
 }
 
 export default function DashboardPage({ onNav, user }: Props) {
+  const { t } = useLang();
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Claim | null>(null);
@@ -83,16 +85,16 @@ export default function DashboardPage({ onNav, user }: Props) {
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div>
-          <div className="text-xl font-extrabold">My Claims</div>
+          <div className="text-xl font-extrabold">{t('dashboard.title')}</div>
           <div className="text-[13px] text-[#64748b]">
-            {user ? `Welcome back, ${name}` : 'Sign in to track your claims'}
+            {user ? `${t('dashboard.welcome')}, ${name}` : t('dashboard.signin_prompt')}
           </div>
         </div>
         <button
           onClick={() => onNav('claim')}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-[#2563eb] text-white rounded-[10px] text-xs font-semibold border-none cursor-pointer hover:bg-[#1d4ed8] transition-colors"
         >
-          <Plus className="w-3.5 h-3.5" /> New Claim
+          <Plus className="w-3.5 h-3.5" /> {t('dashboard.new_claim')}
         </button>
       </div>
 
@@ -102,11 +104,11 @@ export default function DashboardPage({ onNav, user }: Props) {
           <div className="w-12 h-12 bg-[#eff6ff] rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Plane className="w-6 h-6 text-[#2563eb]" />
           </div>
-          <div className="font-bold text-[15px] mb-2">Sign in to see your claims</div>
-          <div className="text-[13px] text-[#64748b] mb-5">Your claim history and status updates are linked to your account.</div>
+          <div className="font-bold text-[15px] mb-2">{t('dashboard.signin_prompt')}</div>
+          <div className="text-[13px] text-[#64748b] mb-5">{t('dashboard.signin_sub')}</div>
           <div className="flex gap-2.5 justify-center">
-            <button onClick={() => onNav('signin')} className="px-4 py-2 bg-[#2563eb] text-white rounded-[10px] text-[13px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8]">Sign In</button>
-            <button onClick={() => onNav('claim')} className="px-4 py-2 bg-[#f8fafc] border border-[#e2e8f0] text-[#0f172a] rounded-[10px] text-[13px] font-semibold cursor-pointer hover:bg-[#e2e8f0]">Submit a Claim</button>
+            <button onClick={() => onNav('signin')} className="px-4 py-2 bg-[#2563eb] text-white rounded-[10px] text-[13px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8]">{t('signin.btn.signin')}</button>
+            <button onClick={() => onNav('claim')} className="px-4 py-2 bg-[#f8fafc] border border-[#e2e8f0] text-[#0f172a] rounded-[10px] text-[13px] font-semibold cursor-pointer hover:bg-[#e2e8f0]">{t('nav.claim')}</button>
           </div>
         </div>
       )}
@@ -124,9 +126,9 @@ export default function DashboardPage({ onNav, user }: Props) {
           <div className="w-12 h-12 bg-[#f0fdf4] rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Plane className="w-6 h-6 text-[#16a34a]" />
           </div>
-          <div className="font-bold text-[15px] mb-2">No claims yet</div>
-          <div className="text-[13px] text-[#64748b] mb-5">Start a claim and we'll handle everything from here.</div>
-          <button onClick={() => onNav('claim')} className="px-4 py-2 bg-[#2563eb] text-white rounded-[10px] text-[13px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8]">Start My First Claim →</button>
+          <div className="font-bold text-[15px] mb-2">{t('dashboard.no_claims')}</div>
+          <div className="text-[13px] text-[#64748b] mb-5">{t('dashboard.no_claims_sub')}</div>
+          <button onClick={() => onNav('claim')} className="px-4 py-2 bg-[#2563eb] text-white rounded-[10px] text-[13px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8]">{t('dashboard.start')}</button>
         </div>
       )}
 
@@ -165,7 +167,7 @@ export default function DashboardPage({ onNav, user }: Props) {
                 onClick={() => setSelected(null)}
                 className="md:hidden mb-3 flex items-center gap-1.5 text-[12px] font-semibold text-[#2563eb] bg-transparent border-none cursor-pointer p-0"
               >
-                ← Back to claims
+                {t('dashboard.back')}
               </button>
               <div className="flex items-start justify-between mb-4">
                 <div>
@@ -188,22 +190,22 @@ export default function DashboardPage({ onNav, user }: Props) {
 
               <div className="grid grid-cols-3 gap-2 mb-5 p-3 sm:p-3.5 bg-[#f8fafc] rounded-[10px]">
                 <div>
-                  <div className="text-[10px] text-[#64748b] mb-0.5">Filed</div>
+                  <div className="text-[10px] text-[#64748b] mb-0.5">{t('dashboard.filed')}</div>
                   <div className="text-[11px] sm:text-[12px] font-semibold">{selected.created_at?.split('T')[0]}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-[#64748b] mb-0.5">Issue</div>
+                  <div className="text-[10px] text-[#64748b] mb-0.5">{t('dashboard.issue')}</div>
                   <div className="text-[11px] sm:text-[12px] font-semibold truncate">{selected.issue_type || '—'}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-[#64748b] mb-0.5">LOA</div>
+                  <div className="text-[10px] text-[#64748b] mb-0.5">{t('dashboard.loa')}</div>
                   <div className={`text-[11px] sm:text-[12px] font-semibold ${selected.loa_signed ? 'text-[#16a34a]' : 'text-[#d97706]'}`}>
-                    {selected.loa_signed ? '✓ Signed' : 'Not signed'}
+                    {selected.loa_signed ? t('dashboard.loa_signed') : t('dashboard.loa_unsigned')}
                   </div>
                 </div>
               </div>
 
-              <div className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider mb-1">Claim Progress</div>
+              <div className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider mb-1">{t('dashboard.progress')}</div>
               <ClaimTimeline status={selected.status} />
             </div>
           )}
