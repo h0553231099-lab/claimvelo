@@ -444,11 +444,19 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
       {/* Detail / Compose pane */}
       {(tab === 'inbox' || tab === 'support') && selectedEmail && (
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="px-5 py-3.5 border-b border-[#e2e8f0] flex items-start justify-between gap-3">
-            <div className="font-bold text-[14px] text-[#0f172a] leading-snug">{selectedEmail.subject || '(no subject)'}</div>
-            <button onClick={() => setSelectedEmail(null)} className="shrink-0 bg-transparent border-none cursor-pointer text-[#94a3b8] hover:text-[#64748b] p-0.5">
-              <X className="w-4 h-4" />
-            </button>
+          <div className="px-5 py-3.5 border-b border-[#e2e8f0] flex items-center justify-between gap-3">
+            <div className="font-bold text-[14px] text-[#0f172a] leading-snug truncate">{selectedEmail.subject || '(no subject)'}</div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={openComposeEmail}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-[#f1f5f9] border border-[#e2e8f0] text-[#374151] rounded-lg text-[11px] font-semibold cursor-pointer hover:bg-[#e2e8f0]"
+              >
+                <Pencil className="w-3 h-3" /> New Email
+              </button>
+              <button onClick={() => setSelectedEmail(null)} className="bg-transparent border-none cursor-pointer text-[#94a3b8] hover:text-[#64748b] p-0.5">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div className="px-5 py-3 border-b border-[#f1f5f9] flex items-start gap-3">
             <div className="w-9 h-9 rounded-full bg-[#dbeafe] flex items-center justify-center text-[13px] font-bold text-[#2563eb] shrink-0">
@@ -492,13 +500,19 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
           <div className="px-5 py-3 border-t border-[#e2e8f0] flex gap-2">
             <button
               onClick={() => openReplyEmail(selectedEmail)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563eb] text-white rounded-lg text-[11px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8]"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#2563eb] text-white rounded-lg text-[12px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8]"
             >
               <Reply className="w-3.5 h-3.5" /> Reply
             </button>
             <button
+              onClick={openComposeEmail}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#f1f5f9] border border-[#e2e8f0] text-[#374151] rounded-lg text-[12px] font-semibold cursor-pointer hover:bg-[#e2e8f0]"
+            >
+              <Pencil className="w-3.5 h-3.5" /> New Email
+            </button>
+            <button
               onClick={() => deleteEmail(selectedEmail.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f8fafc] border border-[#e2e8f0] text-[#dc2626] rounded-lg text-[11px] font-semibold cursor-pointer hover:bg-[#fee2e2]"
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#f8fafc] border border-[#e2e8f0] text-[#dc2626] rounded-lg text-[12px] font-semibold cursor-pointer hover:bg-[#fee2e2] ml-auto"
             >
               <Trash2 className="w-3.5 h-3.5" /> Delete
             </button>
