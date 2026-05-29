@@ -80,9 +80,12 @@ Deno.serve(async (req: Request) => {
     for (const recipient of toList) {
       const toAddress = recipient.email?.toLowerCase() || "";
 
-      // Look up which staff member owns this @claimvelo.com address
+      // Domain inboxes (shared, no owner): info@, support@
+      const isDomainInbox = ["info@claimvelo.com", "support@claimvelo.com"].includes(toAddress);
+
+      // Look up which staff member owns this personal @claimvelo.com address
       let toUserId: string | null = null;
-      if (toAddress.endsWith("@claimvelo.com")) {
+      if (!isDomainInbox && toAddress.endsWith("@claimvelo.com")) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("id")

@@ -267,10 +267,12 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
   const myAddress = currentUser?.claimvelo_email || '';
   const isAdmin = isAdminUser;
 
-  const personalEmails = emails.filter(e => e.to_address !== 'support@claimvelo.com');
+  const DOMAIN_INBOXES = ['support@claimvelo.com', 'info@claimvelo.com'];
+  const personalEmails = emails.filter(e => !DOMAIN_INBOXES.includes(e.to_address));
   const supportEmails = emails.filter(e => e.to_address === 'support@claimvelo.com');
+  const infoEmails = emails.filter(e => e.to_address === 'info@claimvelo.com');
 
-  const activeEmailList = tab === 'support' ? supportEmails : personalEmails;
+  const activeEmailList = tab === 'support' ? supportEmails : tab === 'info' ? infoEmails : personalEmails;
   const filteredEmails = activeEmailList.filter(e =>
     !q || [e.subject, e.from_name, e.from_address, e.body_text].join(' ').toLowerCase().includes(q)
   );
@@ -280,9 +282,10 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
 
   const emailUnread = personalEmails.filter(e => !e.read_by.includes(currentUser?.id || '')).length;
   const supportUnread = supportEmails.filter(e => !e.read_by.includes(currentUser?.id || '')).length;
+  const infoUnread = infoEmails.filter(e => !e.read_by.includes(currentUser?.id || '')).length;
   const msgUnread = messages.filter(m => !m.read_by.includes(currentUser?.id || '')).length;
 
-  const showDetailPane = (tab === 'inbox' || tab === 'support') ? (!!selectedEmail || emailComposing) : (!!selectedMsg || composing);
+  const showDetailPane = (tab === 'inbox' || tab === 'support' || tab === 'info' || tab === 'info') ? (!!selectedEmail || emailComposing) : (!!selectedMsg || composing);
 
   return (
     <div className="flex h-full bg-white rounded-[10px] border border-[#e2e8f0] overflow-hidden">
@@ -309,6 +312,14 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
             <Inbox className="w-3.5 h-3.5" />
             My Inbox
             {emailUnread > 0 && <span className="ml-0.5 bg-[#2563eb] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{emailUnread}</span>}
+          </button>
+          <button
+            onClick={() => { setTab('info'); setSelectedMsg(null); setComposing(false); setSelectedEmail(null); }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-semibold border-none cursor-pointer transition-colors ${tab === 'info' ? 'text-[#2563eb] border-b-2 border-[#2563eb] bg-white' : 'text-[#64748b] bg-[#f8fafc] hover:bg-white'}`}
+          >
+            <Mail className="w-3.5 h-3.5" />
+            Info
+            {infoUnread > 0 && <span className="ml-0.5 bg-[#0891b2] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{infoUnread}</span>}
           </button>
           {isAdmin && (
             <button
@@ -349,7 +360,7 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
               + New
             </button>
           )}
-          {(tab === 'inbox' || tab === 'support') && (
+          {(tab === 'inbox' || tab === 'support' || tab === 'info') && (
             <div className="flex items-center gap-1.5">
               <button
                 onClick={openComposeEmail}
@@ -366,7 +377,7 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto divide-y divide-[#f1f5f9]">
-          {(tab === 'inbox' || tab === 'support') && (
+          {(tab === 'inbox' || tab === 'support' || tab === 'info') && (
             emailsLoading ? (
               <div className="p-6 text-center text-[#94a3b8] text-[12px]">Loading...</div>
             ) : filteredEmails.length === 0 ? (
@@ -442,7 +453,7 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
       </div>
 
       {/* Detail / Compose pane */}
-      {(tab === 'inbox' || tab === 'support') && selectedEmail && (
+      {(tab === 'inbox' || tab === 'support' || tab === 'info') && selectedEmail && (
         <div className="flex-1 flex flex-col min-w-0">
           <div className="px-5 py-3.5 border-b border-[#e2e8f0] flex items-start justify-between gap-3">
             <div className="font-bold text-[14px] text-[#0f172a] leading-snug">{selectedEmail.subject || '(no subject)'}</div>
@@ -506,7 +517,7 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
         </div>
       )}
 
-      {(tab === 'inbox' || tab === 'support') && emailComposing && (
+      {(tab === 'inbox' || tab === 'support' || tab === 'info') && emailComposing && (
         <div className="flex-1 flex flex-col min-w-0">
           <div className="px-5 py-3.5 border-b border-[#e2e8f0] flex items-center justify-between">
             <span className="font-bold text-[13px] text-[#0f172a]">
