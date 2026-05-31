@@ -451,6 +451,37 @@ export default function ClaimPage({ onNav, prefill }: Props) {
     });
 
     if (!error) {
+      // Fetch the claim id so we can attach files
+      const { data: newClaim } = await supabase
+        .from('claims')
+        .select('id')
+        .eq('claim_ref', ref)
+        .maybeSingle();
+
+      // Upload passenger documents to storage + claim_files table
+      if (newClaim?.id) {
+        const filesToUpload: { key: string; file: File; label: string }[] = [];
+        if (uploadedFiles.booking) filesToUpload.push({ key: 'booking', file: uploadedFiles.booking, label: 'Booking Confirmation' });
+        if (uploadedFiles.passport) filesToUpload.push({ key: 'passport', file: uploadedFiles.passport, label: 'Passport / ID' });
+        if (uploadedFiles.boarding) filesToUpload.push({ key: 'boarding', file: uploadedFiles.boarding, label: 'Boarding Pass' });
+
+        for (const { file, label } of filesToUpload) {
+          const storagePath = `claim-files/${newClaim.id}/${Date.now()}-${file.name}`;
+          const { error: storageErr } = await supabase.storage
+            .from('claim-files')
+            .upload(storagePath, file, { upsert: false });
+
+          await supabase.from('claim_files').insert({
+            claim_id: newClaim.id,
+            file_name: file.name,
+            file_size: file.size,
+            file_type: file.type,
+            storage_path: storageErr ? '' : storagePath,
+            note: label,
+          });
+        }
+      }
+
       setClaimRef(ref);
       setSubmitted(true);
       insertNotification({

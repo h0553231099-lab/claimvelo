@@ -33,7 +33,7 @@ interface WorkerProfile {
 interface ClaimFile {
   id: string;
   claim_id: string;
-  uploaded_by: string;
+  uploaded_by: string | null;
   file_name: string;
   file_size: number;
   file_type: string;
