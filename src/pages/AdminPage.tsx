@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { Claim, ClaimStatus, AdminView, UserProfile } from '../types';
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
 import { Page } from '../types';
-import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil } from 'lucide-react';
+import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download } from 'lucide-react';
 
 interface FinanceTransaction {
   id: string;
@@ -1058,6 +1058,14 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     if (storagePath) await supabase.storage.from('claim-files').remove([storagePath]);
     await supabase.from('claim_files').delete().eq('id', fileId);
     setClaimFiles(f => f.filter(x => x.id !== fileId));
+  }
+
+  async function openFile(f: ClaimFile) {
+    if (!f.storage_path) return;
+    const { data } = await supabase.storage
+      .from('claim-files')
+      .createSignedUrl(f.storage_path, 60 * 60);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   }
 
   function formatBytes(bytes: number) {
@@ -2415,10 +2423,26 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                             <FileText className="w-4 h-4 text-[#2563eb]" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-[12px] font-semibold text-[#0f172a] truncate">{f.file_name}</div>
+                            <button
+                              onClick={() => openFile(f)}
+                              disabled={!f.storage_path}
+                              className="text-[12px] font-semibold text-[#2563eb] hover:underline truncate block max-w-full text-left bg-transparent border-none cursor-pointer p-0 disabled:text-[#0f172a] disabled:cursor-default disabled:no-underline"
+                              title={f.storage_path ? 'Open file' : 'No file stored'}
+                            >
+                              {f.file_name}
+                            </button>
                             <div className="text-[10px] text-[#94a3b8]">{formatBytes(f.file_size)} · {f.created_at?.split('T')[0]}</div>
                             {f.note && <div className="text-[10px] text-[#64748b] mt-0.5 italic">"{f.note}"</div>}
                           </div>
+                          {f.storage_path && (
+                            <button
+                              onClick={() => openFile(f)}
+                              className="p-1.5 text-[#94a3b8] hover:text-[#2563eb] bg-transparent border-none cursor-pointer rounded transition-colors shrink-0"
+                              title="Open / download"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <button
                             onClick={() => deleteFile(f.id, f.storage_path)}
                             className="p-1.5 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors shrink-0"
