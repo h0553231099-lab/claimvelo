@@ -176,7 +176,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const siteUrl = Deno.env.get("SITE_URL") || "https://claimvelo.com";
+    const siteUrl = "https://claimvelo.com";
     const loginUrl = `${siteUrl}/agent-signin`;
 
     let qrImageUrl: string | undefined;
