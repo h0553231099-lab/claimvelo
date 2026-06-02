@@ -182,7 +182,8 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
   }
 
   async function deleteEmail(id: string) {
-    await supabase.from('staff_emails').delete().eq('id', id);
+    const { error } = await supabase.from('staff_emails').delete().eq('id', id);
+    if (error) { console.error('deleteEmail failed:', error.message); return; }
     setEmails(prev => prev.filter(e => e.id !== id));
     if (selectedEmail?.id === id) setSelectedEmail(null);
   }
