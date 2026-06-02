@@ -3,6 +3,7 @@ import { Page } from '../types';
 import { useLang } from '../lib/language';
 import { ShieldCheck, Scale, Users, Check, X, Minus, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import ClaimModal from '../components/ClaimModal';
 
 interface Testimonial {
   id: string;
@@ -167,6 +168,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
   const [infoOpen, setInfoOpen] = useState<DisruptionType | null>(null);
   const [region, setRegion] = useState<Region>('eu');
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     supabase
@@ -182,6 +184,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
 
   return (
     <div>
+      <ClaimModal open={modalOpen} onClose={() => setModalOpen(false)} />
       {/* HERO */}
       <div className="relative overflow-hidden text-white text-center py-20 px-5" style={{ background: 'linear-gradient(135deg,#0f2744 0%,#1e3a8a 50%,#1d4ed8)' }}>
         <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
@@ -289,7 +292,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
                   </div>
                   <div className="flex-1 bg-[#fffbeb] border border-[#fde68a] rounded-xl px-4 py-3">
                     <div className="text-[10px] font-black text-[#92400e] uppercase tracking-wider mb-1">Useful tip</div>
-                    <div className="text-[13px] text-[#78350f] leading-relaxed">{info.tip}</div>
+                    <div className="text-[13px] text-[#431407] leading-relaxed">{info.tip}</div>
                   </div>
                 </div>
               </div>
@@ -372,7 +375,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               { n: '02', title: t('home.process.s2.title'), desc: t('home.process.s2.desc'), color: '#0891b2' },
               { n: '03', title: t('home.process.s3.title'), desc: t('home.process.s3.desc'), color: '#059669' },
             ]).map((s, i) => (
-              <div key={s.n} className="bg-white border border-[#e2e8f0] rounded-2xl p-7 text-left relative shadow-sm hover:shadow-md transition-shadow">
+              <div key={s.n} className="bg-white border border-[#e2e8f0] rounded-2xl p-7 text-left relative shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-[16px] mb-4" style={{ background: s.color }}>
                   {s.n}
                 </div>
@@ -493,7 +496,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
             {TIME_LIMITS.map(l => (
-              <div key={l.country} className="bg-white border border-[#e2e8f0] rounded-xl p-4 flex items-center gap-3">
+              <div key={l.country} className="bg-white border border-[#e2e8f0] rounded-xl p-4 flex items-center gap-3 hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5">
                 <span className="text-2xl shrink-0">{l.flag}</span>
                 <div>
                   <div className="text-[13px] font-extrabold text-[#0f172a]">{l.country}</div>
@@ -515,7 +518,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {SERVICES.map(s => (
-              <div key={s.title} className="border border-[#e2e8f0] rounded-2xl p-7 hover:shadow-md transition-all hover:-translate-y-0.5 group">
+              <div key={s.title} className="border border-[#e2e8f0] rounded-2xl p-7 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 group">
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4" style={{ background: s.bg }}>
                   {s.icon}
                 </div>
@@ -564,7 +567,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
             ].map(w => {
               const Icon = w.icon;
               return (
-                <div key={w.title} className="border border-[#e2e8f0] rounded-2xl p-7 text-center bg-white hover:shadow-md transition-shadow">
+                <div key={w.title} className="border border-[#e2e8f0] rounded-2xl p-7 text-center bg-white hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: w.bg }}>
                     <Icon className="w-7 h-7" style={{ color: w.color }} />
                   </div>
@@ -605,7 +608,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {testimonials.slice(0, 3).map(rev => (
-                <div key={rev.id} className="bg-white border border-[#e2e8f0] rounded-2xl p-6 text-left hover:shadow-md transition-shadow">
+                <div key={rev.id} className="bg-white border border-[#e2e8f0] rounded-2xl p-6 text-left hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
                   <div className="flex items-center justify-between mb-3">
                     <div className="text-[#f59e0b] text-sm">{'★'.repeat(rev.stars)}</div>
                     {rev.amount && (
@@ -647,7 +650,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
             {/* Quick stats */}
             <div className="grid grid-cols-3 gap-3 mb-8">
               {[
-                { val: '€0', label: 'No Win, No Fee — zero risk' },
+                { val: '€250', label: 'Minimum cash payout (short-haul)' },
                 { val: '€600', label: 'Maximum cash payout per ticket' },
                 { val: '6 yrs', label: 'Claim back up to 6 years' },
               ].map(s => (
@@ -658,7 +661,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               ))}
             </div>
 
-            <button onClick={() => onNav('claim')} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
               Check My Delay Claim Now →
             </button>
 
@@ -694,7 +697,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
                 </li>
               ))}
             </ul>
-            <div className="bg-[#fffbeb] border border-[#fde68a] rounded-xl p-4 text-[13px] text-[#78350f] leading-relaxed">
+            <div className="bg-[#fffbeb] border border-[#fde68a] rounded-xl p-4 text-[13px] text-[#431407] leading-relaxed">
               <strong>Important:</strong> If the airline refuses to provide vouchers and you pay out of pocket, <strong>keep every itemized receipt</strong>. We will claim these back for you alongside your fixed cash compensation.
             </div>
           </section>
@@ -709,7 +712,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               When a carrier cancels a flight you are legally entitled to <strong>two separate things</strong>: a solution to get you to your destination (or your money back), and an extra cash payout for the severe disruption.
             </p>
 
-            <button onClick={() => onNav('claim')} className="mb-8 inline-block bg-[#dc2626] hover:bg-[#b91c1c] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-red-900/20">
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#dc2626] hover:bg-[#b91c1c] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-red-900/20">
               Claim My Cancelled Flight Cash →
             </button>
 
@@ -749,7 +752,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
                 </div>
               ))}
             </div>
-            <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-xl p-4 text-[13px] text-[#7c2d12] leading-relaxed">
+            <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-xl p-4 text-[13px] text-[#431407] leading-relaxed">
               <strong>Voucher warning:</strong> Airlines push travel vouchers because they often expire unused. Once you accept a voucher you may waive your right to a cash claim. We advise <strong>declining vouchers</strong>.
             </div>
           </section>
@@ -764,7 +767,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               If your first flight suffers a minor delay it can trigger a domino effect — causing you to miss your long-haul connection and leaving you stranded at a foreign transit airport. If the entire journey is on one booking reference, the law treats it as a single disrupted experience.
             </p>
 
-            <button onClick={() => onNav('claim')} className="mb-8 inline-block bg-[#059669] hover:bg-[#047857] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#059669] hover:bg-[#047857] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
               Check My Connection Eligibility →
             </button>
 
@@ -797,7 +800,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               Airlines routinely oversell tickets. When everyone shows up on time and the aircraft runs out of seats, airlines look to "bump" passengers. If you are denied boarding <strong>against your will</strong> despite checking in on time, international laws require <strong>immediate, substantial cash compensation right at the gate</strong>.
             </p>
 
-            <button onClick={() => onNav('claim')} className="mb-8 inline-block bg-[#d97706] hover:bg-[#b45309] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-amber-900/20">
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#d97706] hover:bg-[#b45309] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-amber-900/20">
               Claim Involuntary Bumping Payout →
             </button>
 
@@ -839,7 +842,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               Following Brexit the British Government transitioned EU passenger protections directly into domestic UK law — known as <strong>The Air Passenger Rights Regulations (UK261)</strong>. If you experienced a disruption traveling to or from London Heathrow, Gatwick, Luton, Manchester, or any other UK airport, ClaimVelo can help you claim up to <strong>£520</strong> per ticket.
             </p>
 
-            <button onClick={() => onNav('claim')} className="mb-8 inline-block bg-[#0369a1] hover:bg-[#075985] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-sky-900/20">
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#0369a1] hover:bg-[#075985] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-sky-900/20">
               Check My UK261 Flight Claim →
             </button>
 
