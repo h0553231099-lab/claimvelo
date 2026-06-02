@@ -652,7 +652,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               {[
                 { val: '€250', label: 'Minimum cash payout (short-haul)' },
                 { val: '€600', label: 'Maximum cash payout per ticket' },
-                { val: '6 yrs', label: 'Claim back up to 6 years' },
+                { val: '6 yrs', label: '6-year claim window' },
               ].map(s => (
                 <div key={s.label} className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-4 text-center">
                   <div className="text-[1.6rem] font-black text-[#2563eb] leading-none mb-1">{s.val}</div>
@@ -712,7 +712,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               When a carrier cancels a flight you are legally entitled to <strong>two separate things</strong>: a solution to get you to your destination (or your money back), and an extra cash payout for the severe disruption.
             </p>
 
-            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#dc2626] hover:bg-[#b91c1c] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-red-900/20">
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
               Claim My Cancelled Flight Cash →
             </button>
 
@@ -752,7 +752,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
                 </div>
               ))}
             </div>
-            <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-xl p-4 text-[13px] text-[#431407] leading-relaxed">
+            <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-xl p-4 text-[13px] text-[#431407] leading-[1.75]">
               <strong>Voucher warning:</strong> Airlines push travel vouchers because they often expire unused. Once you accept a voucher you may waive your right to a cash claim. We advise <strong>declining vouchers</strong>.
             </div>
           </section>
@@ -767,7 +767,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               If your first flight suffers a minor delay it can trigger a domino effect — causing you to miss your long-haul connection and leaving you stranded at a foreign transit airport. If the entire journey is on one booking reference, the law treats it as a single disrupted experience.
             </p>
 
-            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#059669] hover:bg-[#047857] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
               Check My Connection Eligibility →
             </button>
 
@@ -794,14 +794,14 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
           <section className="py-14 border-b border-[#f1f5f9]">
             <div className="inline-block bg-[#fef9c3] text-[#92400e] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Overbooking / Bumping</div>
             <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
-              Denied Boarding Compensation:<br className="hidden sm:block" /> What to Do If You're Bumped
+              Denied Boarding Compensation:<br className="hidden sm:block" /> What to Do If You're Denied Boarding
             </h2>
             <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
-              Airlines routinely oversell tickets. When everyone shows up on time and the aircraft runs out of seats, airlines look to "bump" passengers. If you are denied boarding <strong>against your will</strong> despite checking in on time, international laws require <strong>immediate, substantial cash compensation right at the gate</strong>.
+              Airlines routinely oversell tickets. When everyone shows up on time and the aircraft runs out of seats, airlines have the right to "bump" passengers. If you are denied boarding <strong>against your will</strong> despite checking in on time, international laws require <strong>immediate, substantial cash compensation right at the gate</strong>.
             </p>
 
-            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#d97706] hover:bg-[#b45309] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-amber-900/20">
-              Claim Involuntary Bumping Payout →
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+              Claim Involuntary Denied Boarding Payout →
             </button>
 
             <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">Involuntary vs. Voluntary Bumping</h3>
@@ -839,10 +839,10 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
               UK261 Regulation: Passenger<br className="hidden sm:block" /> Compensation for UK Flights
             </h2>
             <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
-              Following Brexit the British Government transitioned EU passenger protections directly into domestic UK law — known as <strong>The Air Passenger Rights Regulations (UK261)</strong>. If you experienced a disruption traveling to or from London Heathrow, Gatwick, Luton, Manchester, or any other UK airport, ClaimVelo can help you claim up to <strong>£520</strong> per ticket.
+              Following Brexit the British Government transitioned EU passenger protections directly into domestic UK law, known as the <strong>Air Passenger Rights Regulations (UK 261)</strong>. If you experienced a disruption traveling to or from London Heathrow, Gatwick, Luton, Manchester, or any other UK airport, ClaimVelo can help you claim up to <strong>£520</strong> per ticket.
             </p>
 
-            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#0369a1] hover:bg-[#075985] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-sky-900/20">
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
               Check My UK261 Flight Claim →
             </button>
 
@@ -863,13 +863,13 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
             <div className="rounded-xl overflow-hidden border border-[#e2e8f0] mb-4">
               <div className="grid grid-cols-3 bg-[#f1f5f9] text-[10px] font-black text-[#475569] uppercase tracking-wider">
                 <div className="px-4 py-2.5">Distance</div>
-                <div className="px-4 py-2.5">Min. Delay</div>
+                <div className="px-4 py-2.5">Delay Duration</div>
                 <div className="px-4 py-2.5">Compensation</div>
               </div>
               {[
-                ['Under 1,500 km', '3+ hrs', '£220'],
-                ['1,500 – 3,500 km', '3+ hrs', '£350'],
-                ['Over 3,500 km', '3+ hrs', '£520'],
+                ['Under 1,500 km', '3+ Hours', '£220'],
+                ['1,500 – 3,500 km', '3+ Hours', '£350'],
+                ['Over 3,500 km', '3+ Hours', '£520'],
               ].map(([dist, delay, comp], i) => (
                 <div key={i} className="grid grid-cols-3 border-t border-[#e2e8f0] bg-white">
                   <div className="px-4 py-3 text-[12px] font-semibold text-[#0f172a]">{dist}</div>
