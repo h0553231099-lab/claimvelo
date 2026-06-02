@@ -627,6 +627,262 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
         </div>
       </div>
 
+      {/* SEO CONTENT — 5 TOPIC SECTIONS */}
+      <div className="bg-white py-4 px-5">
+        <div className="max-w-[820px] mx-auto space-y-0">
+
+          {/* ── FLIGHT DELAY ── */}
+          <section className="py-14 border-b border-[#f1f5f9]">
+            <div className="inline-block bg-[#eff6ff] text-[#2563eb] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">EU261 · UK261 · Israeli Law</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
+              Flight Delay Compensation:<br className="hidden sm:block" /> How to Claim Your Cash
+            </h2>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
+              A flight delay can ruin a long-planned vacation, cause missed business opportunities, and leave you stranded at an airport terminal for hours. However, aviation regulations ensure that airlines pay for your lost time.
+            </p>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-6">
+              Depending on your itinerary and airline, you are legally protected by <strong>EU Regulation 261/2004</strong>, <strong>UK261</strong>, or the <strong>Israeli Aviation Services Law</strong>. These consumer-focused frameworks allow delayed passengers to claim direct cash payouts regardless of the original ticket price.
+            </p>
+
+            {/* Quick stats */}
+            <div className="grid grid-cols-3 gap-3 mb-8">
+              {[
+                { val: '€0', label: 'No Win, No Fee — zero risk' },
+                { val: '€600', label: 'Maximum cash payout per ticket' },
+                { val: '6 yrs', label: 'Claim back up to 6 years' },
+              ].map(s => (
+                <div key={s.label} className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-4 text-center">
+                  <div className="text-[1.6rem] font-black text-[#2563eb] leading-none mb-1">{s.val}</div>
+                  <div className="text-[11px] text-[#64748b] leading-snug">{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => onNav('claim')} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+              Check My Delay Claim Now →
+            </button>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">When Are You Eligible for Flight Delay Compensation?</h3>
+            <p className="text-[13px] text-[#374151] leading-relaxed mb-3">
+              Your entitlement to a cash payout is determined by the <strong>total arrival delay at your final destination</strong>, not the departure delay at the gate.
+            </p>
+            <ul className="space-y-2 mb-6">
+              {[
+                <><strong>Delays of 3+ Hours (EU/UK Flights):</strong> If you land at your final destination 3 hours or more behind schedule on an eligible EU/UK flight, you are entitled to a fixed cash payout ranging from <strong>€250 to €600</strong>.</>,
+                <><strong>Delays of 8+ Hours (Israeli Flights):</strong> Under Israeli law, a delay stretching past 8 hours triggers mandatory compensation ranging from <strong>₪1,390 to ₪3,340</strong> per passenger.</>,
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-[#374151]">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[#dbeafe] text-[#2563eb] flex items-center justify-center shrink-0 text-[9px] font-black">{i + 1}</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">Your Right to Food, Care, and Hotels at the Airport</h3>
+            <p className="text-[13px] text-[#374151] leading-relaxed mb-3">
+              Airlines cannot abandon you during an extended delay. Once your delay crosses the 2-hour mark, the operating carrier must provide the following <strong>Right to Care</strong> amenities free of charge:
+            </p>
+            <ul className="space-y-2 mb-3">
+              {[
+                'Food and Beverage Vouchers — scaled appropriately to the length of your wait time.',
+                'Complimentary Communication — access to two free phone calls, faxes, or internet access.',
+                'Hotel Accommodations — if your flight is delayed overnight, the airline must pay for a hotel room and provide complimentary airport-to-hotel transport.',
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-[#374151]">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[#f0fdf4] text-[#059669] flex items-center justify-center shrink-0 text-[9px] font-black">{i + 1}</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="bg-[#fffbeb] border border-[#fde68a] rounded-xl p-4 text-[13px] text-[#78350f] leading-relaxed">
+              <strong>Important:</strong> If the airline refuses to provide vouchers and you pay out of pocket, <strong>keep every itemized receipt</strong>. We will claim these back for you alongside your fixed cash compensation.
+            </div>
+          </section>
+
+          {/* ── CANCELLATION ── */}
+          <section className="py-14 border-b border-[#f1f5f9]">
+            <div className="inline-block bg-[#fee2e2] text-[#dc2626] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Refund + Cash Payout</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
+              Flight Cancellation Compensation:<br className="hidden sm:block" /> Get Your Cash Refund
+            </h2>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
+              When a carrier cancels a flight you are legally entitled to <strong>two separate things</strong>: a solution to get you to your destination (or your money back), and an extra cash payout for the severe disruption.
+            </p>
+
+            <button onClick={() => onNav('claim')} className="mb-8 inline-block bg-[#dc2626] hover:bg-[#b91c1c] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-red-900/20">
+              Claim My Cancelled Flight Cash →
+            </button>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">The Dual Rights: Refund vs. Rerouting</h3>
+            <p className="text-[13px] text-[#374151] leading-relaxed mb-3">If your flight is cancelled the airline must immediately offer you a clear choice:</p>
+            <ul className="space-y-2 mb-6">
+              {[
+                <><strong>A Full Ticket Refund</strong> — a complete cash reimbursement of the unused ticket cost within 7–21 days.</>,
+                <><strong>Alternative Transport</strong> — rerouting to your final destination on the next available flight, even on a rival airline.</>,
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-[#374151]">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[#fee2e2] text-[#dc2626] flex items-center justify-center shrink-0 text-[9px] font-black">{i + 1}</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">When Does the Cash Payout Trigger?</h3>
+            <p className="text-[13px] text-[#374151] leading-relaxed mb-3">
+              You are entitled to fixed statutory compensation if the airline notified you of the cancellation <strong>less than 14 days before departure</strong>:
+            </p>
+            <div className="rounded-xl overflow-hidden border border-[#e2e8f0] mb-4">
+              <div className="grid grid-cols-3 bg-[#f1f5f9] text-[10px] font-black text-[#475569] uppercase tracking-wider">
+                <div className="px-4 py-2.5">Route type</div>
+                <div className="px-4 py-2.5">Distance</div>
+                <div className="px-4 py-2.5">Compensation</div>
+              </div>
+              {[
+                ['Short-haul', 'Under 1,500 km', '€250 / ₪1,390'],
+                ['Medium-haul', '1,500 – 3,500 km', '€400 / ₪2,220'],
+                ['Long-haul', 'Over 3,500 km', '€600 / ₪3,340'],
+              ].map(([type, dist, comp], i) => (
+                <div key={i} className="grid grid-cols-3 border-t border-[#e2e8f0] bg-white">
+                  <div className="px-4 py-3 text-[12px] font-semibold text-[#0f172a]">{type}</div>
+                  <div className="px-4 py-3 text-[12px] text-[#64748b]">{dist}</div>
+                  <div className="px-4 py-3 text-[13px] font-black text-[#dc2626]">{comp}</div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-xl p-4 text-[13px] text-[#7c2d12] leading-relaxed">
+              <strong>Voucher warning:</strong> Airlines push travel vouchers because they often expire unused. Once you accept a voucher you may waive your right to a cash claim. We advise <strong>declining vouchers</strong>.
+            </div>
+          </section>
+
+          {/* ── MISSED CONNECTION ── */}
+          <section className="py-14 border-b border-[#f1f5f9]">
+            <div className="inline-block bg-[#f0fdf4] text-[#059669] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Single Booking Rule</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
+              Missed Connecting Flight Compensation:<br className="hidden sm:block" /> Your Legal Rights
+            </h2>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
+              If your first flight suffers a minor delay it can trigger a domino effect — causing you to miss your long-haul connection and leaving you stranded at a foreign transit airport. If the entire journey is on one booking reference, the law treats it as a single disrupted experience.
+            </p>
+
+            <button onClick={() => onNav('claim')} className="mb-8 inline-block bg-[#059669] hover:bg-[#047857] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+              Check My Connection Eligibility →
+            </button>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">The Golden Rule: One Booking Reference (PNR)</h3>
+            <div className="grid sm:grid-cols-2 gap-3 mb-6">
+              {[
+                { title: 'Single Ticket ✓', desc: 'The airline is legally responsible for your entire journey. A delay on leg one that causes you to miss leg two means free rebooking plus compensation.', color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
+                { title: 'Self-Transfer ✗', desc: 'Two separate tickets bought on different sites are unprotected. If you miss the second flight you must buy a new ticket yourself.', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+              ].map(c => (
+                <div key={c.title} className="rounded-xl p-4 border" style={{ background: c.bg, borderColor: c.border }}>
+                  <div className="text-[13px] font-extrabold mb-1" style={{ color: c.color }}>{c.title}</div>
+                  <div className="text-[12px] leading-relaxed" style={{ color: c.color === '#059669' ? '#166534' : '#991b1b' }}>{c.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">How Your Payout Is Calculated</h3>
+            <p className="text-[13px] text-[#374151] leading-relaxed mb-3">
+              Compensation is evaluated based on the <strong>final arrival delay at your ultimate destination</strong>. A 20-minute delay on a short hop that causes you to miss a transatlantic connection — resulting in a 5-hour delay overall — entitles you to a payout based on the total long-haul distance (up to <strong>€600 / ₪3,340</strong> per traveler).
+            </p>
+          </section>
+
+          {/* ── DENIED BOARDING ── */}
+          <section className="py-14 border-b border-[#f1f5f9]">
+            <div className="inline-block bg-[#fef9c3] text-[#92400e] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Overbooking / Bumping</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
+              Denied Boarding Compensation:<br className="hidden sm:block" /> What to Do If You're Bumped
+            </h2>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
+              Airlines routinely oversell tickets. When everyone shows up on time and the aircraft runs out of seats, airlines look to "bump" passengers. If you are denied boarding <strong>against your will</strong> despite checking in on time, international laws require <strong>immediate, substantial cash compensation right at the gate</strong>.
+            </p>
+
+            <button onClick={() => onNav('claim')} className="mb-8 inline-block bg-[#d97706] hover:bg-[#b45309] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-amber-900/20">
+              Claim Involuntary Bumping Payout →
+            </button>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">Involuntary vs. Voluntary Bumping</h3>
+            <div className="grid sm:grid-cols-2 gap-3 mb-6">
+              {[
+                { title: 'Voluntary Bumping', desc: 'If you sign the airline\'s waiver form you surrender your right to statutory cash compensation under EU261 or Israeli law.', bad: true },
+                { title: 'Involuntary Bumping ✓', desc: 'If you refuse to step down but the airline denies you access anyway, you keep your full statutory rights — up to €600 / ₪3,340 plus an alternative flight.', bad: false },
+              ].map(c => (
+                <div key={c.title} className={`rounded-xl p-4 border ${c.bad ? 'bg-[#fef2f2] border-[#fecaca]' : 'bg-[#f0fdf4] border-[#bbf7d0]'}`}>
+                  <div className={`text-[13px] font-extrabold mb-1 ${c.bad ? 'text-[#dc2626]' : 'text-[#059669]'}`}>{c.title}</div>
+                  <div className={`text-[12px] leading-relaxed ${c.bad ? 'text-[#991b1b]' : 'text-[#166534]'}`}>{c.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">Immediate Steps to Take at the Gate</h3>
+            <ul className="space-y-2">
+              {[
+                <><strong>Get It in Writing</strong> — ask the gate agent for a written statement that you were denied boarding due to overbooking.</>,
+                <><strong>Keep Your Boarding Pass</strong> — your physical ticket or digital boarding pass is your core proof of check-in compliance.</>,
+                <><strong>Demand Immediate Cash</strong> — under several jurisdictions you can request your compensation directly at the service desk before leaving the airport.</>,
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-[#374151]">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[#fef9c3] text-[#92400e] flex items-center justify-center shrink-0 text-[9px] font-black">{i + 1}</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {/* ── UK261 ── */}
+          <section className="py-14">
+            <div className="inline-block bg-[#e0f2fe] text-[#0369a1] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Post-Brexit UK Law</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
+              UK261 Regulation: Passenger<br className="hidden sm:block" /> Compensation for UK Flights
+            </h2>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
+              Following Brexit the British Government transitioned EU passenger protections directly into domestic UK law — known as <strong>The Air Passenger Rights Regulations (UK261)</strong>. If you experienced a disruption traveling to or from London Heathrow, Gatwick, Luton, Manchester, or any other UK airport, ClaimVelo can help you claim up to <strong>£520</strong> per ticket.
+            </p>
+
+            <button onClick={() => onNav('claim')} className="mb-8 inline-block bg-[#0369a1] hover:bg-[#075985] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-sky-900/20">
+              Check My UK261 Flight Claim →
+            </button>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">Which Flights Fall Under UK261?</h3>
+            <ul className="space-y-2 mb-6">
+              {[
+                'Any flight departing from a UK airport — regardless of the airline\'s nationality.',
+                'Any flight landing at a UK airport operated by a UK-based carrier (e.g. British Airways, EasyJet).',
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-[#374151]">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[#e0f2fe] text-[#0369a1] flex items-center justify-center shrink-0 text-[9px] font-black">{i + 1}</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">UK261 Compensation Rates (in GBP £)</h3>
+            <div className="rounded-xl overflow-hidden border border-[#e2e8f0] mb-4">
+              <div className="grid grid-cols-3 bg-[#f1f5f9] text-[10px] font-black text-[#475569] uppercase tracking-wider">
+                <div className="px-4 py-2.5">Distance</div>
+                <div className="px-4 py-2.5">Min. Delay</div>
+                <div className="px-4 py-2.5">Compensation</div>
+              </div>
+              {[
+                ['Under 1,500 km', '3+ hrs', '£220'],
+                ['1,500 – 3,500 km', '3+ hrs', '£350'],
+                ['Over 3,500 km', '3+ hrs', '£520'],
+              ].map(([dist, delay, comp], i) => (
+                <div key={i} className="grid grid-cols-3 border-t border-[#e2e8f0] bg-white">
+                  <div className="px-4 py-3 text-[12px] font-semibold text-[#0f172a]">{dist}</div>
+                  <div className="px-4 py-3 text-[12px] text-[#64748b]">{delay}</div>
+                  <div className="px-4 py-3 text-[13px] font-black text-[#0369a1]">{comp}</div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-[#f0f9ff] border border-[#bae6fd] rounded-xl p-4 text-[13px] text-[#0c4a6e] leading-relaxed">
+              <strong>Note on EU carriers:</strong> If you fly from Tel Aviv to London on an EU-based carrier like Wizz Air or Lufthansa, your flight is protected by <strong>EU261</strong> instead of UK261. The financial protections are identical but the legal filing path differs — ClaimVelo handles both.
+            </div>
+          </section>
+
+        </div>
+      </div>
+
       {/* FAQ */}
       <div className="py-16 px-5 bg-white">
         <div className="max-w-[820px] mx-auto">
