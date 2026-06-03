@@ -12,9 +12,15 @@ const PUBLIC_PAGE_PATHS: Partial<Record<Page, string>> = {
   'how-it-works': '/how-it-works',
   fees: '/fees',
   about: '/about',
-  signin: '/signin',
   privacy: '/privacy',
 };
+
+// Pages that should never be indexed by search engines
+const NOINDEX_PAGES = new Set<Page>([
+  'signin', 'agent-signin', 'sales-signin', 'seo-signin',
+  'dashboard', 'admin', 'agent-dashboard', 'sales-dashboard', 'seo-dashboard',
+  'loa',
+]);
 
 const BASE_OG_IMAGE = 'https://claimvelo.com/images/og-cover.svg';
 const OG_IMAGE_TYPE = 'image/svg+xml';
@@ -28,6 +34,7 @@ export default function SEO({ page, locale }: Props) {
   const { t } = useTranslation();
 
   const isPublic = page in PUBLIC_PAGE_PATHS;
+  const isNoIndex = NOINDEX_PAGES.has(page);
   const pagePath = PUBLIC_PAGE_PATHS[page] ?? '';
 
   const titleKey = `meta.${page === 'how-it-works' ? 'howitworks' : page}.title`;
@@ -45,6 +52,10 @@ export default function SEO({ page, locale }: Props) {
       <html lang={locale} />
       <title>{title}</title>
       <meta name="description" content={description} />
+      {isNoIndex
+        ? <meta name="robots" content="noindex, nofollow" />
+        : <meta name="robots" content="index, follow" />
+      }
       <link rel="canonical" href={canonicalUrl} />
       <meta http-equiv="content-language" content={locale} />
       <meta name="google-site-verification" content="hID1uCcjhUqtdGh7MA4QCQPrGxsK8zu_UBEseuZqXxQ" />
