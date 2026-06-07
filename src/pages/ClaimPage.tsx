@@ -7,7 +7,7 @@ import { CheckerPrefill } from '../components/CompensationChecker';
 
 interface Props { onNav: (p: Page) => void; prefill?: CheckerPrefill; }
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
 const ALLOWED_MIME = ['image/png', 'image/jpeg', 'application/pdf'];
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -64,7 +64,24 @@ export default function ClaimPage({ onNav, prefill }: Props) {
   const [additionalPassengers, setAdditionalPassengers] = useState<string[]>(['']);
   const [bookingRef, setBookingRef] = useState('');
 
-  // ── STEP 3 ─────────────────────────────────────────────────────────────────
+  // ── STEP 3: Airline response ────────────────────────────────────────────────
+  const [airlineProvidedAnything, setAirlineProvidedAnything] = useState<boolean | null>(null);
+  type AirlineType = 'refund' | 'voucher' | 'meal_voucher' | 'hotel' | 'other';
+  const [airlineTypes, setAirlineTypes] = useState<AirlineType[]>([]);
+  // refund details
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundCurrency, setRefundCurrency] = useState('EUR');
+  const [refundDate, setRefundDate] = useState('');
+  // voucher details
+  const [voucherAmount, setVoucherAmount] = useState('');
+  const [voucherCurrency, setVoucherCurrency] = useState('EUR');
+  const [voucherExpires, setVoucherExpires] = useState('');
+  const [voucherCode, setVoucherCode] = useState('');
+  const [voucherSigned, setVoucherSigned] = useState<'yes' | 'no' | 'not_sure' | ''>('');
+  // care details
+  const [careDescription, setCareDescription] = useState('');
+
+  // ── STEP 4 ─────────────────────────────────────────────────────────────────
   const [uploadedFiles, setUploadedFiles] = useState<Record<DocKey, File | null>>({ boarding: null, passport: null });
   const [fileErrors, setFileErrors] = useState<Record<DocKey, string>>({ boarding: '', passport: '' });
   const [dragOver, setDragOver] = useState<DocKey | null>(null);
@@ -271,6 +288,32 @@ export default function ClaimPage({ onNav, prefill }: Props) {
 
     const additionalNames = additionalPassengers.filter(n => n.trim()).join(', ');
 
+    const airlineDetails: Record<string, unknown> = {};
+    if (airlineProvidedAnything && airlineTypes.length > 0) {
+      if (airlineTypes.includes('refund') && refundAmount) {
+        airlineDetails.refund = { amount: parseFloat(refundAmount) || 0, currency: refundCurrency, date: refundDate || null };
+      }
+      if (airlineTypes.includes('voucher')) {
+        airlineDetails.voucher = {
+          amount: parseFloat(voucherAmount) || 0,
+          currency: voucherCurrency,
+          expires: voucherExpires || null,
+          code: voucherCode.trim() || null,
+          signed_or_accepted_terms: voucherSigned || 'not_sure',
+        };
+      }
+      if (airlineTypes.includes('meal_voucher') || airlineTypes.includes('hotel')) {
+        airlineDetails.care = {
+          description: careDescription.trim() || null,
+          proof_urls: [],
+        };
+      }
+    }
+
+    const reviewRequired =
+      !!airlineProvidedAnything &&
+      (airlineTypes.includes('refund') || (airlineTypes.includes('voucher') && voucherSigned === 'yes'));
+
     const { error } = await supabase.from('claims').insert({
       claim_ref: ref,
       passenger_first_name: firstName,
@@ -291,9 +334,12 @@ export default function ClaimPage({ onNav, prefill }: Props) {
       agent: agentCode || '—',
       loa_signed: hasSig && loaChecked,
       signature_data: sigDataRef.current,
-      prior_comp_type: null,
-      prior_signed: null,
-      review_required: false,
+      prior_comp_type: airlineTypes.length > 0 ? airlineTypes.join(', ') : null,
+      prior_signed: voucherSigned || null,
+      review_required: reviewRequired,
+      airline_provided_anything: !!airlineProvidedAnything,
+      airline_provided_types: airlineTypes,
+      airline_provided_details: airlineDetails,
       passengers_count: passengerCount,
       additional_passengers: additionalNames,
       booking_reference: bookingRef.trim(),
@@ -372,9 +418,10 @@ export default function ClaimPage({ onNav, prefill }: Props) {
 
   // ── SIDEBAR STAGES ──────────────────────────────────────────────────────────
   const stages = [
-    { label: 'Flight Details', sub: 'Route, date & disruption' },
-    { label: 'Your Details', sub: 'Passengers & contact' },
-    { label: 'Sign & Submit', sub: 'Documents & authorization' },
+    { label: 'Flight Details',      sub: 'Route, date & disruption' },
+    { label: 'Your Details',        sub: 'Passengers & contact' },
+    { label: "Airline's Response",  sub: 'What they offered you' },
+    { label: 'Sign & Submit',       sub: 'Documents & authorization' },
   ];
   const progress = Math.round((step / TOTAL_STEPS) * 100);
 
@@ -744,8 +791,259 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                 </div>
               )}
 
-              {/* ── STEP 3: Documents & Sign ───────────────────────────────── */}
+              {/* ── STEP 3: Airline's Response ────────────────────────────── */}
               {step === 3 && (
+                <div>
+                  <h2 className="text-[22px] font-extrabold text-[#0f172a] mb-1">Airline's Response</h2>
+                  <p className="text-[13px] text-[#64748b] mb-6">
+                    Did the airline already give you anything — a refund, voucher, or care? This helps us assess the full value of your claim.
+                  </p>
+
+                  {/* Yes / No */}
+                  <div className="mb-6">
+                    <p className="text-[12px] font-semibold text-[#374151] mb-2">
+                      Did the airline offer or pay you anything? <span className="text-[#dc2626]">*</span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {([
+                        { val: false, label: 'No — nothing offered' },
+                        { val: true,  label: 'Yes — they gave me something' },
+                      ] as { val: boolean; label: string }[]).map(opt => (
+                        <button
+                          key={String(opt.val)}
+                          type="button"
+                          onClick={() => {
+                            setAirlineProvidedAnything(opt.val);
+                            if (!opt.val) setAirlineTypes([]);
+                          }}
+                          className={`px-4 py-3.5 rounded-xl border-2 text-[13px] font-semibold text-left cursor-pointer transition-all ${
+                            airlineProvidedAnything === opt.val
+                              ? 'border-[#1d4ed8] bg-[#eff6ff] text-[#1d4ed8]'
+                              : 'border-[#e2e8f0] bg-white text-[#374151] hover:border-[#93c5fd]'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Type checkboxes */}
+                  {airlineProvidedAnything === true && (
+                    <div className="mb-6">
+                      <p className="text-[12px] font-semibold text-[#374151] mb-2">
+                        What did they provide? <span className="text-[#94a3b8] font-normal">(select all that apply)</span>
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {([
+                          { id: 'refund',       label: 'Cash refund',           sub: 'Money returned to your card or account' },
+                          { id: 'voucher',      label: 'Travel voucher / credit', sub: 'Future credit or voucher for flights' },
+                          { id: 'meal_voucher', label: 'Meal vouchers',          sub: 'Food & drinks at the airport' },
+                          { id: 'hotel',        label: 'Hotel accommodation',   sub: 'Overnight stay arranged by the airline' },
+                          { id: 'other',        label: 'Something else',        sub: 'Any other form of assistance' },
+                        ] as { id: AirlineType; label: string; sub: string }[]).map(opt => {
+                          const checked = (airlineTypes as string[]).includes(opt.id);
+                          return (
+                            <label
+                              key={opt.id}
+                              className={`flex items-start gap-3 px-4 py-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                                checked
+                                  ? 'border-[#1d4ed8] bg-[#eff6ff]'
+                                  : 'border-[#e2e8f0] bg-white hover:border-[#93c5fd]'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={e => {
+                                  setAirlineTypes(prev =>
+                                    e.target.checked
+                                      ? [...prev, opt.id]
+                                      : prev.filter(t => t !== opt.id)
+                                  );
+                                }}
+                                className="mt-0.5 accent-[#1d4ed8] shrink-0 w-4 h-4"
+                              />
+                              <div>
+                                <p className={`text-[13px] font-semibold ${checked ? 'text-[#1d4ed8]' : 'text-[#0f172a]'}`}>{opt.label}</p>
+                                <p className="text-[11px] text-[#64748b] mt-0.5">{opt.sub}</p>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Refund details */}
+                  {airlineProvidedAnything && (airlineTypes as string[]).includes('refund') && (
+                    <div className="mb-5 border-2 border-[#dbeafe] bg-[#f8fbff] rounded-2xl p-5">
+                      <p className="text-[13px] font-bold text-[#1e40af] mb-3">Refund details</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="col-span-1">
+                          <label className="block text-[11px] font-semibold text-[#374151] mb-1.5">Amount</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={refundAmount}
+                            onChange={e => setRefundAmount(e.target.value)}
+                            placeholder="e.g. 120"
+                            className="w-full px-3 py-2.5 border-2 border-[#e2e8f0] focus:border-[#1d4ed8] rounded-xl text-[13px] outline-none transition-colors"
+                          />
+                        </div>
+                        <div className="col-span-1">
+                          <label className="block text-[11px] font-semibold text-[#374151] mb-1.5">Currency</label>
+                          <select
+                            value={refundCurrency}
+                            onChange={e => setRefundCurrency(e.target.value)}
+                            className="w-full px-3 py-2.5 border-2 border-[#e2e8f0] focus:border-[#1d4ed8] rounded-xl text-[13px] outline-none transition-colors bg-white"
+                          >
+                            <option>EUR</option><option>GBP</option><option>USD</option><option>ILS</option><option>Other</option>
+                          </select>
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="block text-[11px] font-semibold text-[#374151] mb-1.5">Date received</label>
+                          <input
+                            type="date"
+                            value={refundDate}
+                            onChange={e => setRefundDate(e.target.value)}
+                            className="w-full px-3 py-2.5 border-2 border-[#e2e8f0] focus:border-[#1d4ed8] rounded-xl text-[13px] outline-none transition-colors bg-white"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3 p-3 bg-[#fffbeb] border border-[#fde68a] rounded-xl text-[12px] text-[#92400e]">
+                        A cash refund may affect your right to additional EU261 compensation. Our team will assess this as part of your claim.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Voucher details */}
+                  {airlineProvidedAnything && (airlineTypes as string[]).includes('voucher') && (
+                    <div className="mb-5 border-2 border-[#dbeafe] bg-[#f8fbff] rounded-2xl p-5">
+                      <p className="text-[13px] font-bold text-[#1e40af] mb-3">Travel voucher details</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-[#374151] mb-1.5">Amount</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={voucherAmount}
+                            onChange={e => setVoucherAmount(e.target.value)}
+                            placeholder="e.g. 200"
+                            className="w-full px-3 py-2.5 border-2 border-[#e2e8f0] focus:border-[#1d4ed8] rounded-xl text-[13px] outline-none transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-[#374151] mb-1.5">Currency</label>
+                          <select
+                            value={voucherCurrency}
+                            onChange={e => setVoucherCurrency(e.target.value)}
+                            className="w-full px-3 py-2.5 border-2 border-[#e2e8f0] focus:border-[#1d4ed8] rounded-xl text-[13px] outline-none bg-white transition-colors"
+                          >
+                            <option>EUR</option><option>GBP</option><option>USD</option><option>ILS</option><option>Other</option>
+                          </select>
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="block text-[11px] font-semibold text-[#374151] mb-1.5">Expiry date</label>
+                          <input
+                            type="date"
+                            value={voucherExpires}
+                            onChange={e => setVoucherExpires(e.target.value)}
+                            className="w-full px-3 py-2.5 border-2 border-[#e2e8f0] focus:border-[#1d4ed8] rounded-xl text-[13px] outline-none bg-white transition-colors"
+                          />
+                        </div>
+                      </div>
+                      <div className="mb-3">
+                        <label className="block text-[11px] font-semibold text-[#374151] mb-1.5">
+                          Voucher code <span className="text-[#94a3b8] font-normal">(optional)</span>
+                        </label>
+                        <input
+                          value={voucherCode}
+                          onChange={e => setVoucherCode(e.target.value.toUpperCase())}
+                          placeholder="e.g. VOUCHERXYZ"
+                          className="w-full px-3 py-2.5 border-2 border-[#e2e8f0] focus:border-[#1d4ed8] rounded-xl text-[13px] outline-none transition-colors font-mono"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold text-[#374151] mb-2">
+                          Did you sign or formally accept the voucher terms? <span className="text-[#dc2626]">*</span>
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {([
+                            { val: 'yes' as const,      label: 'Yes, I signed' },
+                            { val: 'no' as const,       label: 'No, I didn\'t' },
+                            { val: 'not_sure' as const, label: 'Not sure' },
+                          ]).map(opt => (
+                            <button
+                              key={opt.val}
+                              type="button"
+                              onClick={() => setVoucherSigned(opt.val)}
+                              className={`px-3 py-2.5 rounded-xl border-2 text-[12px] font-semibold cursor-pointer transition-all ${
+                                voucherSigned === opt.val
+                                  ? 'border-[#1d4ed8] bg-[#eff6ff] text-[#1d4ed8]'
+                                  : 'border-[#e2e8f0] bg-white text-[#374151] hover:border-[#93c5fd]'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {voucherSigned === 'yes' && (
+                        <div className="mt-3 p-3 bg-[#fef2f2] border border-[#fecaca] rounded-xl text-[12px] text-[#991b1b]">
+                          Accepting and signing a voucher may affect your legal right to cash compensation. Our team will review your case carefully.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Meal vouchers + hotel care description */}
+                  {airlineProvidedAnything && ((airlineTypes as string[]).includes('meal_voucher') || (airlineTypes as string[]).includes('hotel')) && (
+                    <div className="mb-5 border-2 border-[#dbeafe] bg-[#f8fbff] rounded-2xl p-5">
+                      <p className="text-[13px] font-bold text-[#1e40af] mb-3">Airport care details</p>
+                      <label className="block text-[11px] font-semibold text-[#374151] mb-1.5">
+                        Brief description <span className="text-[#94a3b8] font-normal">(optional)</span>
+                      </label>
+                      <textarea
+                        value={careDescription}
+                        onChange={e => setCareDescription(e.target.value)}
+                        rows={2}
+                        placeholder="e.g. 2 meal vouchers (€10 each) + 1 hotel night at Hilton"
+                        className="w-full px-3 py-2.5 border-2 border-[#e2e8f0] focus:border-[#1d4ed8] rounded-xl text-[13px] outline-none transition-colors resize-none"
+                      />
+                    </div>
+                  )}
+
+                  {/* Legal note */}
+                  {airlineProvidedAnything === false && (
+                    <div className="mb-5 p-3.5 bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl text-[13px] text-[#166534]">
+                      Good — you are entitled to the full statutory compensation under EU261/UK261. We will pursue the maximum amount on your behalf.
+                    </div>
+                  )}
+
+                  <div className="mt-7 flex items-center gap-3">
+                    <button
+                      onClick={goBack}
+                      className="flex items-center gap-2 px-4 py-3 rounded-xl text-[14px] font-semibold cursor-pointer bg-white hover:bg-slate-50 transition-colors"
+                      style={{ border: '2px solid #e2e8f0' }}
+                    >
+                      <ArrowLeft className="w-4 h-4" /> Back
+                    </button>
+                    <button
+                      onClick={goNext}
+                      disabled={airlineProvidedAnything === null || (airlineProvidedAnything && airlineTypes.length === 0)}
+                      className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-[#0f2744] hover:bg-[#1a3a5c] text-white rounded-xl text-[15px] font-bold border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Continue <ArrowRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 4: Documents & Sign ───────────────────────────────── */}
+              {step === 4 && (
                 <div>
                   <h2 className="text-[22px] font-extrabold text-[#0f172a] mb-1">Documents & Signature</h2>
                   <p className="text-[13px] text-[#64748b] mb-6">Upload supporting documents and sign to authorize your claim.</p>
