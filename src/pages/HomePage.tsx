@@ -186,47 +186,102 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
     <div>
       <ClaimModal open={modalOpen} onClose={() => setModalOpen(false)} />
       {/* HERO */}
-      <div className="relative overflow-hidden text-white text-center py-20 px-5" style={{ background: 'linear-gradient(135deg,#0f2744 0%,#1e3a8a 50%,#1d4ed8)' }}>
-        <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
-        <div className="relative max-w-[720px] mx-auto">
-          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-xs font-semibold mb-6 tracking-wider uppercase">
-            ✈ {t('hero.badge')}
-          </div>
-          <h1 className="text-[clamp(2rem,5vw,3.4rem)] font-black leading-[1.1] mb-5">
-            {t('hero.title1')}<br />
-            <span style={{ color: '#60a5fa' }}>{t('hero.title2')}</span>
-          </h1>
-          <p className="text-[16px] opacity-85 max-w-[480px] mx-auto mb-8 leading-relaxed">
-            {t('hero.subtitle')}
-          </p>
-          <div className="flex gap-3 justify-center flex-wrap">
-            <button
-              onClick={() => onNav('claim')}
-              className="bg-[#16a34a] hover:bg-[#15803d] text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl text-[14px] sm:text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/30"
-            >
-              {t('hero.cta')}
-            </button>
-            <button
-              onClick={() => onNav('how-it-works')}
-              className="bg-transparent text-white border-2 border-white/30 px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl text-[13px] sm:text-[14px] font-semibold cursor-pointer hover:bg-white/10 transition-colors"
-            >
-              {t('hero.how')}
-            </button>
-          </div>
-          {/* Stats */}
-          <div className="flex justify-center gap-5 sm:gap-8 mt-10 sm:mt-14 flex-wrap">
-            {([
-              ['350+', 'Airlines Covered'],
-              ['30%', 'Standard Fee Only on Win'],
-              ['€0', 'Upfront Cost'],
-              ['6 yrs', 'Max Claim Window'],
-              ['EU·UK·IL·US', 'Regulations'],
-            ] as [string, string][]).map(([v, l]) => (
-              <div key={l} className="text-center">
-                <div className="text-[1.8rem] font-black leading-none">{v}</div>
-                <div className="text-[10px] opacity-60 mt-1 font-medium uppercase tracking-wider">{l}</div>
+      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#0c1f3f 0%,#0f2744 40%,#1a3a6e 100%)' }}>
+        {/* Subtle grid pattern */}
+        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
+
+        <div className="relative max-w-[1140px] mx-auto px-5 py-14 sm:py-20">
+          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
+
+            {/* LEFT: Copy */}
+            <div className="flex-1 text-white text-center lg:text-left">
+              {/* Top badge */}
+              <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-[11px] font-bold mb-6 tracking-widest uppercase">
+                ✈ {t('hero.badge')}
               </div>
-            ))}
+
+              <h1 className="text-[clamp(2rem,4.5vw,3.2rem)] font-black leading-[1.1] mb-5">
+                {t('hero.title1')}<br />
+                <span className="text-[#38bdf8]">{t('hero.title2')}</span>
+              </h1>
+
+              <p className="text-[15px] sm:text-[16px] leading-relaxed opacity-85 mb-8 max-w-[500px] mx-auto lg:mx-0">
+                Claim up to <strong>€600 per passenger</strong> under EU261, UK261 or Israeli Law.
+                Free check. No win, no fee. Takes 2 minutes.
+              </p>
+
+              {/* Trust badges */}
+              <div className="flex flex-wrap gap-2.5 justify-center lg:justify-start mb-8">
+                {[
+                  { icon: '✅', label: '94% Success Rate' },
+                  { icon: '🔒', label: '100% Secure' },
+                  { icon: '⚡', label: 'Free Eligibility Check' },
+                ].map(b => (
+                  <span
+                    key={b.label}
+                    className="inline-flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-[12px] font-semibold text-white backdrop-blur-sm"
+                  >
+                    <span>{b.icon}</span> {b.label}
+                  </span>
+                ))}
+              </div>
+
+              {/* CTA buttons */}
+              <div className="flex gap-3 flex-wrap justify-center lg:justify-start">
+                <button
+                  onClick={() => onNav('claim')}
+                  className="bg-[#16a34a] hover:bg-[#15803d] text-white px-7 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/40"
+                >
+                  Check If I'm Entitled – It's Free →
+                </button>
+                <button
+                  onClick={() => onNav('how-it-works')}
+                  className="bg-transparent text-white border-2 border-white/30 px-5 py-3.5 rounded-xl text-[13px] font-semibold cursor-pointer hover:bg-white/10 transition-colors"
+                >
+                  {t('hero.how')}
+                </button>
+              </div>
+
+              {/* Stats row */}
+              <div className="flex gap-5 sm:gap-8 mt-10 flex-wrap justify-center lg:justify-start">
+                {([
+                  ['350+', 'Airlines Covered'],
+                  ['30%', 'Standard Fee'],
+                  ['€0', 'Upfront Cost'],
+                  ['EU·UK·IL', 'Laws Covered'],
+                ] as [string, string][]).map(([v, l]) => (
+                  <div key={l} className="text-center lg:text-left">
+                    <div className="text-[1.6rem] font-black leading-none text-white">{v}</div>
+                    <div className="text-[10px] opacity-55 mt-1 font-medium uppercase tracking-wider">{l}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* RIGHT: Emotional image */}
+            <div className="w-full lg:w-[460px] shrink-0">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
+                <img
+                  src="https://images.pexels.com/photos/2026324/pexels-photo-2026324.jpeg?auto=compress&cs=tinysrgb&w=900"
+                  alt="Frustrated passenger waiting at airport with delayed flight board"
+                  className="w-full h-[300px] sm:h-[380px] lg:h-[440px] object-cover object-center"
+                  loading="eager"
+                />
+                {/* Overlay gradient for readability */}
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(10,25,50,0.55) 0%, transparent 50%)' }} />
+                {/* Floating compensation badge */}
+                <div className="absolute bottom-5 left-5 right-5">
+                  <div className="bg-white/95 backdrop-blur-sm rounded-xl px-4 py-3 shadow-xl flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#dcfce7] flex items-center justify-center shrink-0 text-lg">💰</div>
+                    <div>
+                      <div className="text-[13px] font-black text-[#0f172a]">You could be owed up to €600</div>
+                      <div className="text-[11px] text-[#64748b]">Per passenger · No win, no fee</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
