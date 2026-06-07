@@ -50,7 +50,7 @@ const en = {
   'meta.fees.title': 'Our Fees — ClaimVelo | 30% Standard, 50% Only If Legal Action Needed',
   'meta.fees.desc': 'ClaimVelo charges 30% on standard claims and 50% only if a lawyer is required — and only when we win.',
   'meta.about.title': 'About ClaimVelo — Passenger Rights Specialists | EU261 & UK261 Experts',
-  'meta.about.desc': 'ClaimVelo is a team of aviation law specialists fighting for passenger rights across the EU, UK, Israel, and US.',
+  'meta.about.desc': 'ClaimVelo is a team of aviation law specialists fighting for passenger rights across the EU, UK, and Israel.',
   'meta.signin.title': 'Sign In — ClaimVelo | Track Your Flight Compensation Claim',
   'meta.signin.desc': 'Sign in to your ClaimVelo account to track your compensation claim, upload documents, and receive payment updates.',
   'meta.privacy.title': 'Privacy Policy — ClaimVelo',
