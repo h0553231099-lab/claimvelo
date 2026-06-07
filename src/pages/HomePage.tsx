@@ -4,6 +4,7 @@ import { useLang } from '../lib/language';
 import { ShieldCheck, Scale, Users, Check, X, Minus, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import ClaimModal from '../components/ClaimModal';
+import FlightCheckerWidget from '../components/FlightCheckerWidget';
 
 interface Testimonial {
   id: string;
@@ -15,7 +16,7 @@ interface Testimonial {
   amount: string | null;
 }
 
-interface Props { onNav: (p: Page) => void; onCheckCompensation?: () => void; }
+interface Props { onNav: (p: Page) => void; onCheckCompensation?: () => void; onPrefillClaim?: (data: { flight: string; fdate: string; dep: string; arr: string; airline: string; issue: string }) => void; }
 
 type DisruptionType = 'delay' | 'cancellation' | 'missed' | 'denied';
 type Region = 'eu' | 'uk' | 'il';
@@ -161,7 +162,7 @@ function CellIcon({ val }: { val: boolean | string }) {
   return <span className="text-[12px] font-semibold text-[#0f172a]">{val}</span>;
 }
 
-export default function HomePage({ onNav, onCheckCompensation }: Props) {
+export default function HomePage({ onNav, onCheckCompensation, onPrefillClaim }: Props) {
   const { t } = useLang();
   const [openFaq, setOpenFaq] = useState<string | null>(null);
   const [disruption, setDisruption] = useState<DisruptionType>('delay');
@@ -240,6 +241,11 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
                 >
                   {t('hero.how')}
                 </button>
+              </div>
+
+              {/* Quick flight checker */}
+              <div className="mt-7">
+                <FlightCheckerWidget onNav={onNav} onPrefillClaim={onPrefillClaim} />
               </div>
 
               {/* Stats row */}

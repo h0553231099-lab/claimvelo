@@ -8,6 +8,8 @@ export interface CheckerPrefill {
   issue: string;
   fdate?: string;
   estimatedAmount: number;
+  flight?: string;
+  airline?: string;
 }
 
 interface Props {

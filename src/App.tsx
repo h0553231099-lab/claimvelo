@@ -193,7 +193,22 @@ export default function App() {
               }}
             />
           )}
-          {page === 'home' && <HomePage onNav={nav} onCheckCompensation={() => setCheckerOpen(true)} />}
+          {page === 'home' && <HomePage
+            onNav={nav}
+            onCheckCompensation={() => setCheckerOpen(true)}
+            onPrefillClaim={(data) => {
+              setClaimPrefill({
+                dep: data.dep,
+                arr: data.arr,
+                issue: data.issue,
+                fdate: data.fdate,
+                estimatedAmount: 600,
+                flight: data.flight,
+                airline: data.airline,
+              });
+              nav('claim');
+            }}
+          />}
           {page === 'claim' && <ClaimPage onNav={nav} prefill={claimPrefill} />}
           {page === 'dashboard' && <DashboardPage onNav={nav} user={user} />}
           {page === 'admin' && user && (user.role === 'admin' || user.role === 'worker' || user.role === 'seo_worker') && <AdminPage onNav={nav} user={user} onSignOut={handleSignOut} />}

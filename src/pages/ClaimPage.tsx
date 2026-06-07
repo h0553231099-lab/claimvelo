@@ -68,7 +68,7 @@ export default function ClaimPage({ onNav, prefill }: Props) {
 
   // ── STEP 2 ────────────────────────────────────────────────────────────────────
   const [flightDate, setFlightDate] = useState(prefill?.fdate || '');
-  const [flightNumber, setFlightNumber] = useState('');
+  const [flightNumber, setFlightNumber] = useState(prefill?.flight || '');
   const [flightNumError, setFlightNumError] = useState('');
   const [searchDone, setSearchDone] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -77,8 +77,8 @@ export default function ClaimPage({ onNav, prefill }: Props) {
   const [searchResults, setSearchResults] = useState<ConfirmedFlight[]>([]);
   const [selectedFlight, setSelectedFlight] = useState<ConfirmedFlight | null>(null);
   const [manualMode, setManualMode] = useState(false);
-  const [manualFlight, setManualFlight] = useState('');
-  const [manualAirline, setManualAirline] = useState('');
+  const [manualFlight, setManualFlight] = useState(prefill?.flight || '');
+  const [manualAirline, setManualAirline] = useState(prefill?.airline || '');
 
   // dep/arr derived from prefill or route fields
   const [dep, setDep] = useState(prefill?.dep || '');
