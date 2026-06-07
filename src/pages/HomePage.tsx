@@ -305,31 +305,6 @@ export default function HomePage({ onNav, onCheckCompensation, onPrefillClaim }:
   return (
     <div>
       <ClaimModal open={modalOpen} onClose={() => setModalOpen(false)} />
-
-      {/* FULL-WIDTH HEADER IMAGE */}
-      <div className="relative w-full overflow-hidden" style={{ height: 'clamp(180px, 28vw, 340px)' }}>
-        <img
-          src="https://images.pexels.com/photos/358319/pexels-photo-358319.jpeg?auto=compress&cs=tinysrgb&w=1600"
-          alt="Airport terminal with aircraft at gate"
-          className="w-full h-full object-cover object-center"
-          loading="eager"
-        />
-        {/* Dark gradient overlay — bottom fades into hero */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.10) 0%, rgba(12,31,63,0.65) 75%, #0c1f3f 100%)' }} />
-        {/* Top-left branding strip */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 py-3.5 sm:px-8">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 bg-white/20 rounded-lg backdrop-blur-sm flex items-center justify-center">
-              <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-white" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-            </div>
-            <span className="text-white font-black text-[15px] tracking-tight drop-shadow">Claim<span className="text-[#38bdf8]">Velo</span></span>
-          </div>
-          <div className="hidden sm:flex items-center gap-1.5 bg-black/30 backdrop-blur-sm border border-white/20 rounded-full px-3.5 py-1.5 text-[11px] font-bold text-white/90 uppercase tracking-wider">
-            ✈ No Win, No Fee · Free Eligibility Check
-          </div>
-        </div>
-      </div>
-
       {/* HERO */}
       <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#0c1f3f 0%,#0f2744 40%,#1a3a6e 100%)' }}>
         {/* Subtle grid pattern */}
