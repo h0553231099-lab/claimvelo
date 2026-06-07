@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Page } from '../types';
 import { useLang } from '../lib/language';
-import { ShieldCheck, Scale, Users, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Scale, Users, Check, X, Minus, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import ClaimModal from '../components/ClaimModal';
-import FlightCheckerWidget from '../components/FlightCheckerWidget';
 
 interface Testimonial {
   id: string;
@@ -16,7 +15,7 @@ interface Testimonial {
   amount: string | null;
 }
 
-interface Props { onNav: (p: Page) => void; onCheckCompensation?: () => void; onPrefillClaim?: (data: { flight: string; fdate: string; dep: string; arr: string; airline: string; issue: string }) => void; }
+interface Props { onNav: (p: Page) => void; onCheckCompensation?: () => void; }
 
 type DisruptionType = 'delay' | 'cancellation' | 'missed' | 'denied';
 type Region = 'eu' | 'uk' | 'il';
@@ -119,6 +118,18 @@ const TIME_LIMITS = [
   { flag: '🇳🇱', country: 'Netherlands', years: '3 years', from: 'from 2023' },
 ];
 
+const COMPARE = [
+  { feature: 'No upfront cost', us: true, diy: true, others: 'sometimes' },
+  { feature: 'No win, no fee', us: true, diy: false, others: 'sometimes' },
+  { feature: 'Commission rate', us: '30% / 50%*', diy: '0%', others: '35–50%' },
+  { feature: 'Legal escalation to court', us: true, diy: false, others: 'sometimes' },
+  { feature: 'EU + UK + IL + US coverage', us: true, diy: false, others: 'sometimes' },
+  { feature: 'Expert aviation lawyers', us: true, diy: false, others: 'sometimes' },
+  { feature: 'Real-time claim tracking', us: true, diy: false, others: 'sometimes' },
+  { feature: 'Personal account manager', us: true, diy: false, others: false },
+  { feature: 'Average claim time', us: '6–12 wks', diy: 'Months–years', others: '3–6 months' },
+];
+
 const SERVICES = [
   {
     title: 'Cancellation',
@@ -136,152 +147,21 @@ const SERVICES = [
   },
   {
     title: 'Denied Boarding',
-    desc: 'Bumped from your flight due to overbooking? You may be entitled to up to €600 / £520 per passenger.',
+    desc: 'Bumped from your flight due to overbooking? Claim up to 400% of your ticket value.',
     icon: '🚫',
     color: '#2563eb',
     bg: '#eff6ff',
   },
 ];
 
-type Distance = 'short' | 'medium' | 'long';
-
-const DISTANCE_OPTIONS: { id: Distance; label: string; range: string; amount: number }[] = [
-  { id: 'short',  label: 'Short-haul',  range: 'Under 1,500 km',      amount: 250 },
-  { id: 'medium', label: 'Medium-haul', range: '1,500 – 3,500 km',    amount: 400 },
-  { id: 'long',   label: 'Long-haul',   range: 'Over 3,500 km',       amount: 600 },
-];
-
-function CompensationCalculator({ onNav }: { onNav: (p: Page) => void }) {
-  const [hours, setHours] = useState(4);
-  const [distance, setDistance] = useState<Distance>('medium');
-
-  const eligible = hours >= 3;
-  const opt = DISTANCE_OPTIONS.find(o => o.id === distance)!;
-  const amount = eligible ? opt.amount : 0;
-  const sliderPct = (hours / 12) * 100;
-
-  return (
-    <div className="bg-white/[0.06] border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-sm">
-      {/* Hours slider */}
-      <div className="mb-7">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[13px] font-bold text-white/70 uppercase tracking-wider">Hours Delayed</span>
-          <span
-            className="text-[18px] font-black px-3 py-0.5 rounded-lg transition-all"
-            style={{
-              background: hours < 3 ? 'rgba(220,38,38,0.2)' : 'rgba(22,163,74,0.2)',
-              color: hours < 3 ? '#fca5a5' : '#86efac',
-            }}
-          >
-            {hours < 12 ? `${hours}h` : '12h+'}
-          </span>
-        </div>
-        <div className="relative">
-          <input
-            type="range"
-            min={0}
-            max={12}
-            step={1}
-            value={hours}
-            onChange={e => setHours(Number(e.target.value))}
-            className="w-full h-3 rounded-full outline-none cursor-pointer"
-            style={{
-              appearance: 'none',
-              background: `linear-gradient(to right, ${hours < 3 ? '#ef4444' : '#22c55e'} 0%, ${hours < 3 ? '#ef4444' : '#22c55e'} ${sliderPct}%, rgba(255,255,255,0.12) ${sliderPct}%, rgba(255,255,255,0.12) 100%)`,
-            }}
-          />
-          {/* Tick marks */}
-          <div className="flex justify-between mt-1.5 px-0.5">
-            {[0, 3, 6, 9, 12].map(h => (
-              <div key={h} className="flex flex-col items-center gap-0.5">
-                <div className={`text-[10px] font-bold transition-colors ${hours === h ? 'text-white' : 'text-white/30'}`}>{h === 12 ? '12+' : `${h}h`}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="mt-2 text-center">
-          <span className="text-[11px] font-semibold" style={{ color: hours < 3 ? '#fca5a5' : '#86efac' }}>
-            {hours < 3
-              ? 'EU261/UK261 requires 3+ hours — slide right'
-              : hours < 8
-              ? 'Eligible under EU261 / UK261'
-              : 'Eligible under EU261, UK261 & Israeli Law'}
-          </span>
-        </div>
-      </div>
-
-      {/* Distance selector */}
-      <div className="mb-7">
-        <div className="text-[13px] font-bold text-white/70 uppercase tracking-wider mb-3">Flight Distance</div>
-        <div className="grid grid-cols-3 gap-2">
-          {DISTANCE_OPTIONS.map(o => (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => setDistance(o.id)}
-              className={`flex flex-col items-center gap-1 px-2 py-3 rounded-xl border-2 cursor-pointer transition-all text-center ${
-                distance === o.id
-                  ? 'border-[#38bdf8] bg-[#38bdf8]/10 shadow-lg shadow-sky-900/40'
-                  : 'border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10'
-              }`}
-            >
-              <span className={`text-[13px] font-black transition-colors ${distance === o.id ? 'text-[#38bdf8]' : 'text-white/80'}`}>{o.label}</span>
-              <span className="text-[10px] text-white/40 leading-tight">{o.range}</span>
-              <span className={`text-[13px] font-black mt-0.5 transition-colors ${distance === o.id ? 'text-white' : 'text-white/50'}`}>€{o.amount}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Result */}
-      <div
-        className="rounded-2xl p-5 text-center transition-all duration-500"
-        style={{
-          background: eligible
-            ? 'linear-gradient(135deg, rgba(22,163,74,0.15) 0%, rgba(5,150,105,0.15) 100%)'
-            : 'rgba(220,38,38,0.08)',
-          border: eligible ? '2px solid rgba(22,163,74,0.35)' : '2px solid rgba(220,38,38,0.25)',
-        }}
-      >
-        {eligible ? (
-          <>
-            <div className="text-[12px] font-bold text-emerald-400 uppercase tracking-widest mb-2">You could be owed</div>
-            <div className="flex items-start justify-center gap-1 mb-1">
-              <span className="text-[24px] font-black text-emerald-300 mt-2">€</span>
-              <span className="text-[64px] font-black text-white leading-none tabular-nums transition-all duration-300">{amount.toLocaleString()}</span>
-            </div>
-            <div className="text-[12px] text-white/50 mb-5">per passenger · no win, no fee</div>
-            <button
-              onClick={() => onNav('claim')}
-              className="inline-flex items-center gap-2 bg-[#16a34a] hover:bg-[#15803d] text-white px-7 py-3.5 rounded-xl text-[14px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/40"
-            >
-              Claim Now <ArrowRight className="w-4 h-4" />
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="text-[32px] mb-2">⚠️</div>
-            <div className="text-[15px] font-black text-red-300 mb-1">Delays under 3 hours usually don't qualify</div>
-            <div className="text-[12px] text-white/50 mb-4">EU261 and UK261 require at least 3 hours of arrival delay. Slide to 3h or more to see your entitlement.</div>
-            <button
-              onClick={() => onNav('claim')}
-              className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/80 px-6 py-3 rounded-xl text-[13px] font-semibold border border-white/15 cursor-pointer transition-all"
-            >
-              Still not sure? Submit your claim
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Fine print */}
-      <div className="mt-4 text-center text-[11px] text-white/30">
-        Estimate based on EU Regulation 261/2004 fixed amounts. Actual compensation may vary.
-      </div>
-    </div>
-  );
+function CellIcon({ val }: { val: boolean | string }) {
+  if (val === true) return <Check className="w-4 h-4 text-[#059669] mx-auto" />;
+  if (val === false) return <X className="w-4 h-4 text-[#dc2626] mx-auto" />;
+  if (val === 'sometimes') return <Minus className="w-4 h-4 text-[#d97706] mx-auto" />;
+  return <span className="text-[12px] font-semibold text-[#0f172a]">{val}</span>;
 }
 
-export default function HomePage({ onNav, onCheckCompensation, onPrefillClaim }: Props) {
+export default function HomePage({ onNav, onCheckCompensation }: Props) {
   const { t } = useLang();
   const [openFaq, setOpenFaq] = useState<string | null>(null);
   const [disruption, setDisruption] = useState<DisruptionType>('delay');
@@ -306,120 +186,48 @@ export default function HomePage({ onNav, onCheckCompensation, onPrefillClaim }:
     <div>
       <ClaimModal open={modalOpen} onClose={() => setModalOpen(false)} />
       {/* HERO */}
-      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#0c1f3f 0%,#0f2744 40%,#1a3a6e 100%)' }}>
-        {/* Subtle grid pattern */}
-        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
-
-        <div className="relative max-w-[1140px] mx-auto px-5 py-14 sm:py-20">
-          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
-
-            {/* LEFT: Copy */}
-            <div className="flex-1 text-white text-center lg:text-left">
-              {/* Top badge */}
-              <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-[11px] font-bold mb-6 tracking-widest uppercase">
-                ✈ {t('hero.badge')}
-              </div>
-
-              <h1 className="text-[clamp(2rem,4.5vw,3.2rem)] font-black leading-[1.1] mb-5">
-                {t('hero.title1')}<br />
-                <span className="text-[#38bdf8]">{t('hero.title2')}</span>
-              </h1>
-
-              <p className="text-[15px] sm:text-[16px] leading-relaxed opacity-85 mb-8 max-w-[500px] mx-auto lg:mx-0">
-                Claim up to <strong>€600 per passenger</strong> under EU261, UK261 or Israeli Law.
-                Free check. No win, no fee. Takes 2 minutes.
-              </p>
-
-              {/* Trust badges */}
-              <div className="flex flex-wrap gap-2.5 justify-center lg:justify-start mb-8">
-                {[
-                  { icon: '✅', label: '94% Success Rate' },
-                  { icon: '🔒', label: '100% Secure' },
-                  { icon: '⚡', label: 'Free Eligibility Check' },
-                ].map(b => (
-                  <span
-                    key={b.label}
-                    className="inline-flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-[12px] font-semibold text-white backdrop-blur-sm"
-                  >
-                    <span>{b.icon}</span> {b.label}
-                  </span>
-                ))}
-              </div>
-
-              {/* CTA buttons */}
-              <div className="flex gap-3 flex-wrap justify-center lg:justify-start">
-                <button
-                  onClick={() => onNav('claim')}
-                  className="bg-[#16a34a] hover:bg-[#15803d] text-white px-7 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/40"
-                >
-                  Check If I'm Entitled – It's Free →
-                </button>
-                <button
-                  onClick={() => onNav('how-it-works')}
-                  className="bg-transparent text-white border-2 border-white/30 px-5 py-3.5 rounded-xl text-[13px] font-semibold cursor-pointer hover:bg-white/10 transition-colors"
-                >
-                  {t('hero.how')}
-                </button>
-              </div>
-
-              {/* Quick flight checker */}
-              <div className="mt-7">
-                <FlightCheckerWidget onNav={onNav} onPrefillClaim={onPrefillClaim} />
-              </div>
-
-              {/* Stats row */}
-              <div className="flex gap-5 sm:gap-8 mt-10 flex-wrap justify-center lg:justify-start">
-                {([
-                  ['350+', 'Airlines Covered'],
-                  ['30%', 'Standard Fee'],
-                  ['€0', 'Upfront Cost'],
-                  ['EU·UK·IL', 'Laws Covered'],
-                ] as [string, string][]).map(([v, l]) => (
-                  <div key={l} className="text-center lg:text-left">
-                    <div className="text-[1.6rem] font-black leading-none text-white">{v}</div>
-                    <div className="text-[10px] opacity-55 mt-1 font-medium uppercase tracking-wider">{l}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* RIGHT: Emotional image */}
-            <div className="w-full lg:w-[460px] shrink-0">
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
-                <img
-                  src="https://images.pexels.com/photos/2026324/pexels-photo-2026324.jpeg?auto=compress&cs=tinysrgb&w=900"
-                  alt="Frustrated passenger waiting at airport with delayed flight board"
-                  className="w-full h-[300px] sm:h-[380px] lg:h-[440px] object-cover object-center"
-                  loading="eager"
-                />
-                {/* Overlay gradient for readability */}
-                <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(10,25,50,0.55) 0%, transparent 50%)' }} />
-                {/* Floating compensation badge */}
-                <div className="absolute bottom-5 left-5 right-5">
-                  <div className="bg-white/95 backdrop-blur-sm rounded-xl px-4 py-3 shadow-xl flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#dcfce7] flex items-center justify-center shrink-0 text-lg">💰</div>
-                    <div>
-                      <div className="text-[13px] font-black text-[#0f172a]">You could be owed up to €600</div>
-                      <div className="text-[11px] text-[#64748b]">Per passenger · No win, no fee</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
+      <div className="relative overflow-hidden text-white text-center py-20 px-5" style={{ background: 'linear-gradient(135deg,#0f2744 0%,#1e3a8a 50%,#1d4ed8)' }}>
+        <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
+        <div className="relative max-w-[720px] mx-auto">
+          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-xs font-semibold mb-6 tracking-wider uppercase">
+            ✈ {t('hero.badge')}
           </div>
-        </div>
-      </div>
-
-      {/* COMPENSATION CALCULATOR */}
-      <div className="py-14 px-5" style={{ background: 'linear-gradient(180deg, #0f2744 0%, #0c1f3f 100%)' }}>
-        <div className="max-w-[680px] mx-auto">
-          <div className="text-center mb-8">
-            <div className="inline-block bg-white/10 border border-white/20 text-white text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Interactive Calculator</div>
-            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-white mb-2">How Much Are You Owed?</h2>
-            <p className="text-[14px] text-white/60 max-w-[400px] mx-auto">Slide to your delay length and select your route distance for an instant estimate.</p>
+          <h1 className="text-[clamp(2rem,5vw,3.4rem)] font-black leading-[1.1] mb-5">
+            {t('hero.title1')}<br />
+            <span style={{ color: '#60a5fa' }}>{t('hero.title2')}</span>
+          </h1>
+          <p className="text-[16px] opacity-85 max-w-[480px] mx-auto mb-8 leading-relaxed">
+            {t('hero.subtitle')}
+          </p>
+          <div className="flex gap-3 justify-center flex-wrap">
+            <button
+              onClick={() => onNav('claim')}
+              className="bg-[#16a34a] hover:bg-[#15803d] text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl text-[14px] sm:text-[15px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/30"
+            >
+              {t('hero.cta')}
+            </button>
+            <button
+              onClick={() => onNav('how-it-works')}
+              className="bg-transparent text-white border-2 border-white/30 px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl text-[13px] sm:text-[14px] font-semibold cursor-pointer hover:bg-white/10 transition-colors"
+            >
+              {t('hero.how')}
+            </button>
           </div>
-          <CompensationCalculator onNav={onNav} />
+          {/* Stats */}
+          <div className="flex justify-center gap-5 sm:gap-8 mt-10 sm:mt-14 flex-wrap">
+            {([
+              ['350+', 'Airlines Covered'],
+              ['30%', 'Standard Fee Only on Win'],
+              ['€0', 'Upfront Cost'],
+              ['6 yrs', 'Max Claim Window'],
+              ['EU·UK·IL·US', 'Regulations'],
+            ] as [string, string][]).map(([v, l]) => (
+              <div key={l} className="text-center">
+                <div className="text-[1.8rem] font-black leading-none">{v}</div>
+                <div className="text-[10px] opacity-60 mt-1 font-medium uppercase tracking-wider">{l}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -550,18 +358,6 @@ export default function HomePage({ onNav, onCheckCompensation, onPrefillClaim }:
               >
                 Check My Eligibility — Free
               </button>
-
-              {/* Legal notes */}
-              {region === 'uk' && (
-                <div className="mt-4 bg-[#fffbeb] border border-[#fde68a] rounded-xl px-4 py-3 text-[12px] text-[#92400e] leading-relaxed">
-                  <strong>UK261 long-haul note:</strong> If you accepted a re-routing offer that arrived within 4 hours of the original schedule, the airline may reduce long-haul (3,500+ km) compensation by 50% to £260. Full amounts apply when no acceptable alternative was offered.
-                </div>
-              )}
-              {region === 'il' && (
-                <div className="mt-4 bg-[#fef9c3] border border-[#fde68a] rounded-xl px-4 py-3 text-[12px] text-[#92400e] leading-relaxed">
-                  <strong>Israeli law disclaimer:</strong> Compensation amounts are set by the Israeli Aviation Services Law (2012) and are subject to periodic adjustment. Rates shown are indicative — actual amounts may vary. Last reviewed: January 2025.
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -658,37 +454,34 @@ export default function HomePage({ onNav, onCheckCompensation, onPrefillClaim }:
         </div>
       </div>
 
-      {/* WHAT YOU GET */}
+      {/* WHY CHOOSE US COMPARISON */}
       <div className="py-16 px-5 bg-white">
-        <div className="max-w-[780px] mx-auto">
+        <div className="max-w-[900px] mx-auto">
           <div className="text-center mb-8">
             <div className="inline-block bg-[#eff6ff] text-[#2563eb] text-[11px] font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">Why Choose Us</div>
-            <h2 className="text-[clamp(1.5rem,3vw,2rem)] font-black text-[#0f172a] mb-2">What You Get With ClaimVelo</h2>
+            <h2 className="text-[clamp(1.5rem,3vw,2rem)] font-black text-[#0f172a] mb-2">How We Compare</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {[
-              {
-                icon: '€0',
-                title: 'No upfront cost — ever',
-                desc: 'You pay nothing to start. We cover all costs of pursuing your claim, including any legal fees.',
-              },
-              {
-                icon: '30%',
-                title: '30% fee, only when we win',
-                desc: 'Our standard commission is 30% of what we recover. If we don\'t win, you owe us nothing.',
-              },
-              {
-                icon: '⚖',
-                title: 'Legal escalation included',
-                desc: 'If the airline refuses, we escalate to court or an ADR body. No extra charge — that\'s our commitment.',
-              },
-            ].map(item => (
-              <div key={item.title} className="bg-white border border-[#e2e8f0] rounded-2xl p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                <div className="text-[2rem] font-black text-[#2563eb] mb-3 leading-none">{item.icon}</div>
-                <div className="text-[15px] font-extrabold text-[#0f172a] mb-2">{item.title}</div>
-                <p className="text-[13px] text-[#64748b] leading-relaxed">{item.desc}</p>
-              </div>
-            ))}
+          <div className="rounded-2xl border border-[#e2e8f0] overflow-x-auto shadow-sm">
+            <table className="w-full min-w-[500px]">
+              <thead>
+                <tr className="bg-[#f1f5f9]">
+                  <th className="px-5 py-3.5 text-left text-[12px] font-black text-[#475569] uppercase tracking-wider">Feature</th>
+                  <th className="px-4 py-3.5 text-center text-[12px] font-black text-[#2563eb] uppercase tracking-wider bg-[#eff6ff]">ClaimVelo ✦</th>
+                  <th className="px-4 py-3.5 text-center text-[12px] font-black text-[#475569] uppercase tracking-wider">DIY</th>
+                  <th className="px-4 py-3.5 text-center text-[12px] font-black text-[#475569] uppercase tracking-wider">Others</th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARE.map((row, i) => (
+                  <tr key={row.feature} className={`border-t border-[#f1f5f9] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fafbfc]'}`}>
+                    <td className="px-5 py-3 text-[13px] text-[#374151] font-medium">{row.feature}</td>
+                    <td className="px-4 py-3 text-center bg-[#f0f9ff]"><CellIcon val={row.us} /></td>
+                    <td className="px-4 py-3 text-center"><CellIcon val={row.diy} /></td>
+                    <td className="px-4 py-3 text-center"><CellIcon val={row.others} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -787,12 +580,32 @@ export default function HomePage({ onNav, onCheckCompensation, onPrefillClaim }:
         </div>
       </div>
 
-      {/* TESTIMONIALS — only shown when real data exists */}
-      {testimonials.length > 0 && (
-        <div className="py-16 px-5 bg-white">
-          <div className="max-w-[1020px] mx-auto text-center">
-            <div className="inline-block bg-[#eff6ff] text-[#2563eb] text-[11px] font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">Real passengers, real money</div>
-            <h2 className="text-[clamp(1.5rem,3vw,2.2rem)] font-black text-[#0f172a] mb-8">Verified Customer Reviews</h2>
+      {/* TESTIMONIALS */}
+      <div className="py-16 px-5 bg-white">
+        <div className="max-w-[1020px] mx-auto text-center">
+          <div className="inline-block bg-[#eff6ff] text-[#2563eb] text-[11px] font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">Real passengers, real money</div>
+          <h2 className="text-[clamp(1.5rem,3vw,2.2rem)] font-black text-[#0f172a] mb-8">What Our Customers Say</h2>
+          {testimonials.length === 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {[1,2,3].map(i => (
+                <div key={i} className="bg-white border border-[#e2e8f0] rounded-2xl p-6 animate-pulse">
+                  <div className="h-3 bg-[#e2e8f0] rounded w-20 mb-4" />
+                  <div className="space-y-2 mb-5">
+                    <div className="h-3 bg-[#e2e8f0] rounded w-full" />
+                    <div className="h-3 bg-[#e2e8f0] rounded w-4/5" />
+                    <div className="h-3 bg-[#e2e8f0] rounded w-3/5" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-[#e2e8f0] shrink-0" />
+                    <div className="space-y-1.5">
+                      <div className="h-3 bg-[#e2e8f0] rounded w-20" />
+                      <div className="h-2.5 bg-[#e2e8f0] rounded w-28" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {testimonials.slice(0, 3).map(rev => (
                 <div key={rev.id} className="bg-white border border-[#e2e8f0] rounded-2xl p-6 text-left hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
@@ -813,9 +626,265 @@ export default function HomePage({ onNav, onCheckCompensation, onPrefillClaim }:
                 </div>
               ))}
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* SEO CONTENT — 5 TOPIC SECTIONS */}
+      <div className="bg-white py-4 px-5">
+        <div className="max-w-[820px] mx-auto space-y-0">
+
+          {/* ── FLIGHT DELAY ── */}
+          <section className="py-14 border-b border-[#f1f5f9]">
+            <div className="inline-block bg-[#eff6ff] text-[#2563eb] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">EU261 · UK261 · Israeli Law</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
+              Flight Delay Compensation:<br className="hidden sm:block" /> How to Claim Your Cash
+            </h2>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
+              A flight delay can ruin a long-planned vacation, cause missed business opportunities, and leave you stranded at an airport terminal for hours. However, aviation regulations ensure that airlines pay for your lost time.
+            </p>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-6">
+              Depending on your itinerary and airline, you are legally protected by <strong>EU Regulation 261/2004</strong>, <strong>UK261</strong>, or the <strong>Israeli Aviation Services Law</strong>. These consumer-focused frameworks allow delayed passengers to claim direct cash payouts regardless of the original ticket price.
+            </p>
+
+            {/* Quick stats */}
+            <div className="grid grid-cols-3 gap-3 mb-8">
+              {[
+                { val: '€250', label: 'Minimum cash payout (short-haul)' },
+                { val: '€600', label: 'Maximum cash payout per ticket' },
+                { val: '6 yrs', label: '6-year claim window' },
+              ].map(s => (
+                <div key={s.label} className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-4 text-center">
+                  <div className="text-[1.6rem] font-black text-[#2563eb] leading-none mb-1">{s.val}</div>
+                  <div className="text-[11px] text-[#64748b] leading-snug">{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+              Check My Delay Claim Now →
+            </button>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">When Are You Eligible for Flight Delay Compensation?</h3>
+            <p className="text-[13px] text-[#374151] leading-relaxed mb-3">
+              Your entitlement to a cash payout is determined by the <strong>total arrival delay at your final destination</strong>, not the departure delay at the gate.
+            </p>
+            <ul className="space-y-2 mb-6">
+              {[
+                <><strong>Delays of 3+ Hours (EU/UK Flights):</strong> If you land at your final destination 3 hours or more behind schedule on an eligible EU/UK flight, you are entitled to a fixed cash payout ranging from <strong>€250 to €600</strong>.</>,
+                <><strong>Delays of 8+ Hours (Israeli Flights):</strong> Under Israeli law, a delay stretching past 8 hours triggers mandatory compensation ranging from <strong>₪1,390 to ₪3,340</strong> per passenger.</>,
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-[#374151]">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[#dbeafe] text-[#2563eb] flex items-center justify-center shrink-0 text-[9px] font-black">{i + 1}</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">Your Right to Food, Care, and Hotels at the Airport</h3>
+            <p className="text-[13px] text-[#374151] leading-relaxed mb-3">
+              Airlines cannot abandon you during an extended delay. Once your delay crosses the 2-hour mark, the operating carrier must provide the following <strong>Right to Care</strong> amenities free of charge:
+            </p>
+            <ul className="space-y-2 mb-3">
+              {[
+                'Food and Beverage Vouchers — scaled appropriately to the length of your wait time.',
+                'Complimentary Communication — access to two free phone calls, faxes, or internet access.',
+                'Hotel Accommodations — if your flight is delayed overnight, the airline must pay for a hotel room and provide complimentary airport-to-hotel transport.',
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-[#374151]">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[#f0fdf4] text-[#059669] flex items-center justify-center shrink-0 text-[9px] font-black">{i + 1}</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="bg-[#fffbeb] border border-[#fde68a] rounded-xl p-4 text-[13px] text-[#431407] leading-relaxed">
+              <strong>Important:</strong> If the airline refuses to provide vouchers and you pay out of pocket, <strong>keep every itemized receipt</strong>. We will claim these back for you alongside your fixed cash compensation.
+            </div>
+          </section>
+
+          {/* ── CANCELLATION ── */}
+          <section className="py-14 border-b border-[#f1f5f9]">
+            <div className="inline-block bg-[#fee2e2] text-[#dc2626] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Refund + Cash Payout</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
+              Flight Cancellation Compensation:<br className="hidden sm:block" /> Get Your Cash Refund
+            </h2>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
+              When a carrier cancels a flight you are legally entitled to <strong>two separate things</strong>: a solution to get you to your destination (or your money back), and an extra cash payout for the severe disruption.
+            </p>
+
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+              Claim My Cancelled Flight Cash →
+            </button>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">The Dual Rights: Refund vs. Rerouting</h3>
+            <p className="text-[13px] text-[#374151] leading-relaxed mb-3">If your flight is cancelled the airline must immediately offer you a clear choice:</p>
+            <ul className="space-y-2 mb-6">
+              {[
+                <><strong>A Full Ticket Refund</strong> — a complete cash reimbursement of the unused ticket cost within 7–21 days.</>,
+                <><strong>Alternative Transport</strong> — rerouting to your final destination on the next available flight, even on a rival airline.</>,
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-[#374151]">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[#fee2e2] text-[#dc2626] flex items-center justify-center shrink-0 text-[9px] font-black">{i + 1}</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">When Does the Cash Payout Trigger?</h3>
+            <p className="text-[13px] text-[#374151] leading-relaxed mb-3">
+              You are entitled to fixed statutory compensation if the airline notified you of the cancellation <strong>less than 14 days before departure</strong>:
+            </p>
+            <div className="rounded-xl overflow-hidden border border-[#e2e8f0] mb-4">
+              <div className="grid grid-cols-3 bg-[#f1f5f9] text-[10px] font-black text-[#475569] uppercase tracking-wider">
+                <div className="px-4 py-2.5">Route type</div>
+                <div className="px-4 py-2.5">Distance</div>
+                <div className="px-4 py-2.5">Compensation</div>
+              </div>
+              {[
+                ['Short-haul', 'Under 1,500 km', '€250 / ₪1,390'],
+                ['Medium-haul', '1,500 – 3,500 km', '€400 / ₪2,220'],
+                ['Long-haul', 'Over 3,500 km', '€600 / ₪3,340'],
+              ].map(([type, dist, comp], i) => (
+                <div key={i} className="grid grid-cols-3 border-t border-[#e2e8f0] bg-white">
+                  <div className="px-4 py-3 text-[12px] font-semibold text-[#0f172a]">{type}</div>
+                  <div className="px-4 py-3 text-[12px] text-[#64748b]">{dist}</div>
+                  <div className="px-4 py-3 text-[13px] font-black text-[#dc2626]">{comp}</div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-xl p-4 text-[13px] text-[#431407] leading-[1.75]">
+              <strong>Voucher warning:</strong> Airlines push travel vouchers because they often expire unused. Once you accept a voucher you may waive your right to a cash claim. We advise <strong>declining vouchers</strong>.
+            </div>
+          </section>
+
+          {/* ── MISSED CONNECTION ── */}
+          <section className="py-14 border-b border-[#f1f5f9]">
+            <div className="inline-block bg-[#f0fdf4] text-[#059669] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Single Booking Rule</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
+              Missed Connecting Flight Compensation:<br className="hidden sm:block" /> Your Legal Rights
+            </h2>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
+              If your first flight suffers a minor delay it can trigger a domino effect — causing you to miss your long-haul connection and leaving you stranded at a foreign transit airport. If the entire journey is on one booking reference, the law treats it as a single disrupted experience.
+            </p>
+
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+              Check My Connection Eligibility →
+            </button>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">The Golden Rule: One Booking Reference (PNR)</h3>
+            <div className="grid sm:grid-cols-2 gap-3 mb-6">
+              {[
+                { title: 'Single Ticket ✓', desc: 'The airline is legally responsible for your entire journey. A delay on leg one that causes you to miss leg two means free rebooking plus compensation.', color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
+                { title: 'Self-Transfer ✗', desc: 'Two separate tickets bought on different sites are unprotected. If you miss the second flight you must buy a new ticket yourself.', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+              ].map(c => (
+                <div key={c.title} className="rounded-xl p-4 border" style={{ background: c.bg, borderColor: c.border }}>
+                  <div className="text-[13px] font-extrabold mb-1" style={{ color: c.color }}>{c.title}</div>
+                  <div className="text-[12px] leading-relaxed" style={{ color: c.color === '#059669' ? '#166534' : '#991b1b' }}>{c.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">How Your Payout Is Calculated</h3>
+            <p className="text-[13px] text-[#374151] leading-relaxed mb-3">
+              Compensation is evaluated based on the <strong>final arrival delay at your ultimate destination</strong>. A 20-minute delay on a short hop that causes you to miss a transatlantic connection — resulting in a 5-hour delay overall — entitles you to a payout based on the total long-haul distance (up to <strong>€600 / ₪3,340</strong> per traveler).
+            </p>
+          </section>
+
+          {/* ── DENIED BOARDING ── */}
+          <section className="py-14 border-b border-[#f1f5f9]">
+            <div className="inline-block bg-[#fef9c3] text-[#92400e] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Overbooking / Bumping</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
+              Denied Boarding Compensation:<br className="hidden sm:block" /> What to Do If You're Denied Boarding
+            </h2>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
+              Airlines routinely oversell tickets. When everyone shows up on time and the aircraft runs out of seats, airlines have the right to "bump" passengers. If you are denied boarding <strong>against your will</strong> despite checking in on time, international laws require <strong>immediate, substantial cash compensation right at the gate</strong>.
+            </p>
+
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+              Claim Involuntary Denied Boarding Payout →
+            </button>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">Involuntary vs. Voluntary Bumping</h3>
+            <div className="grid sm:grid-cols-2 gap-3 mb-6">
+              {[
+                { title: 'Voluntary Bumping', desc: 'If you sign the airline\'s waiver form you surrender your right to statutory cash compensation under EU261 or Israeli law.', bad: true },
+                { title: 'Involuntary Bumping ✓', desc: 'If you refuse to step down but the airline denies you access anyway, you keep your full statutory rights — up to €600 / ₪3,340 plus an alternative flight.', bad: false },
+              ].map(c => (
+                <div key={c.title} className={`rounded-xl p-4 border ${c.bad ? 'bg-[#fef2f2] border-[#fecaca]' : 'bg-[#f0fdf4] border-[#bbf7d0]'}`}>
+                  <div className={`text-[13px] font-extrabold mb-1 ${c.bad ? 'text-[#dc2626]' : 'text-[#059669]'}`}>{c.title}</div>
+                  <div className={`text-[12px] leading-relaxed ${c.bad ? 'text-[#991b1b]' : 'text-[#166534]'}`}>{c.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">Immediate Steps to Take at the Gate</h3>
+            <ul className="space-y-2">
+              {[
+                <><strong>Get It in Writing</strong> — ask the gate agent for a written statement that you were denied boarding due to overbooking.</>,
+                <><strong>Keep Your Boarding Pass</strong> — your physical ticket or digital boarding pass is your core proof of check-in compliance.</>,
+                <><strong>Demand Immediate Cash</strong> — under several jurisdictions you can request your compensation directly at the service desk before leaving the airport.</>,
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-[#374151]">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[#fef9c3] text-[#92400e] flex items-center justify-center shrink-0 text-[9px] font-black">{i + 1}</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {/* ── UK261 ── */}
+          <section className="py-14">
+            <div className="inline-block bg-[#e0f2fe] text-[#0369a1] text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Post-Brexit UK Law</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-[#0f172a] leading-tight mb-4">
+              UK261 Regulation: Passenger<br className="hidden sm:block" /> Compensation for UK Flights
+            </h2>
+            <p className="text-[14px] text-[#374151] leading-relaxed mb-4">
+              Following Brexit the British Government transitioned EU passenger protections directly into domestic UK law, known as the <strong>Air Passenger Rights Regulations (UK 261)</strong>. If you experienced a disruption traveling to or from London Heathrow, Gatwick, Luton, Manchester, or any other UK airport, ClaimVelo can help you claim up to <strong>£520</strong> per ticket.
+            </p>
+
+            <button onClick={() => setModalOpen(true)} className="mb-8 inline-block bg-[#16a34a] hover:bg-[#15803d] hover:scale-[1.03] text-white px-8 py-4 rounded-xl text-[15px] font-black border-none cursor-pointer transition-all shadow-lg shadow-green-900/20">
+              Check My UK261 Flight Claim →
+            </button>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">Which Flights Fall Under UK261?</h3>
+            <ul className="space-y-2 mb-6">
+              {[
+                'Any flight departing from a UK airport — regardless of the airline\'s nationality.',
+                'Any flight landing at a UK airport operated by a UK-based carrier (e.g. British Airways, EasyJet).',
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-[#374151]">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[#e0f2fe] text-[#0369a1] flex items-center justify-center shrink-0 text-[9px] font-black">{i + 1}</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+
+            <h3 className="text-[1.15rem] font-black text-[#0f172a] mb-3">UK261 Compensation Rates (in GBP £)</h3>
+            <div className="rounded-xl overflow-hidden border border-[#e2e8f0] mb-4">
+              <div className="grid grid-cols-3 bg-[#f1f5f9] text-[10px] font-black text-[#475569] uppercase tracking-wider">
+                <div className="px-4 py-2.5">Distance</div>
+                <div className="px-4 py-2.5">Delay Duration</div>
+                <div className="px-4 py-2.5">Compensation</div>
+              </div>
+              {[
+                ['Under 1,500 km', '3+ Hours', '£220'],
+                ['1,500 – 3,500 km', '3+ Hours', '£350'],
+                ['Over 3,500 km', '3+ Hours', '£520'],
+              ].map(([dist, delay, comp], i) => (
+                <div key={i} className="grid grid-cols-3 border-t border-[#e2e8f0] bg-white">
+                  <div className="px-4 py-3 text-[12px] font-semibold text-[#0f172a]">{dist}</div>
+                  <div className="px-4 py-3 text-[12px] text-[#64748b]">{delay}</div>
+                  <div className="px-4 py-3 text-[13px] font-black text-[#0369a1]">{comp}</div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-[#f0f9ff] border border-[#bae6fd] rounded-xl p-4 text-[13px] text-[#0c4a6e] leading-relaxed">
+              <strong>Note on EU carriers:</strong> If you fly from Tel Aviv to London on an EU-based carrier like Wizz Air or Lufthansa, your flight is protected by <strong>EU261</strong> instead of UK261. The financial protections are identical but the legal filing path differs — ClaimVelo handles both.
+            </div>
+          </section>
+
+        </div>
+      </div>
 
       {/* FAQ */}
       <div className="py-16 px-5 bg-white">
