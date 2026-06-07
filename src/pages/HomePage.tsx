@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Page } from '../types';
 import { useLang } from '../lib/language';
-import { ShieldCheck, Scale, Users, Check, X, Minus, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShieldCheck, Scale, Users, Check, X, Minus, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import ClaimModal from '../components/ClaimModal';
 import FlightCheckerWidget from '../components/FlightCheckerWidget';
@@ -155,6 +155,144 @@ const SERVICES = [
   },
 ];
 
+type Distance = 'short' | 'medium' | 'long';
+
+const DISTANCE_OPTIONS: { id: Distance; label: string; range: string; amount: number }[] = [
+  { id: 'short',  label: 'Short-haul',  range: 'Under 1,500 km',      amount: 250 },
+  { id: 'medium', label: 'Medium-haul', range: '1,500 – 3,500 km',    amount: 400 },
+  { id: 'long',   label: 'Long-haul',   range: 'Over 3,500 km',       amount: 600 },
+];
+
+function CompensationCalculator({ onNav }: { onNav: (p: Page) => void }) {
+  const [hours, setHours] = useState(4);
+  const [distance, setDistance] = useState<Distance>('medium');
+
+  const eligible = hours >= 3;
+  const opt = DISTANCE_OPTIONS.find(o => o.id === distance)!;
+  const amount = eligible ? opt.amount : 0;
+  const sliderPct = (hours / 12) * 100;
+
+  return (
+    <div className="bg-white/[0.06] border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-sm">
+      {/* Hours slider */}
+      <div className="mb-7">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[13px] font-bold text-white/70 uppercase tracking-wider">Hours Delayed</span>
+          <span
+            className="text-[18px] font-black px-3 py-0.5 rounded-lg transition-all"
+            style={{
+              background: hours < 3 ? 'rgba(220,38,38,0.2)' : 'rgba(22,163,74,0.2)',
+              color: hours < 3 ? '#fca5a5' : '#86efac',
+            }}
+          >
+            {hours < 12 ? `${hours}h` : '12h+'}
+          </span>
+        </div>
+        <div className="relative">
+          <input
+            type="range"
+            min={0}
+            max={12}
+            step={1}
+            value={hours}
+            onChange={e => setHours(Number(e.target.value))}
+            className="w-full h-3 rounded-full outline-none cursor-pointer"
+            style={{
+              appearance: 'none',
+              background: `linear-gradient(to right, ${hours < 3 ? '#ef4444' : '#22c55e'} 0%, ${hours < 3 ? '#ef4444' : '#22c55e'} ${sliderPct}%, rgba(255,255,255,0.12) ${sliderPct}%, rgba(255,255,255,0.12) 100%)`,
+            }}
+          />
+          {/* Tick marks */}
+          <div className="flex justify-between mt-1.5 px-0.5">
+            {[0, 3, 6, 9, 12].map(h => (
+              <div key={h} className="flex flex-col items-center gap-0.5">
+                <div className={`text-[10px] font-bold transition-colors ${hours === h ? 'text-white' : 'text-white/30'}`}>{h === 12 ? '12+' : `${h}h`}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-2 text-center">
+          <span className="text-[11px] font-semibold" style={{ color: hours < 3 ? '#fca5a5' : '#86efac' }}>
+            {hours < 3
+              ? 'EU261/UK261 requires 3+ hours — slide right'
+              : hours < 8
+              ? 'Eligible under EU261 / UK261'
+              : 'Eligible under EU261, UK261 & Israeli Law'}
+          </span>
+        </div>
+      </div>
+
+      {/* Distance selector */}
+      <div className="mb-7">
+        <div className="text-[13px] font-bold text-white/70 uppercase tracking-wider mb-3">Flight Distance</div>
+        <div className="grid grid-cols-3 gap-2">
+          {DISTANCE_OPTIONS.map(o => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => setDistance(o.id)}
+              className={`flex flex-col items-center gap-1 px-2 py-3 rounded-xl border-2 cursor-pointer transition-all text-center ${
+                distance === o.id
+                  ? 'border-[#38bdf8] bg-[#38bdf8]/10 shadow-lg shadow-sky-900/40'
+                  : 'border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10'
+              }`}
+            >
+              <span className={`text-[13px] font-black transition-colors ${distance === o.id ? 'text-[#38bdf8]' : 'text-white/80'}`}>{o.label}</span>
+              <span className="text-[10px] text-white/40 leading-tight">{o.range}</span>
+              <span className={`text-[13px] font-black mt-0.5 transition-colors ${distance === o.id ? 'text-white' : 'text-white/50'}`}>€{o.amount}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Result */}
+      <div
+        className="rounded-2xl p-5 text-center transition-all duration-500"
+        style={{
+          background: eligible
+            ? 'linear-gradient(135deg, rgba(22,163,74,0.15) 0%, rgba(5,150,105,0.15) 100%)'
+            : 'rgba(220,38,38,0.08)',
+          border: eligible ? '2px solid rgba(22,163,74,0.35)' : '2px solid rgba(220,38,38,0.25)',
+        }}
+      >
+        {eligible ? (
+          <>
+            <div className="text-[12px] font-bold text-emerald-400 uppercase tracking-widest mb-2">You could be owed</div>
+            <div className="flex items-start justify-center gap-1 mb-1">
+              <span className="text-[24px] font-black text-emerald-300 mt-2">€</span>
+              <span className="text-[64px] font-black text-white leading-none tabular-nums transition-all duration-300">{amount.toLocaleString()}</span>
+            </div>
+            <div className="text-[12px] text-white/50 mb-5">per passenger · no win, no fee</div>
+            <button
+              onClick={() => onNav('claim')}
+              className="inline-flex items-center gap-2 bg-[#16a34a] hover:bg-[#15803d] text-white px-7 py-3.5 rounded-xl text-[14px] font-black border-none cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl shadow-lg shadow-green-900/40"
+            >
+              Claim Now <ArrowRight className="w-4 h-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="text-[32px] mb-2">⚠️</div>
+            <div className="text-[15px] font-black text-red-300 mb-1">Delays under 3 hours usually don't qualify</div>
+            <div className="text-[12px] text-white/50 mb-4">EU261 and UK261 require at least 3 hours of arrival delay. Slide to 3h or more to see your entitlement.</div>
+            <button
+              onClick={() => onNav('claim')}
+              className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/80 px-6 py-3 rounded-xl text-[13px] font-semibold border border-white/15 cursor-pointer transition-all"
+            >
+              Still not sure? Submit your claim
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Fine print */}
+      <div className="mt-4 text-center text-[11px] text-white/30">
+        Estimate based on EU Regulation 261/2004 fixed amounts. Actual compensation may vary.
+      </div>
+    </div>
+  );
+}
+
 function CellIcon({ val }: { val: boolean | string }) {
   if (val === true) return <Check className="w-4 h-4 text-[#059669] mx-auto" />;
   if (val === false) return <X className="w-4 h-4 text-[#dc2626] mx-auto" />;
@@ -289,6 +427,18 @@ export default function HomePage({ onNav, onCheckCompensation, onPrefillClaim }:
             </div>
 
           </div>
+        </div>
+      </div>
+
+      {/* COMPENSATION CALCULATOR */}
+      <div className="py-14 px-5" style={{ background: 'linear-gradient(180deg, #0f2744 0%, #0c1f3f 100%)' }}>
+        <div className="max-w-[680px] mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-block bg-white/10 border border-white/20 text-white text-[11px] font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wider">Interactive Calculator</div>
+            <h2 className="text-[clamp(1.6rem,3.5vw,2.4rem)] font-black text-white mb-2">How Much Are You Owed?</h2>
+            <p className="text-[14px] text-white/60 max-w-[400px] mx-auto">Slide to your delay length and select your route distance for an instant estimate.</p>
+          </div>
+          <CompensationCalculator onNav={onNav} />
         </div>
       </div>
 
