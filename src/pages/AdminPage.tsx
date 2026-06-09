@@ -1681,39 +1681,52 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
-                        {['Name', 'Email', 'Agent Code', 'Role', 'Status', 'Added', ''].map(h => (
+                        {['Name', 'Email', 'Code', 'Claims', 'Resolved', 'Value', 'Role', 'Status', 'Added', ''].map(h => (
                           <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {workers.filter(w => w.role !== 'sales_manager' && w.role !== 'agent').map(w => (
-                        <tr key={w.id} className="hover:bg-[#f8fafc]">
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold">{w.full_name || '—'}</td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.email}</td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-mono font-semibold text-[#0f172a]">{w.agent_code || '—'}</td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
-                            <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${w.role === 'admin' ? 'bg-[#fffbeb] text-[#b45309]' : 'bg-[#eff6ff] text-[#2563eb]'}`}>
-                              {w.role.charAt(0).toUpperCase() + w.role.slice(1)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
-                            <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${w.status === 'active' ? 'bg-[#f0fdf4] text-[#16a34a]' : 'bg-[#fffbeb] text-[#d97706]'}`}>
-                              {w.status === 'active' ? '● Active' : '● Pending'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.created_at?.split('T')[0]}</td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
-                            <button
-                              onClick={() => removeWorker(w.id)}
-                              className="p-1 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors"
-                              title="Remove worker"
-                            >
-                              <Trash className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {workers.filter(w => w.role !== 'sales_manager' && w.role !== 'agent').map(w => {
+                        const wClaims = w.agent_code ? claims.filter(c => c.agent === w.agent_code) : [];
+                        const wResolved = wClaims.filter(c => c.status === 'Resolved');
+                        const wValue = wResolved.reduce((sum, c) => {
+                          const n = parseFloat(String(c.amount).replace(/[^0-9.]/g, ''));
+                          return sum + (isNaN(n) ? 0 : n);
+                        }, 0);
+                        return (
+                          <tr key={w.id} className="hover:bg-[#f8fafc]">
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold">{w.full_name || '—'}</td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.email}</td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-mono font-semibold text-[#0f172a]">{w.agent_code || '—'}</td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <span className="inline-flex px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] rounded-[10px] text-[10px] font-semibold">{wClaims.length}</span>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <span className="inline-flex px-2 py-0.5 bg-[#f0fdf4] text-[#16a34a] rounded-[10px] text-[10px] font-semibold">{wResolved.length}</span>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold text-[#0f172a]">
+                              {wValue > 0 ? `€${wValue.toLocaleString('en-EU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '—'}
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${w.role === 'admin' ? 'bg-[#fffbeb] text-[#b45309]' : 'bg-[#eff6ff] text-[#2563eb]'}`}>
+                                {w.role.charAt(0).toUpperCase() + w.role.slice(1)}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${w.status === 'active' ? 'bg-[#f0fdf4] text-[#16a34a]' : 'bg-[#fffbeb] text-[#d97706]'}`}>
+                                {w.status === 'active' ? '● Active' : '● Pending'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.created_at?.split('T')[0]}</td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <button onClick={() => removeWorker(w.id)} className="p-1 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors" title="Remove worker">
+                                <Trash className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}
@@ -1905,37 +1918,57 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
-                        {['Name', 'Email', 'Agent Code', 'Status', 'Added', ''].map(h => (
+                        {['Name', 'Code', 'Claims', 'Resolved', 'Total Value', 'Status', 'Added', ''].map(h => (
                           <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {workers.filter(w => w.role === 'agent').map(w => (
-                        <tr key={w.id} className="hover:bg-[#f8fafc]">
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold">{w.full_name || '—'}</td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.email}</td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-mono font-semibold text-[#0f172a]">{w.agent_code || '—'}</td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
-                            <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${w.status === 'active' ? 'bg-[#f0fdf4] text-[#16a34a]' : 'bg-[#fffbeb] text-[#d97706]'}`}>
-                              {w.status === 'active' ? '● Active' : '● Pending'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.created_at?.split('T')[0]}</td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
-                            <div className="flex items-center gap-1">
-                              {w.agent_code && (
-                                <button onClick={() => openAgentQR(w.full_name || w.email, w.agent_code!)} className="p-1 text-[#64748b] hover:text-[#0369a1] bg-transparent border-none cursor-pointer rounded transition-colors" title="View QR code">
-                                  <QrCode className="w-3.5 h-3.5" />
+                      {workers.filter(w => w.role === 'agent').map(w => {
+                        const agentClaims = w.agent_code ? claims.filter(c => c.agent === w.agent_code) : [];
+                        const resolved = agentClaims.filter(c => c.status === 'Resolved');
+                        const totalValue = resolved.reduce((sum, c) => {
+                          const n = parseFloat(String(c.amount).replace(/[^0-9.]/g, ''));
+                          return sum + (isNaN(n) ? 0 : n);
+                        }, 0);
+                        return (
+                          <tr key={w.id} className="hover:bg-[#f8fafc]">
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold">{w.full_name || '—'}</td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-mono font-semibold text-[#0f172a]">{w.agent_code || '—'}</td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] rounded-[10px] text-[10px] font-semibold">
+                                {agentClaims.length}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#f0fdf4] text-[#16a34a] rounded-[10px] text-[10px] font-semibold">
+                                {resolved.length}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold text-[#0f172a]">
+                              {totalValue > 0 ? `€${totalValue.toLocaleString('en-EU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '—'}
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${w.status === 'active' ? 'bg-[#f0fdf4] text-[#16a34a]' : 'bg-[#fffbeb] text-[#d97706]'}`}>
+                                {w.status === 'active' ? '● Active' : '● Pending'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.created_at?.split('T')[0]}</td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <div className="flex items-center gap-1">
+                                {w.agent_code && (
+                                  <button onClick={() => openAgentQR(w.full_name || w.email, w.agent_code!)} className="p-1 text-[#64748b] hover:text-[#0369a1] bg-transparent border-none cursor-pointer rounded transition-colors" title="View QR code">
+                                    <QrCode className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                <button onClick={() => removeWorker(w.id)} className="p-1 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors" title="Remove">
+                                  <Trash className="w-3.5 h-3.5" />
                                 </button>
-                              )}
-                              <button onClick={() => removeWorker(w.id)} className="p-1 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors" title="Remove">
-                                <Trash className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}
