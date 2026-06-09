@@ -1313,6 +1313,85 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   </tbody>
                 </table>
               </div>
+
+              {/* Team Performance */}
+              {(() => {
+                const withCode = workers.filter(w => w.agent_code);
+                if (withCode.length === 0) return null;
+                const rows = withCode.map(w => {
+                  const wClaims = claims.filter(c => c.agent === w.agent_code);
+                  const wResolved = wClaims.filter(c => c.status === 'Resolved');
+                  const wValue = wResolved.reduce((sum, c) => {
+                    const n = parseFloat(String(c.amount).replace(/[^0-9.]/g, ''));
+                    return sum + (isNaN(n) ? 0 : n);
+                  }, 0);
+                  return { w, total: wClaims.length, resolved: wResolved.length, value: wValue };
+                }).sort((a, b) => b.value - a.value || b.total - a.total);
+                const maxValue = rows[0]?.value || 0;
+                const roleColor: Record<string, string> = {
+                  agent: 'bg-[#f0fdf4] text-[#16a34a]',
+                  worker: 'bg-[#eff6ff] text-[#2563eb]',
+                  sales_manager: 'bg-[#fdf4ff] text-[#9333ea]',
+                  admin: 'bg-[#fffbeb] text-[#b45309]',
+                };
+                return (
+                  <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4">
+                    <div className="flex items-center mb-3.5">
+                      <span className="font-bold text-[13px]">Team Performance</span>
+                      <button onClick={() => setAv('users')} className="ml-auto px-2.5 py-1 bg-[#f8fafc] border border-[#e2e8f0] text-[#0f172a] rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#e2e8f0]">Manage team →</button>
+                    </div>
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr>
+                          {['#', 'Name', 'Role', 'Claims', 'Resolved', 'Total Value', 'Progress'].map(h => (
+                            <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map(({ w, total, resolved, value }, i) => (
+                          <tr key={w.id} className="hover:bg-[#f8fafc]">
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#94a3b8] font-semibold w-8">
+                              {i === 0 && total > 0 ? '🥇' : i === 1 && total > 0 ? '🥈' : i === 2 && total > 0 ? '🥉' : `${i + 1}`}
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0]">
+                              <div className="text-xs font-semibold text-[#0f172a]">{w.full_name || w.email}</div>
+                              <div className="text-[10px] text-[#94a3b8] font-mono">{w.agent_code}</div>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${roleColor[w.role] || 'bg-[#f1f5f9] text-[#64748b]'}`}>
+                                {w.role === 'sales_manager' ? 'Sales' : w.role.charAt(0).toUpperCase() + w.role.slice(1)}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <span className="inline-flex px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] rounded-[10px] text-[10px] font-semibold">{total}</span>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              <span className="inline-flex px-2 py-0.5 bg-[#f0fdf4] text-[#16a34a] rounded-[10px] text-[10px] font-semibold">{resolved}</span>
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-bold text-[#0f172a]">
+                              {value > 0 ? `€${value.toLocaleString('en-EU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : <span className="text-[#cbd5e1] font-normal">—</span>}
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] w-[120px]">
+                              <div className="h-1.5 bg-[#f1f5f9] rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-[#2563eb] to-[#16a34a] transition-all duration-500"
+                                  style={{ width: maxValue > 0 ? `${Math.round((value / maxValue) * 100)}%` : '0%' }}
+                                />
+                              </div>
+                              {total > 0 && (
+                                <div className="text-[9px] text-[#94a3b8] mt-0.5">
+                                  {total > 0 ? `${Math.round((resolved / total) * 100)}% win rate` : ''}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
