@@ -767,6 +767,9 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [workerSaving, setWorkerSaving] = useState(false);
   const [workerError, setWorkerError] = useState('');
 
+  // Partner registrations
+  const [partnerRegs, setPartnerRegs] = useState<{ id: string; agency_name: string; full_name: string; email: string; created_at: string }[]>([]);
+
   // Sales managers state
   const [showAddSales, setShowAddSales] = useState(false);
   const [salesForm, setSalesForm] = useState({ email: '', full_name: '' });
@@ -902,6 +905,9 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     if (!user) return;
     supabase.from('claims').select('*').order('created_at', { ascending: false }).then(({ data }) => {
       if (data) setClaims(data as Claim[]);
+    });
+    supabase.from('partner_registrations').select('*').order('created_at', { ascending: false }).then(({ data }) => {
+      if (data) setPartnerRegs(data);
     });
     loadNotifications();
   }, [user?.id]);
@@ -1489,6 +1495,39 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Partner Applications */}
+              <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4 mt-4">
+                <div className="flex items-center gap-2 mb-3.5">
+                  <span className="font-bold text-[13px]">B2B Partner Applications</span>
+                  <span className="ml-1 px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] rounded-[10px] text-[10px] font-semibold">{partnerRegs.length}</span>
+                </div>
+                {partnerRegs.length === 0 ? (
+                  <div className="text-center py-8 text-[#94a3b8] text-[13px]">No partner applications yet.</div>
+                ) : (
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        {['Agency', 'Contact Name', 'Email', 'Applied'].map(h => (
+                          <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {partnerRegs.map(r => (
+                        <tr key={r.id} className="hover:bg-[#f8fafc]">
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold">{r.agency_name}</td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">{r.full_name}</td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#2563eb]">
+                            <a href={`mailto:${r.email}`} className="hover:underline">{r.email}</a>
+                          </td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{r.created_at?.split('T')[0]}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           )}
