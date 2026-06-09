@@ -981,6 +981,8 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
       setSalesSuccess(`Account created! Welcome email sent to ${salesForm.email.trim()}.`);
       setSalesForm({ email: '', full_name: '' });
       setShowAddSales(false);
+      const { data } = await supabase.from('worker_profiles').select('*').order('created_at', { ascending: false });
+      if (data) setWorkers(data as WorkerProfile[]);
     } catch (e: unknown) {
       setSalesError(e instanceof Error ? e.message : 'Something went wrong');
     }
@@ -1569,7 +1571,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
               <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4 mb-3.5">
                 <div className="flex items-center mb-3.5">
                   <span className="font-bold text-[13px]">Workers</span>
-                  <span className="ml-2 text-[10px] text-[#64748b]">{workers.length} member{workers.length !== 1 ? 's' : ''}</span>
+                  <span className="ml-2 text-[10px] text-[#64748b]">{workers.filter(w => w.role !== 'sales_manager' && w.role !== 'agent').length} member{workers.filter(w => w.role !== 'sales_manager' && w.role !== 'agent').length !== 1 ? 's' : ''}</span>
                   <button
                     onClick={() => { setShowAddWorker(true); setWorkerError(''); }}
                     className="ml-auto flex items-center gap-1.5 px-2.5 py-1 bg-[#2563eb] text-white border-none rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#1d4ed8]"
@@ -1643,7 +1645,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   </div>
                 )}
 
-                {workers.length === 0 ? (
+                {workers.filter(w => w.role !== 'sales_manager' && w.role !== 'agent').length === 0 ? (
                   <div className="text-center py-10 text-[#94a3b8] text-[13px]">No workers added yet. Click "Add Worker" to get started.</div>
                 ) : (
                   <table className="w-full border-collapse">
@@ -1655,7 +1657,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {workers.map(w => (
+                      {workers.filter(w => w.role !== 'sales_manager' && w.role !== 'agent').map(w => (
                         <tr key={w.id} className="hover:bg-[#f8fafc]">
                           <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold">{w.full_name || '—'}</td>
                           <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.email}</td>
@@ -1697,7 +1699,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
               <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4">
                 <div className="flex items-center mb-3.5">
                   <span className="font-bold text-[13px]">Sales Managers</span>
-                  <span className="ml-2 text-[10px] text-[#64748b]">External sales partners</span>
+                  <span className="ml-2 text-[10px] text-[#64748b]">{workers.filter(w => w.role === 'sales_manager').length} member{workers.filter(w => w.role === 'sales_manager').length !== 1 ? 's' : ''}</span>
                   <button
                     onClick={() => { setShowAddSales(true); setSalesError(''); setSalesSuccess(''); }}
                     className="ml-auto flex items-center gap-1.5 px-2.5 py-1 bg-[#0369a1] text-white border-none rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#075985]"
@@ -1754,10 +1756,41 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   </div>
                 )}
 
-                {!showAddSales && !salesSuccess && (
+                {!showAddSales && !salesSuccess && workers.filter(w => w.role === 'sales_manager').length === 0 && (
                   <div className="text-[12px] text-[#94a3b8] py-3 text-center">
                     Sales managers get their own login portal and a temporary password via email.
                   </div>
+                )}
+
+                {workers.filter(w => w.role === 'sales_manager').length > 0 && (
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        {['Name', 'Email', 'Status', 'Added', ''].map(h => (
+                          <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workers.filter(w => w.role === 'sales_manager').map(w => (
+                        <tr key={w.id} className="hover:bg-[#f8fafc]">
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold">{w.full_name || '—'}</td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.email}</td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                            <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${w.status === 'active' ? 'bg-[#f0fdf4] text-[#16a34a]' : 'bg-[#fffbeb] text-[#d97706]'}`}>
+                              {w.status === 'active' ? '● Active' : '● Pending'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.created_at?.split('T')[0]}</td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                            <button onClick={() => removeWorker(w.id)} className="p-1 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors" title="Remove">
+                              <Trash className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
 
@@ -1765,7 +1798,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
               <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4">
                 <div className="flex items-center mb-3.5">
                   <span className="font-bold text-[13px]">Agents</span>
-                  <span className="ml-2 text-[10px] text-[#64748b]">Referral agents</span>
+                  <span className="ml-2 text-[10px] text-[#64748b]">{workers.filter(w => w.role === 'agent').length} member{workers.filter(w => w.role === 'agent').length !== 1 ? 's' : ''}</span>
                   <button
                     onClick={() => { setShowAddAgent(true); setAgentError(''); setAgentSuccess(''); }}
                     className="ml-auto flex items-center gap-1.5 px-2.5 py-1 bg-[#16a34a] text-white border-none rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#15803d]"
@@ -1832,10 +1865,42 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   </div>
                 )}
 
-                {!showAddAgent && !agentSuccess && (
+                {!showAddAgent && !agentSuccess && workers.filter(w => w.role === 'agent').length === 0 && (
                   <div className="text-[12px] text-[#94a3b8] py-3 text-center">
                     Agents get their own login, a temporary password, and their referral QR code via email.
                   </div>
+                )}
+
+                {workers.filter(w => w.role === 'agent').length > 0 && (
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        {['Name', 'Email', 'Agent Code', 'Status', 'Added', ''].map(h => (
+                          <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workers.filter(w => w.role === 'agent').map(w => (
+                        <tr key={w.id} className="hover:bg-[#f8fafc]">
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold">{w.full_name || '—'}</td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.email}</td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-mono font-semibold text-[#0f172a]">{w.agent_code || '—'}</td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                            <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${w.status === 'active' ? 'bg-[#f0fdf4] text-[#16a34a]' : 'bg-[#fffbeb] text-[#d97706]'}`}>
+                              {w.status === 'active' ? '● Active' : '● Pending'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.created_at?.split('T')[0]}</td>
+                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                            <button onClick={() => removeWorker(w.id)} className="p-1 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors" title="Remove">
+                              <Trash className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
 
