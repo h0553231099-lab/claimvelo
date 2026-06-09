@@ -31,6 +31,7 @@ export default function Nav({ page, onNav, user, onSignOut }: NavProps) {
     { id: 'about' as Page, label: t('nav.about') },
     { id: 'how-it-works' as Page, label: t('nav.how') },
     { id: 'fees' as Page, label: t('nav.fees') },
+    { id: 'partners' as Page, label: 'B2B Partners' },
     { id: 'claim' as Page, label: t('nav.claim') },
   ];
 

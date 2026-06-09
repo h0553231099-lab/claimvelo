@@ -26,6 +26,7 @@ const SalesManagerPage = lazy(() => import('./pages/SalesManagerPage'));
 const AgentSignInPage = lazy(() => import('./pages/AgentSignInPage'));
 const SalesSignInPage = lazy(() => import('./pages/SalesSignInPage'));
 const SeoSignInPage = lazy(() => import('./pages/SeoSignInPage'));
+const PartnerPage = lazy(() => import('./pages/PartnerPage'));
 const emptyForm = (): ClaimFormData => ({
   firstName: '', lastName: '', email: '', phone: '', address: '', country: 'United Kingdom', countryOther: '', dob: '',
   flight: '', fdate: '', dep: '', arr: '', airline: '', issue: '', reason: '',
@@ -187,6 +188,7 @@ export default function App() {
           {page === 'sales-signin' && <SalesSignInPage onAuth={handleAuth} onNav={nav} />}
           {page === 'seo-signin' && <SeoSignInPage onAuth={handleAuth} onNav={nav} />}
           {page === 'privacy' && <PrivacyPolicyPage onNav={nav} />}
+          {page === 'partners' && <PartnerPage onNav={nav} />}
           {page === 'agent-dashboard' && <AgentDashboardPage onNav={nav} user={user} onSignOut={handleSignOut} />}
           {page === 'sales-dashboard' && <SalesManagerPage onNav={nav} user={user} onSignOut={handleSignOut} />}
         </Suspense>

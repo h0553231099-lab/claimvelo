@@ -15,6 +15,7 @@ export const PAGE_PATHS: Record<string, Page> = {
   'privacy': 'privacy',
   'dashboard': 'dashboard',
   'admin': 'admin',
+  'partners': 'partners',
 };
 
 export const PAGE_SLUGS: Partial<Record<Page, string>> = {
@@ -30,6 +31,7 @@ export const PAGE_SLUGS: Partial<Record<Page, string>> = {
   privacy: 'privacy',
   dashboard: 'dashboard',
   admin: 'admin',
+  partners: 'partners',
 };
 
 export function parseUrl(pathname: string): { locale: Locale; page: Page } {
