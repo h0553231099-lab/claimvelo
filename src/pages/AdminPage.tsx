@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { Claim, ClaimStatus, AdminView, UserProfile } from '../types';
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
 import { Page } from '../types';
-import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download } from 'lucide-react';
+import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2 } from 'lucide-react';
 
 interface FinanceTransaction {
   id: string;
@@ -792,6 +792,9 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [qrAgentName, setQrAgentName] = useState('');
   const [qrAgentId, setQrAgentId] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  // Inline QR modal for agent rows
+  const [qrModal, setQrModal] = useState<{ name: string; code: string; dataUrl: string } | null>(null);
+  const [qrCopied, setQrCopied] = useState(false);
 
   async function generateQR() {
     const id = qrAgentId.trim() || 'AGT-001';
@@ -802,6 +805,33 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
       color: { dark: '#0f172a', light: '#ffffff' },
     });
     setQrDataUrl(dataUrl);
+  }
+
+  async function openAgentQR(name: string, code: string) {
+    const url = `${window.location.origin}/claim?agent=${encodeURIComponent(code)}`;
+    const dataUrl = await QRCode.toDataURL(url, {
+      width: 240,
+      margin: 2,
+      color: { dark: '#0f172a', light: '#ffffff' },
+    });
+    setQrModal({ name, code, dataUrl });
+    setQrCopied(false);
+  }
+
+  function downloadAgentQR() {
+    if (!qrModal) return;
+    const a = document.createElement('a');
+    a.download = `claimvelo-qr-${qrModal.code}.png`;
+    a.href = qrModal.dataUrl;
+    a.click();
+  }
+
+  function copyAgentLink() {
+    if (!qrModal) return;
+    const url = `${window.location.origin}/claim?agent=${encodeURIComponent(qrModal.code)}`;
+    navigator.clipboard.writeText(url);
+    setQrCopied(true);
+    setTimeout(() => setQrCopied(false), 2000);
   }
 
   function downloadQR() {
@@ -1893,9 +1923,16 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                           </td>
                           <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{w.created_at?.split('T')[0]}</td>
                           <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
-                            <button onClick={() => removeWorker(w.id)} className="p-1 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors" title="Remove">
-                              <Trash className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {w.agent_code && (
+                                <button onClick={() => openAgentQR(w.full_name || w.email, w.agent_code!)} className="p-1 text-[#64748b] hover:text-[#0369a1] bg-transparent border-none cursor-pointer rounded transition-colors" title="View QR code">
+                                  <QrCode className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button onClick={() => removeWorker(w.id)} className="p-1 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors" title="Remove">
+                                <Trash className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1904,6 +1941,51 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 )}
               </div>
 
+            </div>
+          )}
+
+          {/* QR modal */}
+          {qrModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setQrModal(null)}>
+              <div className="bg-white rounded-[14px] shadow-2xl p-6 w-[320px] flex flex-col items-center gap-4" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between w-full">
+                  <div>
+                    <div className="font-bold text-[14px] text-[#0f172a]">{qrModal.name}</div>
+                    <div className="text-[11px] font-mono text-[#64748b] mt-0.5">{qrModal.code}</div>
+                  </div>
+                  <button onClick={() => setQrModal(null)} className="p-1 text-[#94a3b8] hover:text-[#0f172a] bg-transparent border-none cursor-pointer rounded">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <img src={qrModal.dataUrl} alt="QR Code" className="w-[200px] h-[200px] rounded-[8px] border border-[#e2e8f0]" />
+
+                <div className="w-full">
+                  <div className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider mb-1.5">Referral Link</div>
+                  <div className="flex items-center gap-2 px-2.5 py-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-[8px]">
+                    <Link2 className="w-3.5 h-3.5 text-[#64748b] flex-shrink-0" />
+                    <a
+                      href={`${window.location.origin}/claim?agent=${encodeURIComponent(qrModal.code)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-[#0369a1] truncate flex-1 hover:underline"
+                    >
+                      {`${window.location.origin}/claim?agent=${encodeURIComponent(qrModal.code)}`}
+                    </a>
+                    <button onClick={copyAgentLink} className="flex-shrink-0 p-0.5 text-[#64748b] hover:text-[#0369a1] bg-transparent border-none cursor-pointer rounded" title="Copy link">
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {qrCopied && <div className="text-[10px] text-[#16a34a] mt-1 text-right">Copied!</div>}
+                </div>
+
+                <button
+                  onClick={downloadAgentQR}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#0f172a] text-white border-none rounded-[8px] text-[12px] font-semibold cursor-pointer hover:bg-[#1e293b] transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download QR PNG
+                </button>
+              </div>
             </div>
           )}
 
