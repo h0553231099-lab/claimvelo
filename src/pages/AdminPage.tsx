@@ -63,7 +63,7 @@ const AV_TITLES: Record<AdminView, string> = {
   dash:'Dashboard', claims:'All Claims', crm:'CRM Kanban',
   inbox:'Inbox', notifs:'Notifications', analytics:'Analytics',
   automation:'Automation', users:'Users & Roles', settings:'Settings',
-  finance:'Income & Expenses', qr:'Agent QR Codes',
+  finance:'Income & Expenses', qr:'Agent QR Codes', partners:'B2B Partners',
 };
 
 interface DbNotification {
@@ -1207,7 +1207,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const sidebarMainItems: AdminView[] = isWorker ? ['dash','claims'] : ['dash','claims','crm'];
   const sidebarSystemItems: AdminView[] = isWorker
     ? ['inbox','notifs']
-    : ['inbox','notifs','analytics','automation','users','qr','settings'];
+    : ['inbox','notifs','analytics','automation','users','qr','partners','settings'];
   const sidebarFinanceItems: AdminView[] = isWorker ? [] : ['finance'];
 
   return (
@@ -1233,7 +1233,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
           {sidebarSystemItems.map(id => (
             <button key={id} onClick={() => setAv(id)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] cursor-pointer text-[12px] font-medium border-none w-full text-left mb-0.5 transition-colors ${av===id?'bg-[#eff6ff] text-[#2563eb]':'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'}`}>
-              <span>{id==='inbox'?'📥':id==='notifs'?'🔔':id==='analytics'?'📈':id==='automation'?'⚙️':id==='users'?'👥':id==='qr'?'🔳':'🔧'}</span>
+              <span>{id==='inbox'?'📥':id==='notifs'?'🔔':id==='analytics'?'📈':id==='automation'?'⚙️':id==='users'?'👥':id==='qr'?'🔳':id==='partners'?'🤝':'🔧'}</span>
               {AV_TITLES[id]}
               {id==='notifs' && notifications.filter(n => !n.read).length > 0 && <span className="ml-auto bg-[#2563eb] text-white text-[9px] font-bold px-1 py-0.5 rounded-[7px]">{notifications.filter(n => !n.read).length}</span>}
             </button>
@@ -1496,39 +1496,44 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   );
                 })}
               </div>
+            </div>
+          )}
 
-              {/* Partner Applications */}
-              <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4 mt-4">
-                <div className="flex items-center gap-2 mb-3.5">
-                  <span className="font-bold text-[13px]">B2B Partner Applications</span>
-                  <span className="ml-1 px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] rounded-[10px] text-[10px] font-semibold">{partnerRegs.length}</span>
-                </div>
-                {partnerRegs.length === 0 ? (
-                  <div className="text-center py-8 text-[#94a3b8] text-[13px]">No partner applications yet.</div>
-                ) : (
+          {/* B2B PARTNERS */}
+          {av === 'partners' && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="font-bold text-[15px]">B2B Partner Applications</span>
+                <span className="px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] rounded-[10px] text-[10px] font-semibold">{partnerRegs.length}</span>
+              </div>
+              {partnerRegs.length === 0 ? (
+                <div className="text-center py-16 text-[#94a3b8] text-[13px]">No partner applications yet.</div>
+              ) : (
+                <div className="bg-white border border-[#e2e8f0] rounded-[10px] overflow-hidden">
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
-                        {['Agency', 'Contact Name', 'Email', 'Applied'].map(h => (
-                          <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
+                        {['#', 'Agency', 'Contact Name', 'Email', 'Applied'].map(h => (
+                          <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {partnerRegs.map(r => (
-                        <tr key={r.id} className="hover:bg-[#f8fafc]">
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold">{r.agency_name}</td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">{r.full_name}</td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#2563eb]">
+                      {partnerRegs.map((r, i) => (
+                        <tr key={r.id} className="hover:bg-[#f8fafc] transition-colors">
+                          <td className="px-3.5 py-3 border-b border-[#e2e8f0] text-[11px] text-[#94a3b8] font-medium">{i + 1}</td>
+                          <td className="px-3.5 py-3 border-b border-[#e2e8f0] text-[12px] font-semibold text-[#0f172a]">{r.agency_name}</td>
+                          <td className="px-3.5 py-3 border-b border-[#e2e8f0] text-[12px]">{r.full_name}</td>
+                          <td className="px-3.5 py-3 border-b border-[#e2e8f0] text-[12px] text-[#2563eb]">
                             <a href={`mailto:${r.email}`} className="hover:underline">{r.email}</a>
                           </td>
-                          <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b]">{r.created_at?.split('T')[0]}</td>
+                          <td className="px-3.5 py-3 border-b border-[#e2e8f0] text-[11px] text-[#64748b]">{r.created_at?.split('T')[0]}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
