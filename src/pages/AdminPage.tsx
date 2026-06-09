@@ -941,7 +941,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
       full_name: workerForm.full_name.trim(),
       role: workerForm.role,
       agent_code: workerForm.agent_code.trim().toUpperCase(),
-      status: 'pending',
+      status: 'active',
       created_by: user?.id,
     });
     if (error) {
