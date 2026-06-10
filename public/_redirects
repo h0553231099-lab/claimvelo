@@ -1,1 +1,29 @@
-/* /index.html 200
+# 301 redirects for removed language prefixes — all → English canonical
+
+/es/*         /:splat         301
+/de/*         /:splat         301
+/fr/*         /:splat         301
+/pt/*         /:splat         301
+/it/*         /:splat         301
+/nl/*         /:splat         301
+/pl/*         /:splat         301
+/ro/*         /:splat         301
+/ru/*         /:splat         301
+/cs/*         /:splat         301
+/da/*         /:splat         301
+/sv/*         /:splat         301
+/no/*         /:splat         301
+/fi/*         /:splat         301
+/el/*         /:splat         301
+/hr/*         /:splat         301
+/hu/*         /:splat         301
+/bg/*         /:splat         301
+/tr/*         /:splat         301
+/uk/*         /:splat         301
+/ar/*         /:splat         301
+/zh/*         /:splat         301
+/sq/*         /:splat         301
+/pt-br/*      /:splat         301
+
+# SPA fallback — must come last
+/*            /index.html     200
