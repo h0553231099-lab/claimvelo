@@ -11,15 +11,99 @@ interface Props {
 type ModalState =
   | { kind: 'idle' }
   | { kind: 'loading' }
-  | { kind: 'eligible'; flight: FlightLookupResult; amount: number; currency: string }
+  | { kind: 'eligible'; flight: FlightLookupResult; amount: number; currency: string; distanceKm: number | null }
   | { kind: 'not_eligible'; flight: FlightLookupResult; reason: string }
   | { kind: 'not_found'; flightNum: string; date: string }
   | { kind: 'error'; message: string };
 
-function compensationAmount(delayMin: number): { amount: number; currency: string } | null {
+// IATA → [lat, lon] for major airports (haversine distance calc)
+const AIRPORT_COORDS: Record<string, [number, number]> = {
+  LHR:[51.477,-0.461],LGW:[51.148,-0.190],LTN:[51.874,-0.368],STN:[51.885,0.235],LCY:[51.505,0.055],
+  MAN:[53.354,-2.275],EDI:[55.950,-3.373],BHX:[52.453,-1.748],GLA:[55.872,-4.433],BRS:[51.382,-2.719],
+  CDG:[49.009,2.548],ORY:[48.724,2.380],NCE:[43.658,7.215],LYS:[45.726,5.081],MRS:[43.435,5.215],
+  AMS:[52.308,4.764],BRU:[50.902,4.484],LGG:[50.637,5.443],
+  FRA:[50.033,8.570],MUC:[48.354,11.786],BER:[52.366,13.503],DUS:[51.289,6.767],HAM:[53.630,10.006],
+  STR:[48.690,9.222],CGN:[50.866,7.143],NUE:[49.499,11.078],HAJ:[52.461,9.685],
+  MAD:[40.472,-3.561],BCN:[41.297,2.078],PMI:[39.551,2.739],AGP:[36.675,-4.499],ALC:[38.282,-0.558],
+  VLC:[39.489,-0.481],BIO:[43.301,-2.911],SVQ:[37.418,-5.893],
+  FCO:[41.800,12.239],MXP:[45.630,8.723],LIN:[45.445,9.277],VCE:[45.505,12.352],NAP:[40.886,14.291],
+  BGY:[45.669,9.704],PSA:[43.683,10.393],BLQ:[44.535,11.289],CTA:[37.467,15.066],
+  LIS:[38.781,-9.136],OPO:[41.248,-8.681],FAO:[37.014,-7.966],
+  ZRH:[47.458,8.548],GVA:[46.238,6.109],BSL:[47.590,7.530],
+  VIE:[48.110,16.570],SZG:[47.793,13.004],GRZ:[46.991,15.440],
+  PRG:[50.100,14.260],BRQ:[49.151,16.695],
+  WAW:[52.165,20.967],KRK:[50.077,19.785],WRO:[51.102,16.885],KTW:[50.474,19.080],
+  BUD:[47.433,19.261],
+  OTP:[44.572,26.102],CLJ:[46.785,23.686],
+  SOF:[42.696,23.411],VAR:[43.232,27.825],
+  ATH:[37.936,23.944],SKG:[40.520,22.971],HER:[35.340,25.181],
+  IST:[40.976,28.814],SAW:[40.898,29.309],AYT:[36.899,30.800],ADB:[38.292,27.157],ESB:[40.128,32.995],
+  SVO:[55.973,37.415],DME:[55.408,37.906],LED:[59.800,30.262],VKO:[55.591,37.261],
+  ARN:[59.651,17.919],GOT:[57.669,12.300],BMA:[59.354,17.947],
+  CPH:[55.618,12.656],AAL:[57.093,9.849],
+  OSL:[60.194,11.100],BGO:[60.294,5.218],
+  HEL:[60.317,24.963],TMP:[61.414,23.604],
+  RIX:[56.924,23.971],TLL:[59.413,24.833],VNO:[54.634,25.285],
+  DUB:[53.421,-6.270],SNN:[52.702,-8.925],ORK:[51.841,-8.491],
+  KEF:[63.985,-22.606],
+  TXL:[52.554,13.291],SXF:[52.380,13.522],
+  LPA:[27.931,-15.387],TFS:[28.045,-16.572],ACE:[28.945,-13.605],FUE:[28.300,-13.864],
+  HRG:[27.178,33.799],SSH:[27.977,34.395],CAI:[30.122,31.405],
+  DXB:[25.253,55.364],AUH:[24.433,54.651],SHJ:[25.328,55.517],DOH:[25.273,51.608],
+  KWI:[29.227,47.969],BAH:[26.270,50.634],MCT:[23.594,58.285],
+  DEL:[28.556,77.100],BOM:[19.089,72.868],BLR:[13.199,77.706],MAA:[12.990,80.169],
+  HYD:[17.231,78.430],CCU:[22.655,88.447],COK:[10.152,76.401],
+  BKK:[13.681,100.747],DMK:[13.913,100.606],HKT:[8.113,98.316],
+  SIN:[1.359,103.989],KUL:[2.745,101.710],CGK:[-6.127,106.655],
+  HKG:[22.308,113.915],PEK:[40.080,116.585],PVG:[31.143,121.805],CAN:[23.392,113.299],
+  ICN:[37.469,126.451],GMP:[37.558,126.791],
+  NRT:[35.765,140.386],HND:[35.549,139.780],KIX:[34.426,135.244],NGO:[34.858,136.805],
+  SYD:[-33.946,151.177],MEL:[-37.673,144.843],BNE:[-27.384,153.118],PER:[-31.940,115.967],
+  JNB:[-26.134,28.242],CPT:[-33.965,18.602],
+  YYZ:[43.677,-79.631],YVR:[49.194,-123.184],YUL:[45.470,-73.741],YYC:[51.131,-114.010],
+  JFK:[40.640,-73.779],LAX:[33.943,-118.408],ORD:[41.978,-87.905],ATL:[33.640,-84.427],
+  DFW:[32.896,-97.038],DEN:[39.856,-104.674],SFO:[37.619,-122.375],LAS:[36.080,-115.152],
+  SEA:[47.449,-122.309],PHX:[33.436,-112.008],EWR:[40.693,-74.169],MIA:[25.796,-80.287],
+  BOS:[42.365,-71.010],MSP:[44.882,-93.222],IAD:[38.944,-77.456],CLT:[35.214,-80.943],
+  DTW:[42.212,-83.353],MCO:[28.430,-81.309],PHL:[39.873,-75.241],SAN:[32.734,-117.190],
+  TPA:[27.976,-82.533],PDX:[45.589,-122.593],STL:[38.748,-90.370],BNA:[36.124,-86.678],
+  MXP:[45.630,8.723],GRU:[-23.432,-46.469],GIG:[-22.808,-43.244],EZE:[-34.822,-58.536],
+  BOG:[4.700,-74.147],LIM:[-12.022,-77.114],SCL:[-33.393,-70.786],
+  MEX:[19.436,-99.072],CUN:[21.037,-86.877],GDL:[20.521,-103.311],MTY:[25.775,-100.107],
+};
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function routeDistanceKm(depCode: string, arrCode: string): number | null {
+  const dep = AIRPORT_COORDS[depCode?.toUpperCase()];
+  const arr = AIRPORT_COORDS[arrCode?.toUpperCase()];
+  if (!dep || !arr) return null;
+  return haversineKm(dep[0], dep[1], arr[0], arr[1]);
+}
+
+function compensationAmount(delayMin: number, depCode?: string, arrCode?: string): { amount: number; currency: string; distanceKm: number | null } | null {
   if (delayMin < 180) return null;
-  // Simplified EU261 estimate — we don't know distance so show max possible
-  return { amount: 600, currency: '€' };
+  const distanceKm = depCode && arrCode ? routeDistanceKm(depCode, arrCode) : null;
+  if (distanceKm === null) {
+    // Unknown distance — show max possible
+    return { amount: 600, currency: '€', distanceKm: null };
+  }
+  let amount: number;
+  if (distanceKm <= 1500) {
+    amount = 250;
+  } else if (distanceKm <= 3500) {
+    amount = 400;
+  } else {
+    // Over 3500 km: €300 for 3-4h delay, €600 for 4h+
+    amount = delayMin >= 240 ? 600 : 300;
+  }
+  return { amount, currency: '€', distanceKm: Math.round(distanceKm) };
 }
 
 function formatDelay(min: number): string {
@@ -59,13 +143,13 @@ export default function FlightCheckerWidget({ onNav, onPrefillClaim }: Props) {
 
     // Cancelled flight — always eligible
     if (flight.status === 'cancelled') {
-      setModal({ kind: 'eligible', flight, amount: 600, currency: '€' });
+      setModal({ kind: 'eligible', flight, amount: 600, currency: '€', distanceKm: null });
       return;
     }
 
-    const comp = compensationAmount(flight.delayMin);
+    const comp = compensationAmount(flight.delayMin, flight.depCode, flight.arrCode);
     if (comp) {
-      setModal({ kind: 'eligible', flight, amount: comp.amount, currency: comp.currency });
+      setModal({ kind: 'eligible', flight, amount: comp.amount, currency: comp.currency, distanceKm: comp.distanceKm });
     } else {
       const reason =
         flight.delayMin > 0
@@ -216,6 +300,9 @@ export default function FlightCheckerWidget({ onNav, onPrefillClaim }: Props) {
                         value={`${formatDelay(modal.flight.delayMin)} late`}
                         valueClass="text-amber-600 font-black"
                       />
+                    )}
+                    {modal.distanceKm && (
+                      <DetailRow icon="📏" label="Route Distance" value={`${modal.distanceKm.toLocaleString()} km`} />
                     )}
                   </div>
 
