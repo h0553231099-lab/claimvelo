@@ -746,9 +746,6 @@ function LOAPreview({ claim }: { claim: Claim }) {
         </div>
       </div>
 
-      <div className="mt-5 pt-2 border-t border-[#e2e8f0] text-[9px] text-center text-[#94a3b8]" style={{ fontFamily: 'sans-serif' }}>
-        ClaimVelo Ltd. registered in England & Wales. Co. No. 12345678. 12 Aviation House, London EC1A 1BB.
-      </div>
     </div>
   );
 }

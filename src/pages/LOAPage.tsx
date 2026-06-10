@@ -80,7 +80,7 @@ export default function LOAPage({ onNav }: Props) {
       <div style="margin-top:4px;">Date: ${today}</div>
     </div>
   </div>
-  <div class="footer">ClaimVelo Ltd. registered in England &amp; Wales. Co. No. 12345678. 12 Aviation House, London EC1A 1BB.<br />Governed by laws of England &amp; Wales. EC Regulation 261/2004 / UK261 claims specialists.</div>
+  <div class="footer">Governed by laws of England &amp; Wales. EC Regulation 261/2004 / UK261 claims specialists.</div>
   <script>window.onload = function(){ window.print(); };<\/script>
 </body>
 </html>`;
@@ -174,7 +174,6 @@ export default function LOAPage({ onNav }: Props) {
 
         {/* Footer */}
         <div className="mt-6 pt-3 border-t border-[#e2e8f0] text-[10px] text-center text-[#64748b]" style={{ fontFamily: '-apple-system, sans-serif' }}>
-          ClaimVelo Ltd. registered in England & Wales. Co. No. 12345678. 12 Aviation House, London EC1A 1BB.<br />
           Governed by laws of England & Wales. EC Regulation 261/2004 / UK261 claims specialists.
         </div>
       </div>
