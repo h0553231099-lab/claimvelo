@@ -89,11 +89,11 @@ type Translations = Record<TranslationKey, string>;
 
 const base: Translations = {
   'hero.title1': 'Delayed or Canceled Flight?',
-  'hero.title2': 'Get Up to $650!',
+  'hero.title2': 'Get Up to €600!',
   'hero.subtitle': 'We fight the airlines so you don\'t have to. Submit in minutes — our experts handle everything.',
   'hero.cta': 'Start Now — It\'s Free',
   'hero.how': 'Our Process',
-  'hero.stat.max': '$650', 'hero.stat.max_label': 'Max per passenger',
+  'hero.stat.max': '€600', 'hero.stat.max_label': 'Max per passenger',
   'hero.stat.lookback': '3 yrs', 'hero.stat.lookback_label': 'Look-back period',
   'hero.stat.success': '99%', 'hero.stat.success_label': 'Success rate',
   'hero.stat.payout': '21d', 'hero.stat.payout_label': 'Avg. payout time',
