@@ -683,6 +683,9 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
 
 function LOAPreview({ claim }: { claim: Claim }) {
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const signedDate = claim.created_at
+    ? new Date(claim.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    : today;
   const fullName = `${claim.passenger_first_name} ${claim.passenger_last_name}`;
 
   return (
@@ -734,7 +737,7 @@ function LOAPreview({ claim }: { claim: Claim }) {
               {claim.loa_signed ? <span className="text-[#16a34a] text-[11px] font-semibold">✓ Signed</span> : <span className="text-[#64748b] text-[11px]">Not signed</span>}
             </div>
           )}
-          <div className="mt-1">Date: {claim.created_at?.split('T')[0] || today}</div>
+          <div className="mt-1">Date: {signedDate}</div>
         </div>
         <div className="border-t border-[#333] pt-1.5 text-[10px] text-[#64748b]">
           <div className="font-semibold text-[11px] text-[#0f172a] mb-1">ClaimVelo Ltd.</div>
