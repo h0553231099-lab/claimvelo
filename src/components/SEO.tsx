@@ -1,11 +1,10 @@
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
-import { SUPPORTED_LOCALES, type Locale } from '../lib/i18n';
 import type { Page } from '../types';
+import type { Locale } from '../lib/i18n';
 
 const BASE_URL = 'https://claimvelo.com';
 
-// Public pages that get indexed and hreflang tags
 const PUBLIC_PAGE_PATHS: Partial<Record<Page, string>> = {
   home: '',
   claim: '/claim',
@@ -15,7 +14,6 @@ const PUBLIC_PAGE_PATHS: Partial<Record<Page, string>> = {
   privacy: '/privacy',
 };
 
-// Pages that should never be indexed by search engines
 const NOINDEX_PAGES = new Set<Page>([
   'signin', 'agent-signin', 'sales-signin', 'seo-signin',
   'dashboard', 'admin', 'agent-dashboard', 'sales-dashboard', 'seo-dashboard',
@@ -33,7 +31,6 @@ interface Props {
 export default function SEO({ page, locale }: Props) {
   const { t } = useTranslation();
 
-  const isPublic = page in PUBLIC_PAGE_PATHS;
   const isNoIndex = NOINDEX_PAGES.has(page);
   const pagePath = PUBLIC_PAGE_PATHS[page] ?? '';
 
@@ -43,22 +40,18 @@ export default function SEO({ page, locale }: Props) {
   const title = t(titleKey, { defaultValue: 'ClaimVelo — Flight Compensation Specialists' });
   const description = t(descKey, { defaultValue: 'Claim up to €600 for delayed or cancelled flights. No win, no fee.' });
 
-  // Canonical URL for current locale
-  const localePath = locale === 'en' ? '' : `/${locale}`;
-  const canonicalUrl = `${BASE_URL}${localePath}${pagePath}`;
+  const canonicalUrl = `${BASE_URL}${pagePath}`;
 
   return (
     <Helmet>
-      <html lang={locale} />
+      <html lang="en" />
       <title>{title}</title>
       <meta name="description" content={description} />
       {isNoIndex
         ? <meta name="robots" content="noindex, nofollow" />
-        : <meta name="robots" content="index, follow" />
+        : <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
       }
       <link rel="canonical" href={canonicalUrl} />
-      <meta http-equiv="content-language" content={locale} />
-      <meta name="google-site-verification" content="hID1uCcjhUqtdGh7MA4QCQPrGxsK8zu_UBEseuZqXxQ" />
 
       {/* Open Graph */}
       <meta property="og:type" content="website" />
@@ -71,7 +64,7 @@ export default function SEO({ page, locale }: Props) {
       <meta property="og:image:height" content="630" />
       <meta property="og:image:alt" content="ClaimVelo — Claim up to €600 for delayed or cancelled flights" />
       <meta property="og:site_name" content="ClaimVelo" />
-      <meta property="og:locale" content={locale.replace('-', '_')} />
+      <meta property="og:locale" content="en_GB" />
 
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
@@ -80,17 +73,6 @@ export default function SEO({ page, locale }: Props) {
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={BASE_OG_IMAGE} />
       <meta name="twitter:image:alt" content="ClaimVelo — Claim up to €600 for delayed or cancelled flights" />
-
-      {/* Hreflang — only for public pages */}
-      {isPublic && SUPPORTED_LOCALES.map(loc => {
-        const lp = loc === 'en' ? '' : `/${loc}`;
-        const href = `${BASE_URL}${lp}${pagePath}`;
-        return <link key={loc} rel="alternate" hrefLang={loc} href={href} />;
-      })}
-      {/* x-default always points to English */}
-      {isPublic && (
-        <link rel="alternate" hrefLang="x-default" href={`${BASE_URL}${pagePath}`} />
-      )}
     </Helmet>
   );
 }

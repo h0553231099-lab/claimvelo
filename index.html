@@ -8,61 +8,34 @@
     <link rel="icon" type="image/svg+xml" href="/images/logo.svg" />
     <link rel="apple-touch-icon" href="/images/logo.svg" />
 
-    <!-- Primary SEO -->
-    <title>ClaimVelo — Claim Up to €600 for Delayed or Cancelled Flights. No Win, No Fee.</title>
-    <meta name="description" content="Were you delayed, cancelled, or denied boarding? You could be owed up to €600 per passenger under EU261, UK261, or Israeli law. Free eligibility check — no win, no fee. Start your claim in under 60 seconds." />
-    <meta name="keywords" content="flight compensation, EU261, UK261, delayed flight claim, cancelled flight compensation, denied boarding, passenger rights, no win no fee, flight delay refund, flight cancellation claim, aviation law" />
-    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
-    <meta name="author" content="ClaimVelo" />
-    <link rel="canonical" href="https://claimvelo.com/" />
-
     <!--
-      hreflang and per-page canonical/title/description tags are injected by
-      react-helmet-async at runtime, and baked into HTML at build time by
-      vite-plugin-prerender (see vite.config.ts). The static fallbacks below
-      cover the home page for crawlers that hit the raw index.html.
+      Per-page <title>, <meta name="description">, <link rel="canonical">,
+      and <meta name="robots"> are injected by react-helmet-async (SEO.tsx)
+      at runtime and baked into each pre-rendered HTML file at build time by
+      vite-plugin-prerender. The fallback default below covers the shell only.
     -->
-    <link rel="alternate" hreflang="x-default" href="https://claimvelo.com/" />
-    <link rel="alternate" hreflang="en"    href="https://claimvelo.com/" />
-    <link rel="alternate" hreflang="es"    href="https://claimvelo.com/es/" />
-    <link rel="alternate" hreflang="de"    href="https://claimvelo.com/de/" />
-    <link rel="alternate" hreflang="fr"    href="https://claimvelo.com/fr/" />
-    <link rel="alternate" hreflang="pt"    href="https://claimvelo.com/pt/" />
-    <link rel="alternate" hreflang="it"    href="https://claimvelo.com/it/" />
-    <link rel="alternate" hreflang="nl"    href="https://claimvelo.com/nl/" />
-    <link rel="alternate" hreflang="pl"    href="https://claimvelo.com/pl/" />
-    <link rel="alternate" hreflang="ro"    href="https://claimvelo.com/ro/" />
-    <link rel="alternate" hreflang="ru"    href="https://claimvelo.com/ru/" />
-    <link rel="alternate" hreflang="cs"    href="https://claimvelo.com/cs/" />
-    <link rel="alternate" hreflang="da"    href="https://claimvelo.com/da/" />
-    <link rel="alternate" hreflang="sv"    href="https://claimvelo.com/sv/" />
-    <link rel="alternate" hreflang="no"    href="https://claimvelo.com/no/" />
-    <link rel="alternate" hreflang="fi"    href="https://claimvelo.com/fi/" />
-    <link rel="alternate" hreflang="el"    href="https://claimvelo.com/el/" />
-    <link rel="alternate" hreflang="hr"    href="https://claimvelo.com/hr/" />
-    <link rel="alternate" hreflang="hu"    href="https://claimvelo.com/hu/" />
-    <link rel="alternate" hreflang="bg"    href="https://claimvelo.com/bg/" />
-    <link rel="alternate" hreflang="tr"    href="https://claimvelo.com/tr/" />
-    <link rel="alternate" hreflang="uk"    href="https://claimvelo.com/uk/" />
-    <link rel="alternate" hreflang="ar"    href="https://claimvelo.com/ar/" />
-    <link rel="alternate" hreflang="zh"    href="https://claimvelo.com/zh/" />
-    <link rel="alternate" hreflang="sq"    href="https://claimvelo.com/sq/" />
-    <link rel="alternate" hreflang="pt-BR" href="https://claimvelo.com/pt-br/" />
+    <title>ClaimVelo — Claim Up to €600 for Delayed or Cancelled Flights. No Win, No Fee.</title>
 
-    <!-- Open Graph — branded own-domain cover image -->
-    <meta property="og:type"        content="website" />
-    <meta property="og:url"         content="https://claimvelo.com/" />
-    <meta property="og:title"       content="ClaimVelo — Get Up to €600 for Your Disrupted Flight" />
-    <meta property="og:description" content="Delayed, cancelled, or denied boarding? Claim up to €600 per passenger. Free check. No win, no fee. EU261 · UK261 · Israeli law." />
-    <meta property="og:image"       content="https://claimvelo.com/images/og-cover.svg" />
-    <meta property="og:image:type"  content="image/svg+xml" />
+    <meta name="keywords" content="flight compensation, EU261, UK261, delayed flight claim, cancelled flight compensation, denied boarding, passenger rights, no win no fee, flight delay refund, flight cancellation claim, aviation law" />
+    <meta name="author" content="ClaimVelo" />
+
+    <!-- Google Search Console verification -->
+    <meta name="google-site-verification" content="hID1uCcjhUqtdGh7MA4QCQPrGxsK8zu_UBEseuZqXxQ" />
+
+    <!-- Open Graph — home-page fallback (react-helmet-async overrides per page) -->
+    <meta property="og:type"         content="website" />
+    <meta property="og:url"          content="https://claimvelo.com/" />
+    <meta property="og:title"        content="ClaimVelo — Get Up to €600 for Your Disrupted Flight" />
+    <meta property="og:description"  content="Delayed, cancelled, or denied boarding? Claim up to €600 per passenger. Free check. No win, no fee. EU261 · UK261 · Israeli law." />
+    <meta property="og:image"        content="https://claimvelo.com/images/og-cover.svg" />
+    <meta property="og:image:type"   content="image/svg+xml" />
     <meta property="og:image:width"  content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt"   content="ClaimVelo — Claim up to €600 for delayed or cancelled flights" />
-    <meta property="og:site_name"   content="ClaimVelo" />
-    <meta property="og:locale"      content="en_GB" />
+    <meta property="og:image:alt"    content="ClaimVelo — Claim up to €600 for delayed or cancelled flights" />
+    <meta property="og:site_name"    content="ClaimVelo" />
+    <meta property="og:locale"       content="en_GB" />
 
-    <!-- Twitter Card — branded own-domain cover image -->
+    <!-- Twitter Card — home-page fallback -->
     <meta name="twitter:card"        content="summary_large_image" />
     <meta name="twitter:site"        content="@ClaimVeloPro" />
     <meta name="twitter:title"       content="ClaimVelo — Get Up to €600 for Your Disrupted Flight" />
@@ -70,7 +43,7 @@
     <meta name="twitter:image"       content="https://claimvelo.com/images/og-cover.svg" />
     <meta name="twitter:image:alt"   content="ClaimVelo — Claim up to €600 for delayed or cancelled flights" />
 
-    <!-- Structured Data — Organization / LegalService (own-domain logo) -->
+    <!-- Structured Data — Organization / LegalService -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -178,7 +151,7 @@
     }
     </script>
 
-    <!-- Structured Data — BreadcrumbList (real path-based URLs) -->
+    <!-- Structured Data — BreadcrumbList -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -190,9 +163,6 @@
       ]
     }
     </script>
-
-    <!-- Google Search Console verification -->
-    <meta name="google-site-verification" content="hID1uCcjhUqtdGh7MA4QCQPrGxsK8zu_UBEseuZqXxQ" />
 
     <!-- Inter font -->
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
