@@ -943,6 +943,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
           <button onClick={() => onNav('privacy')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">{t('home.footer.privacy')}</button>
           <a href="mailto:support@claimvelo.com" className="text-[#94a3b8] no-underline text-xs hover:text-white transition-colors">support@claimvelo.com</a>
           <a href="tel:+13477688926" className="text-[#94a3b8] no-underline text-xs hover:text-white transition-colors">347 768 8926</a>
+          <span className="text-[#94a3b8] text-xs">1265 55th St, Brooklyn, NY 11219</span>
           <button onClick={() => onNav('how-it-works')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">{t('home.footer.how')}</button>
           <button onClick={() => onNav('fees')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">{t('home.footer.fees')}</button>
         </div>
