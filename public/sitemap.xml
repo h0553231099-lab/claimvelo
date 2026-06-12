@@ -43,4 +43,11 @@
     <priority>0.3</priority>
   </url>
 
+  <url>
+    <loc>https://claimvelo.com/ireland</loc>
+    <lastmod>2026-06-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
 </urlset>
