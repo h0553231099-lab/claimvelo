@@ -12,6 +12,8 @@ const PUBLIC_PAGE_PATHS: Partial<Record<Page, string>> = {
   fees: '/fees',
   about: '/about',
   privacy: '/privacy',
+  ireland: '/ireland',
+  partners: '/partners',
 };
 
 const NOINDEX_PAGES = new Set<Page>([

@@ -18,6 +18,8 @@ const PUBLIC_ROUTES = [
   '/about',
   '/signin',
   '/privacy',
+  '/ireland',
+  '/partners',
 ];
 
 // Skip prerendering in environments where a local server cannot be started
