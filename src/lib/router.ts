@@ -5,6 +5,7 @@ import type { Page } from '../types';
 export const PAGE_PATHS: Record<string, Page> = {
   '': 'home',
   'claim': 'claim',
+  'claim-success': 'claim-success',
   'how-it-works': 'how-it-works',
   'fees': 'fees',
   'about': 'about',
@@ -22,6 +23,7 @@ export const PAGE_PATHS: Record<string, Page> = {
 export const PAGE_SLUGS: Partial<Record<Page, string>> = {
   home: '',
   claim: 'claim',
+  'claim-success': 'claim-success',
   'how-it-works': 'how-it-works',
   fees: 'fees',
   about: 'about',

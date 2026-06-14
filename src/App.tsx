@@ -28,6 +28,7 @@ const SalesSignInPage = lazy(() => import('./pages/SalesSignInPage'));
 const SeoSignInPage = lazy(() => import('./pages/SeoSignInPage'));
 const PartnerPage = lazy(() => import('./pages/PartnerPage'));
 const IrelandPage = lazy(() => import('./pages/IrelandPage'));
+const ClaimSuccessPage = lazy(() => import('./pages/ClaimSuccessPage'));
 const emptyForm = (): ClaimFormData => ({
   firstName: '', lastName: '', email: '', phone: '', address: '', country: 'United Kingdom', countryOther: '', dob: '',
   flight: '', fdate: '', dep: '', arr: '', airline: '', issue: '', reason: '',
@@ -132,7 +133,7 @@ export default function App() {
   async function handleSignOut() {
     await supabase.auth.signOut();
     setUser(null);
-    naw('home');
+    nav('home');
   }
   // Private portals — render without the public Nav/Chat
   if (!loadingAuth && user?.role === 'agent' && page !== 'home' && page !== 'claim') {
@@ -178,6 +179,7 @@ export default function App() {
           )}
           {page === 'home' && <HomePage onNav={nav} onCheckCompensation={() => setCheckerOpen(true)} />}
           {page === 'claim' && <ClaimPage onNav={nav} prefill={claimPrefill} />}
+          {page === 'claim-success' && <ClaimSuccessPage onNav={nav} />}
           {page === 'dashboard' && <DashboardPage onNav={nav} user={user} />}
           {page === 'admin' && user && (user.role === 'admin' || user.role === 'worker' || user.role === 'seo_worker') && <AdminPage onNav={nav} user={user} onSignOut={handleSignOut} />}
           {page === 'loa' && <LOAPage onNav={nav} form={form} sigData={sigData} />}
