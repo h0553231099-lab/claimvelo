@@ -15,7 +15,7 @@ export default function PartnerPage({ onNav }: PartnerPageProps) {
   const [error, setError] = useState('');
   const formRef = useRef<HTMLDivElement>(null);
 
-  const claims = Math.round(tickets * 0.15);
+  const claims = Math.round(tickets * 0.02);
   const monthly = claims * 20;
   const yearly = monthly * 12;
   const pct = Math.round(((tickets - 10) / (2000 - 10)) * 100);
@@ -66,7 +66,7 @@ export default function PartnerPage({ onNav }: PartnerPageProps) {
             <span className="flex items-center gap-2"><span className="text-[#38bdf8] text-sm font-bold">€0</span> Setup Costs</span>
             <span className="flex items-center gap-2"><span className="text-[#38bdf8] text-sm font-bold">€20</span> Per Approved Claim</span>
             <span className="flex items-center gap-2"><span className="text-[#38bdf8] text-sm font-bold">24h</span> Activation</span>
-            <span className="flex items-center gap-2"><span className="text-[#38bdf8] text-sm font-bold">15%</span> Flights Eligible</span>
+            <span className="flex items-center gap-2"><span className="text-[#38bdf8] text-sm font-bold">2%</span> Flights Eligible</span>
           </div>
           <p className="mt-3 text-[10px] uppercase tracking-[0.25em] text-blue-300/80">EU · UK · US · IL</p>
         </div>
@@ -80,10 +80,10 @@ export default function PartnerPage({ onNav }: PartnerPageProps) {
               <span className="inline-block rounded-full bg-blue-50 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-700 ring-1 ring-blue-200/60">Revenue Calculator</span>
             </div>
             <h3 className="mt-4 text-center text-lg font-bold text-slate-900 sm:text-xl">How Much Can Your Agency Earn?</h3>
-            <p className="mt-2 text-center text-xs text-slate-500">~15% of all flights experience compensable disruptions. At €20 per approved claim, see what that means for your bottom line — monthly and annually.</p>
+            <p className="mt-2 text-center text-xs text-slate-500">~2% of all flights experience compensable disruptions. At €20 per approved claim, see what that means for your bottom line — monthly and annually.</p>
             <div className="mt-6 space-y-6">
               <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-4 py-3 text-center text-[11px] leading-relaxed text-blue-800">
-                <span className="font-bold">Did you know?</span> On average, <span className="font-bold text-[#2563eb]">15% of flights</span> experience delays or cancellations that qualify passengers for financial compensation under EU261 and similar regulations.
+                <span className="font-bold">Did you know?</span> On average, <span className="font-bold text-[#2563eb]">2% of flights</span> experience delays or cancellations that qualify passengers for financial compensation under EU261 and similar regulations.
               </div>
               <div>
                 <div className="mb-2 flex items-center justify-between text-xs">
@@ -110,7 +110,7 @@ export default function PartnerPage({ onNav }: PartnerPageProps) {
                   <p className="mt-1 text-lg font-bold text-slate-900">{tickets.toLocaleString()}</p>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-center">
-                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">15% Eligible</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">2% Eligible</p>
                   <p className="mt-1 text-lg font-bold text-slate-900">{claims.toLocaleString()}</p>
                 </div>
                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-3.5 text-center ring-1 ring-blue-200">
@@ -127,9 +127,9 @@ export default function PartnerPage({ onNav }: PartnerPageProps) {
                 <p className="mt-1 text-3xl font-black text-green-700 sm:text-4xl">
                   €{yearly.toLocaleString()}<span className="ml-1 text-base font-semibold text-green-600">/ year</span>
                 </p>
-                <p className="mt-2 text-[10px] text-green-600/80">{tickets.toLocaleString()} tickets × 15% disruptions × €20 commission × 12 months</p>
+                <p className="mt-2 text-[10px] text-green-600/80">{tickets.toLocaleString()} tickets × 2% disruptions × €20 commission × 12 months</p>
               </div>
-              <p className="text-center text-[10px] text-slate-400">* Based on ~15% claimable flight disruptions and a fixed €20 agency commission per approved passenger claim.</p>
+              <p className="text-center text-[10px] text-slate-400">* Based on ~2% claimable flight disruptions and a fixed €20 agency commission per approved passenger claim.</p>
               <div className="flex justify-center">
                 <button onClick={scrollToForm} className="rounded-lg bg-[#2563eb] px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_10px_30px_-10px_rgba(37,99,235,0.8)] transition hover:bg-[#1d4ed8] border-none cursor-pointer">
                   Start Earning Now
