@@ -106,7 +106,7 @@ export default function IrelandPage({ onNav }: Props) {
             {[
               { icon: <Check className="w-5 h-5 text-[#2563eb]" />, title: 'Ryanair & Aer Lingus Experts', desc: "We know Irish airlines inside-out and handle their specific processes daily." },
               { icon: <Shield className="w-5 h-5 text-[#2563eb]" />, title: 'No Win, No Fee — Guaranteed', desc: "Zero upfront cost. You only pay when we successfully win your compensation." },
-              { icon: <Star className="w-5 h-5 text-[#2563eb]" />, title: '2,500+ Irish Passengers Helped', desc: "Average payout of €380 per successful Irish claim." },
+              { icon: <Star className="w-5 h-5 text-[#2563eb]" />, title: 'Proven Results', desc: "Strong track record of successful Irish claims with above-average payouts." },
               { icon: <Clock className="w-5 h-5 text-[#2563eb]" />, title: 'Fast & Fully Managed', desc: "We handle everything from submission to payment. You just wait." },
             ].map((b, i) => (
               <div key={i} className="flex gap-4 p-5 rounded-xl border border-[#e2e8f0] bg-[#f8fafc]">
@@ -147,7 +147,7 @@ export default function IrelandPage({ onNav }: Props) {
         <div className="max-w-[640px] mx-auto">
           <h2 className="text-[22px] font-black text-center mb-3">Claiming Against Ryanair?</h2>
           <p className="text-[14px] text-blue-200 text-center mb-8">
-            Ryanair is Ireland's largest airline — and one of the most claimed-against in Europe. We've won 1,000+ Ryanair claims.
+            Ryanair is Ireland's largest airline — and one of the most claimed-against in Europe. We have extensive experience winning Ryanair claims.
           </p>
           <div className="grid sm:grid-cols-2 gap-3 mb-8">
             {[
@@ -231,7 +231,7 @@ export default function IrelandPage({ onNav }: Props) {
         <div className="font-black text-[16px] text-white mb-1">Claim<span className="text-[#60a5fa]">Velo</span> Ireland</div>
         <div className="text-[12px] mb-4 opacity-70">Helping Irish passengers claim EU flight compensation</div>
         <div className="flex gap-5 justify-center flex-wrap mb-5">
-          <a href="mailto:ireland@claimvelo.com" className="text-[#94a3b8] no-underline text-xs hover:text-white transition-colors">ireland@claimvelo.com</a>
+          <a href="mailto:info@claimvelo.com" className="text-[#94a3b8] no-underline text-xs hover:text-white transition-colors">info@claimvelo.com</a>
           <button onClick={() => onNav('privacy')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">Privacy Policy</button>
           <button onClick={() => onNav('how-it-works')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">How It Works</button>
           <button onClick={() => onNav('fees')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">Our Fees</button>
