@@ -48,11 +48,11 @@ export default function PartnerPage({ onNav }: PartnerPageProps) {
         <div className="relative mx-auto max-w-2xl text-center">
           <span className="mb-4 inline-block rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-blue-200 ring-1 ring-white/20">Claim Velo · B2B Partner Network</span>
           <h1 className="text-3xl font-bold leading-tight tracking-tight sm:text-[40px]">
-            Turn Flight Disruptions<br />
-            <span className="text-blue-300">Into a New Revenue Stream</span>
+            The Only Tool That Makes Your<br />
+            <span className="text-blue-300">Clients Love Flight Delays.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-blue-100">
-            Join our partner program and help your travelers claim financial compensation for canceled or delayed flights. Zero overhead for you — pure passive profit for your agency.
+            Every delayed flight = a happy customer + €20 in your pocket. No work. No code. No complaints. Just passive income from problems you didn't cause.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <button onClick={scrollToForm} className="rounded-lg bg-[#2563eb] px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_10px_30px_-10px_rgba(37,99,235,0.8)] transition hover:bg-[#1d4ed8] border-none cursor-pointer">
