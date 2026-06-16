@@ -596,7 +596,7 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
                 value={emailDraft.body}
                 onChange={e => setEmailDraft(d => ({ ...d, body: e.target.value }))}
                 placeholder="Write your message..."
-                className="flex-1 px-3 py-2 border border-[#e2e8f0] rounded-lg text-[13px] outline-none focus:border-[#2563eb] resize-none font-sans min-h-[180px] bg-white"
+                className="flex-1 px-3 py-2 border border-[#e2e8f0] rounded-lg text-[13px] outline-none focus:border-[#2563eb] resize-none font-sans min-h-[180px] bg-white whitespace-pre-wrap"
               />
             </div>
             {emailSendError && (
@@ -650,7 +650,7 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
                 value={draft.body}
                 onChange={e => setDraft(d => ({ ...d, body: e.target.value }))}
                 placeholder="Write your message..."
-                className="flex-1 px-3 py-2 border border-[#e2e8f0] rounded-lg text-[13px] outline-none focus:border-[#2563eb] resize-none font-sans min-h-[200px]"
+                className="flex-1 px-3 py-2 border border-[#e2e8f0] rounded-lg text-[13px] outline-none focus:border-[#2563eb] resize-none font-sans min-h-[200px] whitespace-pre-wrap"
               />
             </div>
           </div>
@@ -2671,7 +2671,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                           onChange={e => setEmailBody(e.target.value)}
                           placeholder="Write your message..."
                           rows={5}
-                          className="w-full px-3 py-2 border border-[#e2e8f0] rounded-[7px] text-xs resize-none outline-none focus:border-[#2563eb] font-sans"
+                          className="w-full px-3 py-2 border border-[#e2e8f0] rounded-[7px] text-xs resize-none outline-none focus:border-[#2563eb] font-sans whitespace-pre-wrap"
                         />
                         {emailSendResult === 'success' && (
                           <div className="text-[11px] text-[#16a34a] font-semibold bg-[#f0fdf4] border border-[#bbf7d0] rounded-[7px] px-3 py-2">Email sent successfully.</div>
