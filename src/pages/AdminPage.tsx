@@ -103,6 +103,38 @@ interface StaffEmail {
   raw_payload?: { data?: { attachments?: { filename: string; content_type: string }[] } };
 }
 
+function decodeHtml(str: string): string {
+  if (!str) return '';
+  const el = document.createElement('textarea');
+  el.innerHTML = str;
+  return el.value;
+}
+
+function looksLikeHtml(str: string): boolean {
+  const decoded = decodeHtml(str);
+  return /(<[a-zA-Z][^>]*>)/i.test(decoded);
+}
+
+function EmailIframe({ html, title = 'Email content' }: { html: string; title?: string }) {
+  const decoded = decodeHtml(html);
+  return (
+    <iframe
+      srcDoc={decoded}
+      className="w-full border-none block"
+      style={{ minHeight: 420 }}
+      sandbox="allow-same-origin allow-popups"
+      title={title}
+      onLoad={(e) => {
+        const iframe = e.currentTarget;
+        try {
+          const h = iframe.contentDocument?.documentElement?.scrollHeight;
+          if (h && h > 0) iframe.style.height = h + 'px';
+        } catch { /* cross-origin guard */ }
+      }}
+    />
+  );
+}
+
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
@@ -475,36 +507,10 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
           </div>
           <div className="flex-1 overflow-y-auto">
             {selectedEmail.body_html ? (
-              <iframe
-                srcDoc={selectedEmail.body_html}
-                className="w-full border-none block"
-                style={{ minHeight: 420 }}
-                sandbox="allow-same-origin allow-popups"
-                title="Email content"
-                onLoad={(e) => {
-                  const iframe = e.currentTarget;
-                  try {
-                    const h = iframe.contentDocument?.documentElement?.scrollHeight;
-                    if (h && h > 0) iframe.style.height = h + 'px';
-                  } catch { /* cross-origin guard */ }
-                }}
-              />
+              <EmailIframe html={selectedEmail.body_html} />
             ) : selectedEmail.body_text ? (
-              /(<[a-zA-Z][^>]*>)/i.test(selectedEmail.body_text) ? (
-                <iframe
-                  srcDoc={selectedEmail.body_text}
-                  className="w-full border-none block"
-                  style={{ minHeight: 420 }}
-                  sandbox="allow-same-origin allow-popups"
-                  title="Email content"
-                  onLoad={(e) => {
-                    const iframe = e.currentTarget;
-                    try {
-                      const h = iframe.contentDocument?.documentElement?.scrollHeight;
-                      if (h && h > 0) iframe.style.height = h + 'px';
-                    } catch { /* cross-origin guard */ }
-                  }}
-                />
+              looksLikeHtml(selectedEmail.body_text) ? (
+                <EmailIframe html={selectedEmail.body_text} />
               ) : (
                 <div className="text-[13px] text-[#374151] whitespace-pre-line leading-relaxed px-5 py-4">{selectedEmail.body_text}</div>
               )
@@ -682,21 +688,8 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
             <div className="text-[10px] text-[#94a3b8] shrink-0">{timeAgo(selectedMsg.created_at)}</div>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {/(<[a-zA-Z][^>]*>)/i.test(selectedMsg.body) ? (
-              <iframe
-                srcDoc={selectedMsg.body}
-                className="w-full border-none block"
-                style={{ minHeight: 420 }}
-                sandbox="allow-same-origin allow-popups"
-                title="Message content"
-                onLoad={(e) => {
-                  const iframe = e.currentTarget;
-                  try {
-                    const h = iframe.contentDocument?.documentElement?.scrollHeight;
-                    if (h && h > 0) iframe.style.height = h + 'px';
-                  } catch { /* cross-origin guard */ }
-                }}
-              />
+            {looksLikeHtml(selectedMsg.body) ? (
+              <EmailIframe html={selectedMsg.body} title="Message content" />
             ) : (
               <div className="text-[13px] text-[#374151] whitespace-pre-line leading-relaxed px-5 py-4">{selectedMsg.body}</div>
             )}
