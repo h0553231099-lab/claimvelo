@@ -473,13 +473,43 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
             </div>
             <div className="text-[10px] text-[#94a3b8] shrink-0 mt-0.5">{timeAgo(selectedEmail.received_at)}</div>
           </div>
-          <div className="flex-1 overflow-y-auto px-5 py-4">
+          <div className="flex-1 overflow-y-auto">
             {selectedEmail.body_html ? (
-              <div className="text-[13px] text-[#374151] leading-relaxed prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: selectedEmail.body_html }} />
+              <iframe
+                srcDoc={selectedEmail.body_html}
+                className="w-full border-none block"
+                style={{ minHeight: 420 }}
+                sandbox="allow-same-origin allow-popups"
+                title="Email content"
+                onLoad={(e) => {
+                  const iframe = e.currentTarget;
+                  try {
+                    const h = iframe.contentDocument?.documentElement?.scrollHeight;
+                    if (h && h > 0) iframe.style.height = h + 'px';
+                  } catch { /* cross-origin guard */ }
+                }}
+              />
             ) : selectedEmail.body_text ? (
-              <div className="text-[13px] text-[#374151] whitespace-pre-line leading-relaxed">{selectedEmail.body_text}</div>
+              /(<[a-zA-Z][^>]*>)/i.test(selectedEmail.body_text) ? (
+                <iframe
+                  srcDoc={selectedEmail.body_text}
+                  className="w-full border-none block"
+                  style={{ minHeight: 420 }}
+                  sandbox="allow-same-origin allow-popups"
+                  title="Email content"
+                  onLoad={(e) => {
+                    const iframe = e.currentTarget;
+                    try {
+                      const h = iframe.contentDocument?.documentElement?.scrollHeight;
+                      if (h && h > 0) iframe.style.height = h + 'px';
+                    } catch { /* cross-origin guard */ }
+                  }}
+                />
+              ) : (
+                <div className="text-[13px] text-[#374151] whitespace-pre-line leading-relaxed px-5 py-4">{selectedEmail.body_text}</div>
+              )
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 px-5 py-4">
                 <div className="text-[12px] text-[#94a3b8] italic">No message body available.</div>
                 {(() => {
                   const attachments = selectedEmail.raw_payload?.data?.attachments;
