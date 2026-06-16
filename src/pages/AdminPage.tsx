@@ -681,8 +681,25 @@ function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
             </div>
             <div className="text-[10px] text-[#94a3b8] shrink-0">{timeAgo(selectedMsg.created_at)}</div>
           </div>
-          <div className="flex-1 overflow-y-auto px-5 py-4">
-            <div className="text-[13px] text-[#374151] whitespace-pre-line leading-relaxed">{selectedMsg.body}</div>
+          <div className="flex-1 overflow-y-auto">
+            {/(<[a-zA-Z][^>]*>)/i.test(selectedMsg.body) ? (
+              <iframe
+                srcDoc={selectedMsg.body}
+                className="w-full border-none block"
+                style={{ minHeight: 420 }}
+                sandbox="allow-same-origin allow-popups"
+                title="Message content"
+                onLoad={(e) => {
+                  const iframe = e.currentTarget;
+                  try {
+                    const h = iframe.contentDocument?.documentElement?.scrollHeight;
+                    if (h && h > 0) iframe.style.height = h + 'px';
+                  } catch { /* cross-origin guard */ }
+                }}
+              />
+            ) : (
+              <div className="text-[13px] text-[#374151] whitespace-pre-line leading-relaxed px-5 py-4">{selectedMsg.body}</div>
+            )}
           </div>
           <div className="px-5 py-3 border-t border-[#e2e8f0] flex gap-2">
             <button
