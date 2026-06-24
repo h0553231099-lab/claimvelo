@@ -14,9 +14,9 @@
       at runtime and baked into each pre-rendered HTML file at build time by
       vite-plugin-prerender. The fallback default below covers the shell only.
     -->
-    <title>ClaimVelo — Claim Up to €600 for Delayed or Cancelled Flights. No Win, No Fee.</title>
+    <title>Flight Compensation Claim — Up to €600 Per Passenger | ClaimVelo</title>
 
-    <meta name="keywords" content="flight compensation, EU261, UK261, delayed flight claim, cancelled flight compensation, denied boarding, passenger rights, no win no fee, flight delay refund, flight cancellation claim, aviation law" />
+    <meta name="keywords" content="flight compensation, EU261, UK261, delayed flight claim, cancelled flight compensation, denied boarding, passenger rights, no win no fee, flight delay refund, flight cancellation claim, aviation law, Ryanair claim, Aer Lingus claim, British Airways claim" />
     <meta name="author" content="ClaimVelo" />
 
     <!-- Google Search Console verification -->
@@ -25,8 +25,8 @@
     <!-- Open Graph — home-page fallback (react-helmet-async overrides per page) -->
     <meta property="og:type"         content="website" />
     <meta property="og:url"          content="https://claimvelo.com/" />
-    <meta property="og:title"        content="ClaimVelo — Get Up to €600 for Your Disrupted Flight" />
-    <meta property="og:description"  content="Delayed, cancelled, or denied boarding? Claim up to €600 per passenger. Free check. No win, no fee. EU261 · UK261 · Israeli law." />
+    <meta property="og:title"        content="Flight Compensation Claim — Up to €600 Per Passenger | ClaimVelo" />
+    <meta property="og:description"  content="Delayed, cancelled, or denied boarding? Claim up to €600 per passenger under EU261, UK261 or Israeli law. Free 2-minute check. No win, no fee." />
     <meta property="og:image"        content="https://claimvelo.com/images/og-cover.svg" />
     <meta property="og:image:type"   content="image/svg+xml" />
     <meta property="og:image:width"  content="1200" />
@@ -38,10 +38,24 @@
     <!-- Twitter Card — home-page fallback -->
     <meta name="twitter:card"        content="summary_large_image" />
     <meta name="twitter:site"        content="@ClaimVeloPro" />
-    <meta name="twitter:title"       content="ClaimVelo — Get Up to €600 for Your Disrupted Flight" />
-    <meta name="twitter:description" content="Delayed, cancelled, or denied boarding? Claim up to €600. Free check. No win, no fee." />
+    <meta name="twitter:title"       content="Flight Compensation Claim — Up to €600 Per Passenger | ClaimVelo" />
+    <meta name="twitter:description" content="Delayed, cancelled, or denied boarding? Claim up to €600. Free 2-minute check. No win, no fee." />
     <meta name="twitter:image"       content="https://claimvelo.com/images/og-cover.svg" />
     <meta name="twitter:image:alt"   content="ClaimVelo — Claim up to €600 for delayed or cancelled flights" />
+
+    <!-- Structured Data — WebSite -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "ClaimVelo",
+      "url": "https://claimvelo.com",
+      "description": "Flight compensation specialists — claim up to €600 under EU261, UK261 and Israeli law. No win, no fee.",
+      "inLanguage": "en-GB",
+      "copyrightYear": 2026,
+      "publisher": { "@type": "LegalService", "name": "ClaimVelo", "url": "https://claimvelo.com" }
+    }
+    </script>
 
     <!-- Structured Data — Organization / LegalService -->
     <script type="application/ld+json">
@@ -112,7 +126,15 @@
           "name": "How much can I claim for a delayed or cancelled flight?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Up to €600 per passenger under EU Regulation 261/2004, £520 under UK261, or ₪3,530 under Israeli aviation law — depending on your flight distance and disruption type. These amounts are set by regulation and are unrelated to your ticket price."
+            "text": "Under EU261 and UK261, compensation ranges from €250 / £220 for short-haul (under 1,500 km) up to €600 / £520 for long-haul (over 3,500 km, 4+ hour arrival delay). For over 3,500 km flights with a 3–4 hour delay, compensation is €300 / £260. Under Israeli Aviation Services Law, compensation is ₪1,530 to ₪3,670 (2026 indexed amounts). These are fixed statutory amounts unrelated to ticket price."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which flights qualify for EU261 compensation?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "EU261 applies to any flight departing from an EU airport on any airline, and to flights arriving in the EU operated by an EU-based carrier. UK261 covers flights departing UK airports, flights arriving in the UK on a UK or EU airline, and flights arriving in the EU on a UK airline."
           }
         },
         {
@@ -120,7 +142,7 @@
           "name": "How far back can I claim flight compensation?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Up to 6 years in England and Wales, 5 years in Scotland and France, 4 years in Israel, and 3 years in most EU countries from the date of the disrupted flight. Flights from 2022 and 2023 may still be within the window."
+            "text": "6 years in England and Wales, 5 years in Scotland and France, 4 years in Israel, and 3 years in most EU countries from the date of the disrupted flight. Flights from 2021 onward are very likely still within time."
           }
         },
         {
@@ -128,7 +150,7 @@
           "name": "What does no win, no fee mean for flight compensation?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "You never pay anything upfront or out of pocket. ClaimVelo's 30% fee is only deducted from the compensation we recover for you. If we don't win, you owe us absolutely nothing."
+            "text": "You never pay anything upfront or out of pocket. ClaimVelo deducts its 30% success fee only from the compensation recovered. If we lose your case, you owe us absolutely nothing — ever."
           }
         },
         {
@@ -136,7 +158,7 @@
           "name": "What flights qualify for compensation under EU261?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Flights departing any EU airport, or flights arriving in the EU on an EU-based airline. You may claim if your flight was delayed 3 or more hours, cancelled with less than 14 days notice, or you were denied boarding due to overbooking."
+            "text": "Flights departing any EU airport regardless of airline, or flights arriving in the EU operated by an EU carrier. You may claim if your flight was delayed 3+ hours at the final destination, cancelled with less than 14 days' notice, or you were denied boarding due to overbooking."
           }
         },
         {
@@ -144,7 +166,39 @@
           "name": "How long does a flight compensation claim take?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Most airlines settle within 2–8 weeks. If the airline disputes the claim, escalation to authorities or court can take 3–6 months. ClaimVelo handles everything — you just wait for the payment."
+            "text": "Most airlines settle within 4–12 weeks of ClaimVelo's formal demand. If an airline disputes the claim, escalation to enforcement authorities or court can add 2–6 months. ClaimVelo handles everything — you just wait for payment."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can airlines refuse to pay by claiming extraordinary circumstances?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Airlines misuse this defence regularly. Under EU261 and UK261, extraordinary circumstances are narrowly defined. Technical faults and crew shortages do not qualify. ClaimVelo challenges this excuse in the majority of contested cases and succeeds."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What documents do I need to make a flight compensation claim?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "At minimum: your booking confirmation or e-ticket and the names of all passengers claiming. Boarding passes and delay notifications help but are not required. The ClaimVelo submission takes under 2 minutes."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "When am I entitled to meals and hotel under EU261?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Under EU261 and UK261, the Right to Care threshold depends on flight distance: 2 hours for flights under 1,500 km, 3 hours for 1,500–3,500 km, and 4 hours for over 3,500 km. Under Israeli law, a departure delay of 2 hours or more triggers the right to food, beverages, and communication services."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What are my rights if my flight to the US is cancelled?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Under US DOT rules, if a flight to, from, or within the United States is cancelled or significantly changed and you reject the alternative offered, you are generally entitled to an automatic refund in your original form of payment. For involuntary denied boarding on flights departing the US, separate compensation rules apply based on the one-way fare and arrival delay."
           }
         }
       ]
