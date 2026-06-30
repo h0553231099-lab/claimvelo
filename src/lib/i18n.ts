@@ -28,6 +28,8 @@ const en = {
   'meta.privacy.desc': 'Read the ClaimVelo privacy policy. We are committed to protecting your personal data in full compliance with GDPR and applicable data protection law.',
   'meta.ireland.title': 'Flight Compensation Ireland — Ryanair & Aer Lingus Claims | ClaimVelo',
   'meta.ireland.desc': 'Delayed or cancelled flight from Dublin, Cork, Shannon or Knock? Claim up to €600 under EU261. All airlines covered — Ryanair, Aer Lingus and more. No win, no fee.',
+  'meta.united-kingdom.title': 'UK Flight Compensation — Claim Up to £520 Under UK261 | ClaimVelo',
+  'meta.united-kingdom.desc': 'Delayed or cancelled flight from Heathrow, Gatwick, Manchester or any UK airport? Claim up to £520 under UK261. British Airways, EasyJet, Jet2 and all UK airlines covered. No win, no fee.',
   'meta.partners.title': 'Partner with ClaimVelo — Refer Passengers & Earn Commission',
   'meta.partners.desc': 'Join the ClaimVelo partner programme. Refer passengers with delayed or cancelled flights and earn a commission on every successful claim. Free to join.',
 

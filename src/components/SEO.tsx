@@ -14,6 +14,7 @@ const PUBLIC_PAGE_PATHS: Partial<Record<Page, string>> = {
   privacy: '/privacy',
   ireland: '/ireland',
   partners: '/partners',
+  'united-kingdom': '/united-kingdom',
 };
 
 const NOINDEX_PAGES = new Set<Page>([
@@ -238,18 +239,108 @@ function buildAboutSchema(title: string, description: string, canonicalUrl: stri
   return [webpage, org];
 }
 
+function buildUKSchemas(title: string, description: string, canonicalUrl: string) {
+  const webpage = buildWebPageSchema(canonicalUrl, title, description);
+  const faqPage = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: 'Does UK261 apply to all UK flights?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'UK261 covers three categories: any flight departing from a UK airport (on any airline), any flight arriving in the UK operated by a UK or EU airline, and any flight arriving in the EU operated by a UK airline.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'How much compensation can I claim for a delayed UK flight?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Under UK261: £220 for flights under 1,500 km, £350 for 1,500–3,500 km, £260 for flights over 3,500 km with a 3–4 hour arrival delay, and £520 for flights over 3,500 km with a 4+ hour arrival delay.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'Can I claim UK flight compensation after Brexit?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Yes. Following Brexit, the UK transposed EU Regulation 261/2004 into domestic law as UK261. Your rights are essentially identical to EU261 — compensation amounts are fixed in pounds sterling.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'How far back can I claim for a UK flight?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: '6 years in England and Wales, and 5 years in Scotland, from the date of the disrupted flight. Flights from 2020 onward are likely still within the claim window.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'Can I claim against British Airways or EasyJet?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Yes. All UK-registered carriers including British Airways, EasyJet, Jet2, TUI, and Virgin Atlantic are fully subject to UK261. ClaimVelo has extensive experience winning claims against all of them.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'What if my delay is 5 hours or more?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'If your delay reaches 5 hours or more under UK261, you have the right to choose not to travel and request a full refund of the unused ticket in the original form of payment within 7 days.',
+        },
+      },
+    ],
+  };
+  return [webpage, faqPage];
+}
+
+function buildBreadcrumbSchema(page: Page, canonicalUrl: string) {
+  const homeItem = { '@type': 'ListItem', position: 1, name: 'Home', item: BASE_URL + '/' };
+
+  const pageLabels: Partial<Record<Page, string>> = {
+    'how-it-works': 'How It Works',
+    fees: 'Our Fees',
+    about: 'About Us',
+    claim: 'Start a Claim',
+    ireland: 'Ireland',
+    'united-kingdom': 'United Kingdom',
+    partners: 'Partner Programme',
+    privacy: 'Privacy Policy',
+  };
+
+  const label = pageLabels[page];
+  if (!label) return null;
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      homeItem,
+      { '@type': 'ListItem', position: 2, name: label, item: canonicalUrl },
+    ],
+  };
+}
+
 function getPageSchemas(page: Page, title: string, description: string, canonicalUrl: string) {
+  const breadcrumb = buildBreadcrumbSchema(page, canonicalUrl);
+  let schemas: object[];
+
   switch (page) {
-    case 'home': return buildHomeSchemas(title, description, canonicalUrl);
-    case 'how-it-works': return buildHowItWorksSchema(title, description, canonicalUrl);
-    case 'ireland': return buildIrelandSchemas(title, description, canonicalUrl);
-    case 'about': return buildAboutSchema(title, description, canonicalUrl);
+    case 'home': schemas = buildHomeSchemas(title, description, canonicalUrl); break;
+    case 'how-it-works': schemas = buildHowItWorksSchema(title, description, canonicalUrl); break;
+    case 'ireland': schemas = buildIrelandSchemas(title, description, canonicalUrl); break;
+    case 'about': schemas = buildAboutSchema(title, description, canonicalUrl); break;
+    case 'united-kingdom': schemas = buildUKSchemas(title, description, canonicalUrl); break;
     default:
-      if (PUBLIC_PAGE_PATHS[page] !== undefined) {
-        return [buildWebPageSchema(canonicalUrl, title, description)];
-      }
-      return [];
+      schemas = PUBLIC_PAGE_PATHS[page] !== undefined ? [buildWebPageSchema(canonicalUrl, title, description)] : [];
   }
+
+  if (breadcrumb) schemas = [...schemas, breadcrumb];
+  return schemas;
 }
 
 export default function SEO({ page, locale }: Props) {

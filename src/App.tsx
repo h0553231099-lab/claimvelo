@@ -28,6 +28,7 @@ const SalesSignInPage = lazy(() => import('./pages/SalesSignInPage'));
 const SeoSignInPage = lazy(() => import('./pages/SeoSignInPage'));
 const PartnerPage = lazy(() => import('./pages/PartnerPage'));
 const IrelandPage = lazy(() => import('./pages/IrelandPage'));
+const UKPage = lazy(() => import('./pages/UKPage'));
 const ClaimSuccessPage = lazy(() => import('./pages/ClaimSuccessPage'));
 const emptyForm = (): ClaimFormData => ({
   firstName: '', lastName: '', email: '', phone: '', address: '', country: 'United Kingdom', countryOther: '', dob: '',
@@ -193,6 +194,7 @@ export default function App() {
           {page === 'privacy' && <PrivacyPolicyPage onNav={nav} />}
           {page === 'partners' && <PartnerPage onNav={nav} />}
           {page === 'ireland' && <IrelandPage onNav={nav} />}
+          {page === 'united-kingdom' && <UKPage onNav={nav} />}
           {page === 'agent-dashboard' && <AgentDashboardPage onNav={nav} user={user} onSignOut={handleSignOut} />}
           {page === 'sales-dashboard' && <SalesManagerPage onNav={nav} user={user} onSignOut={handleSignOut} />}
         </Suspense>
