@@ -1589,6 +1589,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
             const unreadCount = notifications.filter(n => !n.read).length;
             const notifIcon = (type: string) => {
               if (type === 'new_claim') return { icon: '🆕', bg: '#f0fdf4' };
+              if (type === 'new_lead') return { icon: '🎯', bg: '#fef9c3' };
               if (type === 'stale_in_progress') return { icon: '⏰', bg: '#eff6ff' };
               if (type === 'stale_waiting') return { icon: '⚠️', bg: '#fffbeb' };
               if (type === 'status_changed') return { icon: '🔄', bg: '#f8fafc' };
@@ -1596,6 +1597,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
             };
             const notifTitle = (type: string) => {
               if (type === 'new_claim') return 'New Claim';
+              if (type === 'new_lead') return 'New Lead';
               if (type === 'stale_in_progress') return 'Stale — In Progress';
               if (type === 'stale_waiting') return 'Stale — Waiting';
               if (type === 'status_changed') return 'Status Changed';

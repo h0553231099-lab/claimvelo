@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Plane, Calendar, MapPin, Clock, User, Mail, Phone, ChevronRight, ChevronLeft, CheckCircle } from 'lucide-react';
 import AirportInput from './AirportInput';
+import { supabase, insertNotification } from '../lib/supabase';
 
 interface Props {
   open: boolean;
@@ -69,7 +70,47 @@ export default function ClaimModal({ open, onClose, onSubmitSuccess }: Props) {
   async function handleSubmit() {
     if (!canAdvance()) return;
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 900));
+
+    const ref = `LEAD-${Date.now()}`;
+    const nameParts = form.fullName.trim().split(/\s+/);
+    const firstName = nameParts[0] ?? '';
+    const lastName = nameParts.slice(1).join(' ') || '—';
+
+    const delayLabel: Record<string, string> = {
+      '2-3h': '2–3 hour delay',
+      '3-8h': '3–8 hour delay',
+      '8h+': '8+ hour delay',
+      'cancelled': 'Cancellation',
+    };
+
+    await supabase.from('claims').insert({
+      claim_ref: ref,
+      passenger_first_name: firstName,
+      passenger_last_name: lastName,
+      email: form.email,
+      phone: form.phone || '',
+      address: '',
+      country: '',
+      flight_number: form.flightNumber,
+      flight_date: form.flightDate || null,
+      departure: form.departure,
+      arrival: form.destination,
+      airline: '',
+      issue_type: 'Enquiry',
+      airline_reason: delayLabel[form.delayDuration] ?? form.delayDuration,
+      status: 'Untouched',
+      amount: '—',
+      agent: '—',
+      loa_signed: false,
+      signature_data: '',
+    });
+
+    await insertNotification({
+      type: 'new_lead',
+      claim_ref: ref,
+      message: `New lead from ${form.fullName.trim()} — ${form.flightNumber} ${form.departure} → ${form.destination} (${delayLabel[form.delayDuration] ?? form.delayDuration})`,
+    });
+
     setSubmitting(false);
     setSubmitted(true);
     onSubmitSuccess?.();
