@@ -1,4 +1,5 @@
 import { supabase, insertNotification, lookupFlight } from './supabase';
+import { applyFinancials } from './financialService';
 
 /**
  * Global Automated Checking Engine (Rules Engine)
@@ -12,6 +13,8 @@ import { supabase, insertNotification, lookupFlight } from './supabase';
  *   2. Flight Delay Timing check (< 3h = not eligible)
  *   3. Weather & Force Majeure analysis (carrier fault vs weather/ATC +
  *      neighboring flights verification)
+ *   4. Financial calculation (compensation value + agent commission split —
+ *      only when the decision is "Eligible")
  */
 
 type DelayReasonCode =
@@ -269,7 +272,7 @@ function inferReasonFromStatus(status: string): DelayReasonCode {
 export async function evaluateClaim(claimId: string): Promise<EngineResult> {
   const { data: claim, error } = await supabase
     .from('claims')
-    .select('id, claim_ref, flight_number, flight_date, departure, arrival, airline_reason, delay_hours')
+    .select('id, claim_ref, flight_number, flight_date, departure, arrival, airline_reason, delay_hours, agent')
     .eq('id', claimId)
     .maybeSingle();
 
@@ -321,6 +324,7 @@ export async function evaluateClaim(claimId: string): Promise<EngineResult> {
   if (isCarrierFault) {
     const detail = `Delay of ${delayMinutes}min caused by ${reasonCode.toLowerCase()} issue — carrier responsibility. (source: ${source})`;
     await applyDecision(claimId, claimRef, 'Eligible', detail);
+    await applyFinancials(claimId, claimRef, departure, arrival, claim.agent || null);
     return { claimId, decision: 'Eligible', delayMinutes, reasonCode, neighborsOnTime: null, source, detail };
   }
 
@@ -331,6 +335,7 @@ export async function evaluateClaim(claimId: string): Promise<EngineResult> {
   if (neighborCheck.anyOnTime) {
     const detail = `Delay of ${delayMinutes}min (${reasonCode}) but neighboring flights from ${departure} departed on time — not force majeure. Neighbors: ${neighborSummary}. (source: ${source})`;
     await applyDecision(claimId, claimRef, 'Eligible', detail);
+    await applyFinancials(claimId, claimRef, departure, arrival, claim.agent || null);
     return { claimId, decision: 'Eligible', delayMinutes, reasonCode, neighborsOnTime: true, source, detail };
   }
 
