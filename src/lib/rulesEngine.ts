@@ -83,18 +83,70 @@ function generateMockFlightData(flightNumber: string, flightDate: string): MockF
   return { delayMinutes, reasonCode };
 }
 
-/** Mock check of 3 neighboring flights from the same airport. */
+interface NeighboringFlight {
+  airline: string;
+  flightNumber: string;
+  destination: string;
+  delayMinutes: number;
+  onTime: boolean;
+}
+
+const NEIGHBORING_AIRLINES = [
+  'British Airways', 'Lufthansa', 'Air France', 'KLM',
+  'Ryanair', 'easyJet', 'Iberia', 'TAP Air Portugal',
+  'Aegean Airlines', 'SAS', 'Finnair', 'Swiss International',
+];
+
+const NEIGHBORING_DESTINATIONS = [
+  'LHR', 'CDG', 'FRA', 'AMS', 'MAD', 'FCO', 'DUB', 'CPH',
+  'VIE', 'ZRH', 'ATH', 'LIS',
+];
+
+/**
+ * Simulates checking 3 other airlines from the same airport in the
+ * same time window. Each flight is deterministically generated based
+ * on the airport, date, and reason — so the same claim always produces
+ * the same neighboring flight results.
+ *
+ * Returns the 3 simulated flights and whether they were on-time.
+ * If all 3 were also delayed, the original flight's delay was likely
+ * caused by a genuine airport-wide disruption (force majeure).
+ */
 function checkNeighboringFlights(
   airport: string,
   flightDate: string,
   reasonCode: DelayReasonCode,
-): boolean {
-  let hash = 0;
-  const seed = `${airport}|${flightDate}|${reasonCode}`;
-  for (let i = 0; i < seed.length; i++) {
-    hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+): { flights: NeighboringFlight[]; allDelayed: boolean; anyOnTime: boolean } {
+  const flights: NeighboringFlight[] = [];
+  for (let i = 0; i < 3; i++) {
+    const seed = `${airport}|${flightDate}|${reasonCode}|${i}`;
+    let hash = 0;
+    for (let j = 0; j < seed.length; j++) {
+      hash = ((hash << 5) - hash + seed.charCodeAt(j)) | 0;
+    }
+    const absHash = Math.abs(hash);
+    const airlineIdx = absHash % NEIGHBORING_AIRLINES.length;
+    const destIdx = (absHash >> 4) % NEIGHBORING_DESTINATIONS.length;
+    const flightNum = `${NEIGHBORING_AIRLINES[airlineIdx].slice(0, 2).toUpperCase()}${100 + (absHash % 900)}`;
+    const delayMin = absHash % 240;
+    const onTime = delayMin < 30;
+    flights.push({
+      airline: NEIGHBORING_AIRLINES[airlineIdx],
+      flightNumber: flightNum,
+      destination: NEIGHBORING_DESTINATIONS[destIdx],
+      delayMinutes: delayMin,
+      onTime,
+    });
   }
-  return Math.abs(hash) % 100 < 70;
+  const allDelayed = flights.every(f => !f.onTime);
+  const anyOnTime = flights.some(f => f.onTime);
+  return { flights, allDelayed, anyOnTime };
+}
+
+function formatNeighbors(flights: NeighboringFlight[]): string {
+  return flights.map(f =>
+    `${f.airline} ${f.flightNumber} → ${f.destination}: ${f.onTime ? 'on time' : `${f.delayMinutes}min delay`}`,
+  ).join('; ');
 }
 
 const ISRAELI_AIRPORT_CODES = new Set(['TLV', 'BGW', 'ETM', 'HFA']);
@@ -272,16 +324,17 @@ export async function evaluateClaim(claimId: string): Promise<EngineResult> {
     return { claimId, decision: 'Eligible', delayMinutes, reasonCode, neighborsOnTime: null, source, detail };
   }
 
-  // Weather / ATC / Security → check neighboring flights
-  const neighborsOnTime = checkNeighboringFlights(departure, flightDate, reasonCode);
+  // Weather / ATC / Security → verify with 3 neighboring flights from same airport
+  const neighborCheck = checkNeighboringFlights(departure, flightDate, reasonCode);
+  const neighborSummary = formatNeighbors(neighborCheck.flights);
 
-  if (neighborsOnTime) {
-    const detail = `Delay of ${delayMinutes}min (${reasonCode}) but neighboring flights departed on time — not force majeure. (source: ${source})`;
+  if (neighborCheck.anyOnTime) {
+    const detail = `Delay of ${delayMinutes}min (${reasonCode}) but neighboring flights from ${departure} departed on time — not force majeure. Neighbors: ${neighborSummary}. (source: ${source})`;
     await applyDecision(claimId, claimRef, 'Eligible', detail);
     return { claimId, decision: 'Eligible', delayMinutes, reasonCode, neighborsOnTime: true, source, detail };
   }
 
-  const detail = `Delay of ${delayMinutes}min (${reasonCode}) and neighboring flights also delayed — force majeure confirmed. (source: ${source})`;
+  const detail = `Delay of ${delayMinutes}min (${reasonCode}) and all 3 neighboring flights from ${departure} also delayed — force majeure confirmed. Neighbors: ${neighborSummary}. (source: ${source})`;
   await applyDecision(claimId, claimRef, 'Force Majeure', detail);
   return { claimId, decision: 'Force Majeure', delayMinutes, reasonCode, neighborsOnTime: false, source, detail };
 }
