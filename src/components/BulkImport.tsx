@@ -316,12 +316,20 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
           {['PNR Code', 'Passenger Name', 'Passenger Email', 'Passenger Phone', 'Flight Number', 'Departure Date', 'Origin Airport', 'Destination Airport'].map(col => (
             <span key={col} className="px-2 py-0.5 bg-[#f1f5f9] text-[#64748b] rounded-[6px] text-[10px] font-medium">
               {col}
             </span>
           ))}
+          <a
+            href="/sample-bulk-import.csv"
+            download
+            className="ml-auto flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-[#2563eb] hover:text-[#1d4ed8] border-none cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Sample CSV
+          </a>
         </div>
       </div>
 
@@ -416,3 +424,6 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
     </div>
   );
 }
+
+
+export default BulkImport

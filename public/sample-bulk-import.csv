@@ -1,0 +1,4 @@
+PNR Code,Passenger Name,Passenger Email,Passenger Phone,Flight Number,Departure Date,Origin Airport,Destination Airport
+ABC123,John Smith,john.smith@email.com,+44 7700 900123,BA456,2026-09-15,LHR,CDG
+DEF456,Maria Garcia,maria.garcia@email.com,+353 86 123 4567,FR2389,2026-09-20,DUB,STN
+GHI789,James OConnor,james.oconnor@email.com,+44 161 555 8899,EI106,2026-10-01,MAN,ORK
