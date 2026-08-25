@@ -517,7 +517,7 @@ export default function ClaimPage({ onNav, prefill }: Props) {
   const currentStage = sidebarStages.findIndex(s => s.steps.includes(step));
 
   return (
-    <div className="min-h-screen flex" style={{ background: '#f1f5f9' }}>
+    <div className="min-h-screen w-full min-w-0 flex overflow-x-hidden" style={{ background: '#f1f5f9' }}>
       {/* Sidebar */}
       <div
         className="hidden md:flex w-[260px] shrink-0 flex-col justify-between p-7 text-white relative overflow-hidden"
@@ -558,7 +558,7 @@ export default function ClaimPage({ onNav, prefill }: Props) {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Header */}
         <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-4 shrink-0">
           <button onClick={() => onNav('home')} className="md:hidden flex items-center gap-2 border-none bg-transparent cursor-pointer mr-2">
@@ -581,9 +581,9 @@ export default function ClaimPage({ onNav, prefill }: Props) {
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-3 py-5 sm:px-4 sm:py-8 md:px-10 md:py-10">
-          <div className="max-w-[680px] mx-auto bg-white rounded-2xl shadow-sm border border-slate-200">
-            <div className="p-4 sm:p-6 md:p-8 lg:p-10">
+        <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden px-3 py-5 sm:px-4 sm:py-8 md:px-10 md:py-10">
+          <div className="w-full min-w-0 max-w-[680px] mx-auto bg-white rounded-2xl shadow-sm border border-slate-200">
+            <div className="min-w-0 p-4 sm:p-6 md:p-8 lg:p-10">
 
               {/* ── STEP 1: Contact & Journey ─────────────────────────────────── */}
               {step === 1 && (
