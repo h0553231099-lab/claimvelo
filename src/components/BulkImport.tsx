@@ -207,7 +207,7 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
           departure: row.origin,
           arrival: row.destination,
           booking_reference: row.pnr,
-          status: 'Untouched',
+          status: 'Pending Check',
           amount: '€600',
           agent: agentCode,
           loa_signed: false,
