@@ -301,3 +301,55 @@ export async function recalculateAgentPayout(
 
   return { newTotal: total, claimCount: claims.length, breakdown };
 }
+
+/**
+ * Sub-Step C — logs a manual payout to an agent and updates their
+ * total_paid_to_date. Called by the admin dashboard when the admin
+ * clicks "Mark as Paid" and submits the payout form.
+ *
+ * Also records the payout as a finance transaction for audit trail.
+ *
+ * Returns the new total_paid_to_date and the resulting balance_due.
+ */
+export async function logAgentPayout(
+  agentId: string,
+  agentCode: string,
+  agentName: string,
+  amount: number,
+  paymentDate: string,
+  referenceId: string,
+): Promise<{ newTotalPaid: number; balanceDue: number }> {
+  // Fetch current totals
+  const { data: agent } = await supabase
+    .from('worker_profiles')
+    .select('total_payout_earned, total_paid_to_date')
+    .eq('id', agentId)
+    .maybeSingle();
+
+  const currentEarned = Number(agent?.total_payout_earned) || 0;
+  const currentPaid = Number(agent?.total_paid_to_date) || 0;
+  const newTotalPaid = Math.round((currentPaid + amount) * 100) / 100;
+  const balanceDue = Math.round((currentEarned - newTotalPaid) * 100) / 100;
+
+  // Update the agent's total_paid_to_date
+  await supabase
+    .from('worker_profiles')
+    .update({ total_paid_to_date: newTotalPaid })
+    .eq('id', agentId);
+
+  // Log as a finance transaction for audit trail
+  await supabase
+    .from('finance_transactions')
+    .insert({
+      type: 'expense',
+      category: 'Payroll',
+      description: `Agent payout — ${agentName} (${agentCode}) — Ref: ${referenceId}`,
+      amount,
+      currency: 'EUR',
+      date: paymentDate,
+      claim_ref: null,
+      created_by: null,
+    });
+
+  return { newTotalPaid, balanceDue };
+}

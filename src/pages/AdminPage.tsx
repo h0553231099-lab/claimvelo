@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import { Claim, ClaimStatus, AdminView, UserProfile } from '../types';
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
-import { recalculateAgentPayout } from '../lib/financialService';
+import { recalculateAgentPayout, logAgentPayout } from '../lib/financialService';
 import { Page } from '../types';
 import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2 } from 'lucide-react';
 import BulkImport from '../components/BulkImport';
@@ -32,6 +32,7 @@ interface WorkerProfile {
   created_at: string;
   commission_rate?: number;
   total_payout_earned?: number;
+  total_paid_to_date?: number;
 }
 
 interface ClaimFile {
@@ -843,6 +844,13 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
 
   // Agent commission editing state
   const [editingCommission, setEditingCommission] = useState<string | null>(null);
+
+  // Agent payout modal state
+  const [payoutAgent, setPayoutAgent] = useState<WorkerProfile | null>(null);
+  const [payoutForm, setPayoutForm] = useState({ amount: '', paymentDate: new Date().toISOString().split('T')[0], reference: '' });
+  const [payoutSaving, setPayoutSaving] = useState(false);
+  const [payoutError, setPayoutError] = useState('');
+  const [payoutSuccess, setPayoutSuccess] = useState('');
   const [commissionInput, setCommissionInput] = useState('');
   const [commissionSaving, setCommissionSaving] = useState(false);
 
@@ -853,6 +861,37 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   // Inline QR modal for agent rows
   const [qrModal, setQrModal] = useState<{ name: string; code: string; dataUrl: string } | null>(null);
   const [qrCopied, setQrCopied] = useState(false);
+
+  async function submitPayout() {
+    if (!payoutAgent) return;
+    const amt = parseFloat(payoutForm.amount);
+    if (isNaN(amt) || amt <= 0) { setPayoutError('Amount must be a positive number.'); return; }
+    if (!payoutForm.reference.trim()) { setPayoutError('Reference/Transaction ID is required.'); return; }
+    setPayoutSaving(true);
+    setPayoutError('');
+    setPayoutSuccess('');
+    try {
+      const { newTotalPaid, balanceDue } = await logAgentPayout(
+        payoutAgent.id,
+        payoutAgent.agent_code || '',
+        payoutAgent.full_name || payoutAgent.email,
+        amt,
+        payoutForm.paymentDate,
+        payoutForm.reference.trim(),
+      );
+      setWorkers(prev => prev.map(w => w.id === payoutAgent.id
+        ? { ...w, total_paid_to_date: newTotalPaid }
+        : w,
+      ));
+      setPayoutSuccess(`Payout of €${amt.toFixed(2)} logged. New balance due: €${balanceDue.toFixed(2)}`);
+      setPayoutForm({ amount: '', paymentDate: new Date().toISOString().split('T')[0], reference: '' });
+      // Auto-close after showing success briefly
+      setTimeout(() => { setPayoutAgent(null); setPayoutSuccess(''); }, 1800);
+    } catch (e: unknown) {
+      setPayoutError(e instanceof Error ? e.message : 'Failed to log payout');
+    }
+    setPayoutSaving(false);
+  }
 
   async function saveCommissionRate(agentId: string) {
     const rate = parseFloat(commissionInput);
@@ -2121,7 +2160,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
-                        {['Name', 'Code', 'Claims', 'Resolved', 'Total Value', 'Commission', 'Earned', 'Status', 'Added', ''].map(h => (
+                        {['Name', 'Code', 'Claims', 'Resolved', 'Total Value', 'Commission', 'Earned', 'Paid', 'Balance Due', 'Status', 'Added', ''].map(h => (
                           <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
                         ))}
                       </tr>
@@ -2203,6 +2242,21 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                                 return earned > 0 ? `€${earned.toLocaleString('en-EU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-[#cbd5e1] font-normal">—</span>;
                               })()}
                             </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold text-[#0f172a]">
+                              {(() => {
+                                const paid = w.total_paid_to_date ?? 0;
+                                return paid > 0 ? `€${paid.toLocaleString('en-EU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-[#cbd5e1] font-normal">—</span>;
+                              })()}
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-bold">
+                              {(() => {
+                                const earned = w.total_payout_earned ?? 0;
+                                const paid = w.total_paid_to_date ?? 0;
+                                const balance = Math.round((earned - paid) * 100) / 100;
+                                if (balance <= 0) return <span className="text-[#94a3b8] font-normal">€0.00</span>;
+                                return <span className="text-[#d97706]">€{balance.toLocaleString('en-EU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+                              })()}
+                            </td>
                             <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
                               <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${w.status === 'active' ? 'bg-[#f0fdf4] text-[#16a34a]' : 'bg-[#fffbeb] text-[#d97706]'}`}>
                                 {w.status === 'active' ? '● Active' : '● Pending'}
@@ -2216,6 +2270,18 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                                     <QrCode className="w-3.5 h-3.5" />
                                   </button>
                                 )}
+                                <button
+                                  onClick={() => {
+                                    setPayoutAgent(w);
+                                    setPayoutForm({ amount: '', paymentDate: new Date().toISOString().split('T')[0], reference: '' });
+                                    setPayoutError('');
+                                    setPayoutSuccess('');
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-0.5 bg-[#fffbeb] text-[#b45309] border border-[#fde68a] rounded-[10px] text-[10px] font-semibold cursor-pointer hover:bg-[#fef3c7] transition-colors"
+                                  title="Log a payout to this agent"
+                                >
+                                  <DollarSign className="w-2.5 h-2.5" /> Mark Paid
+                                </button>
                                 <button onClick={() => removeWorker(w.id)} className="p-1 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors" title="Remove">
                                   <Trash className="w-3.5 h-3.5" />
                                 </button>
@@ -2229,6 +2295,94 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 )}
               </div>
 
+            </div>
+          )}
+
+          {/* Payout modal */}
+          {payoutAgent && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setPayoutAgent(null)}>
+              <div className="bg-white rounded-[14px] shadow-2xl p-6 w-[400px] flex flex-col gap-4" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-[14px] text-[#0f172a]">Settle Payout</div>
+                    <div className="text-[11px] text-[#64748b] mt-0.5">{payoutAgent.full_name} ({payoutAgent.agent_code})</div>
+                  </div>
+                  <button onClick={() => setPayoutAgent(null)} className="p-1 text-[#94a3b8] hover:text-[#0f172a] bg-transparent border-none cursor-pointer rounded">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {(() => {
+                  const earned = payoutAgent.total_payout_earned ?? 0;
+                  const paid = payoutAgent.total_paid_to_date ?? 0;
+                  const balance = Math.round((earned - paid) * 100) / 100;
+                  return (
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-[#fffbeb] border border-[#fde68a] rounded-[8px]">
+                      <span className="text-[11px] font-semibold text-[#92400e]">Current Balance Due</span>
+                      <span className="text-[14px] font-bold text-[#b45309]">€{balance.toLocaleString('en-EU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  );
+                })()}
+
+                {payoutSuccess ? (
+                  <div className="px-3 py-3 bg-[#f0fdf4] border border-[#86efac] text-[#166534] text-[12px] rounded-[8px] text-center font-semibold">
+                    {payoutSuccess}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">Amount Paid</label>
+                      <div className="flex items-center border border-[#e2e8f0] rounded-[7px] overflow-hidden bg-white focus-within:border-[#16a34a]">
+                        <span className="px-2.5 py-2 text-[12px] text-[#64748b] bg-[#f8fafc] border-r border-[#e2e8f0]">€</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={payoutForm.amount}
+                          onChange={e => setPayoutForm(f => ({ ...f, amount: e.target.value }))}
+                          placeholder="0.00"
+                          className="flex-1 px-2 py-2 text-[12px] outline-none bg-white"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">Payment Date</label>
+                      <input
+                        type="date"
+                        value={payoutForm.paymentDate}
+                        onChange={e => setPayoutForm(f => ({ ...f, paymentDate: e.target.value }))}
+                        className="px-2.5 py-2 border border-[#e2e8f0] rounded-[7px] text-[12px] outline-none focus:border-[#16a34a] bg-white"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">Reference / Transaction ID</label>
+                      <input
+                        value={payoutForm.reference}
+                        onChange={e => setPayoutForm(f => ({ ...f, reference: e.target.value }))}
+                        placeholder="e.g. BANK-TRF-001234"
+                        className="px-2.5 py-2 border border-[#e2e8f0] rounded-[7px] text-[12px] outline-none focus:border-[#16a34a] bg-white"
+                      />
+                    </div>
+                    {payoutError && <div className="text-[11px] text-[#dc2626]">{payoutError}</div>}
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        onClick={submitPayout}
+                        disabled={payoutSaving}
+                        className="flex-1 px-3 py-2 bg-[#16a34a] text-white border-none rounded-[7px] text-[12px] font-semibold cursor-pointer hover:bg-[#15803d] disabled:opacity-60 transition-colors"
+                      >
+                        {payoutSaving ? 'Saving...' : 'Log Payout'}
+                      </button>
+                      <button
+                        onClick={() => setPayoutAgent(null)}
+                        className="px-3 py-2 bg-white text-[#64748b] border border-[#e2e8f0] rounded-[7px] text-[12px] font-semibold cursor-pointer hover:bg-[#f8fafc]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
