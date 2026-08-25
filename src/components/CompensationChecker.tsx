@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   X, PlaneTakeoff, PlaneLanding, Star, ArrowRight, Lock, CheckCircle2,
   Clock, Ban, Luggage, Link, Search, AlertTriangle, Users, Calendar,
@@ -91,6 +91,7 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
 
   // Live lookup
   const [liveFlight, setLiveFlight] = useState<FlightLookupResult | null>(null);
+  const [flightMatches, setFlightMatches] = useState<FlightLookupResult[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState('');
 
@@ -133,21 +134,39 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
     setLookupLoading(true);
     setLookupError('');
     setLiveFlight(null);
+    setFlightMatches([]);
     try {
       const { flights, error } = await lookupFlight(fn.toUpperCase(), fdate, depC, arrC);
       if (error) {
         setLookupError(error);
       } else if (flights.length > 0) {
-        const match = flights[0];
-        setLiveFlight(match);
-        if (match.status === 'cancelled' && issue !== 'cancelled') {
-          setIssue('cancelled');
+        if (fn.length >= 2) {
+          const match = flights[0];
+          setLiveFlight(match);
+          if (match.status === 'cancelled' && issue !== 'cancelled') {
+            setIssue('cancelled');
+          }
+        } else {
+          setFlightMatches(flights);
         }
       }
     } catch {
       setLookupError('Network error — please try again');
     }
     setLookupLoading(false);
+  }
+
+  function selectFlight(idx: number): void {
+    const match = flightMatches[idx];
+    if (!match) return;
+    setLiveFlight(match);
+    setFlightMatches([]);
+    if (match.flightNum && match.flightNum !== 'N/A') {
+      setFlightNumber(match.flightNum);
+    }
+    if (match.status === 'cancelled' && issue !== 'cancelled') {
+      setIssue('cancelled');
+    }
   }
 
   function computeResult(): CompensationResult {
@@ -243,6 +262,20 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
   const activeSidebarIdx = Math.min(step - 1, 4);
 
   const claimWindow = fdate ? isWithinClaimWindow(fdate) : null;
+
+  useEffect(() => {
+    if (step !== 3) return;
+    if (!fdate) return;
+    if (flightNumber.trim().length >= 2) return;
+    if (liveFlight) return;
+    if (flightMatches.length > 0) return;
+    if (lookupLoading) return;
+    const depC = depCode();
+    const arrC = arrCode();
+    if (!depC || !arrC) return;
+    tryLiveLookup();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fdate, step]);
 
   return (
     <div className="fixed inset-0 z-[500] flex items-center justify-center p-4" onClick={onClose}>
@@ -508,6 +541,70 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
                       )}
                     </div>
                   </div>
+
+                  {/* Flight selection list (when multiple flights found by route) */}
+                  {flightMatches.length > 0 && !liveFlight && (
+                    <div>
+                      <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        We found {flightMatches.length} flights on this route — which one was yours?
+                      </label>
+                      <p className="text-[11px] text-slate-400 mb-2">Select your flight to verify delay data automatically.</p>
+                      <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                        {flightMatches.map((f, i) => (
+                          <button
+                            key={i}
+                            onClick={() => selectFlight(i)}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border-2 border-slate-200 bg-white hover:border-blue-500 hover:bg-blue-50 text-left cursor-pointer transition-all"
+                          >
+                            <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                              <Plane className="w-4 h-4 text-slate-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[14px] font-bold text-slate-800">
+                                {f.flightNum !== 'N/A' ? f.flightNum : 'Unknown'} · {f.airline}
+                              </div>
+                              <div className="text-[12px] text-slate-500">
+                                {f.depTime && `Dep ${f.depTime}`}
+                                {f.arrTime && ` → Arr ${f.arrTime}`}
+                                {f.delayMin > 0 && ` · ${formatDelay(f.delayMin)} delay`}
+                                {f.status === 'cancelled' && ' · Cancelled'}
+                                {f.delayMin === 0 && f.status !== 'cancelled' && ' · On time'}
+                              </div>
+                            </div>
+                            {f.delayMin > 0 && (
+                              <span className="px-2 py-1 rounded-lg bg-amber-100 text-amber-700 text-[11px] font-bold shrink-0">
+                                Delayed
+                              </span>
+                            )}
+                            {f.status === 'cancelled' && (
+                              <span className="px-2 py-1 rounded-lg bg-red-100 text-red-700 text-[11px] font-bold shrink-0">
+                                Cancelled
+                              </span>
+                            )}
+                            {f.delayMin === 0 && f.status !== 'cancelled' && (
+                              <span className="px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-[11px] font-bold shrink-0">
+                                On time
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {lookupLoading && !liveFlight && flightMatches.length === 0 && (
+                    <div className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                      <span className="w-5 h-5 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
+                      <span className="text-[13px] text-slate-500">Searching for flights on this route...</span>
+                    </div>
+                  )}
+
+                  {lookupError && !liveFlight && flightMatches.length === 0 && !lookupLoading && (
+                    <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-[12px] text-slate-500">
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-slate-400" />
+                      Couldn't verify flight data automatically — you can still continue with your manual input.
+                    </div>
+                  )}
 
                   {/* Live flight data banner (found by flight number OR route) */}
                   {liveFlight && (
