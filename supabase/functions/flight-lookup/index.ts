@@ -224,6 +224,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (flightNumber?.trim() && flights?.length) {
+      const requestedFlight = flightNumber.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      flights = flights.filter((flight) => {
+        const returnedFlight = flight.flightNum.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+        return returnedFlight === requestedFlight;
+      });
+    }
+
     if (!flights?.length) {
       // Never expose raw API error messages to users
       void apiNote; // logged internally but not shown
