@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
-import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, Loader2, X, User } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, Loader2, X, User, Download } from 'lucide-react';
 
 interface WorkerProfile {
   id: string;
