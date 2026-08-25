@@ -124,18 +124,25 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
     return true;
   }
 
- async function tryLiveLookup(): Promise<void> {
+  async function tryLiveLookup(): Promise<void> {
     const fn = flightNumber.trim();
-    if (fn.length < 2 || !fdate) return;
+    const depC = depCode();
+    const arrC = arrCode();
+    if (!fdate) return;
+    if (fn.length < 2 && (!depC || !arrC)) return;
     setLookupLoading(true);
     setLookupError('');
     setLiveFlight(null);
     try {
-      const { flights, error } = await lookupFlight(fn.toUpperCase(), fdate, depCode(), arrCode());
+      const { flights, error } = await lookupFlight(fn.toUpperCase(), fdate, depC, arrC);
       if (error) {
         setLookupError(error);
       } else if (flights.length > 0) {
-        setLiveFlight(flights[0]);
+        const match = flights[0];
+        setLiveFlight(match);
+        if (match.status === 'cancelled' && issue !== 'cancelled') {
+          setIssue('cancelled');
+        }
       }
     } catch {
       setLookupError('Network error — please try again');
@@ -150,20 +157,29 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
     setAutoJurisdiction(jur);
 
     let delayMin = 0;
-    if (issue === 'delay') {
+    let effectiveIssue = issue;
+
+    if (liveFlight) {
+      if (liveFlight.status === 'cancelled') {
+        effectiveIssue = 'cancelled';
+      } else if (liveFlight.delayMin > 0 && issue === 'delay') {
+        delayMin = liveFlight.delayMin;
+      } else if (liveFlight.delayMin > 0 && issue === 'missed') {
+        delayMin = liveFlight.delayMin;
+      }
+    }
+
+    if (effectiveIssue === 'delay' && delayMin === 0) {
       const opt = DELAY_OPTS.find(o => o.id === delay);
       delayMin = opt?.min ?? 0;
-      // If we have live data, use actual delay
       if (liveFlight && liveFlight.delayMin > 0) {
         delayMin = liveFlight.delayMin;
       }
-    } else if (issue === 'missed' && liveFlight) {
-      delayMin = liveFlight.delayMin;
     }
 
     return calculateCompensation({
       jurisdiction: jur,
-      disruption: issue as DisruptionType,
+      disruption: effectiveIssue as DisruptionType,
       delayMin,
       depCode: depC,
       arrCode: arrC,
@@ -183,10 +199,11 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
     } else if (step === 2) {
       setStep(3);
     } else if (step === 3) {
-      // Wait for live lookup to complete before moving on — the result
-      // is used in step 4 and for the final compensation calculation.
-      if (flightNumber.trim().length >= 2) {
-        setStep(4); // show step 4 immediately with a loading spinner
+      // Always try live lookup when we have a date + at least a flight number or route
+      const hasFlightNum = flightNumber.trim().length >= 2;
+      const hasRoute = depCode() && arrCode();
+      if (hasFlightNum || hasRoute) {
+        setStep(4);
         await tryLiveLookup();
       } else {
         setStep(4);
@@ -380,10 +397,15 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
                         className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[14px] outline-none focus:border-blue-500 focus:bg-white transition-all"
                       />
                     </div>
-                    {flightNumber.trim().length >= 2 && (
+                    {flightNumber.trim().length >= 2 ? (
                       <div className="mt-2 flex items-center gap-2 text-[12px] text-blue-600">
                         <Search className="w-3.5 h-3.5" />
                         We'll look up this flight's actual delay data automatically.
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-2 text-[12px] text-slate-400">
+                        <Search className="w-3.5 h-3.5" />
+                        No flight number? We'll still try to verify your flight using the route and date.
                       </div>
                     )}
                   </div>
@@ -487,15 +509,39 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
                     </div>
                   </div>
 
+                  {/* Live flight data banner (found by flight number OR route) */}
+                  {liveFlight && (
+                    <div className="mb-3 flex items-start gap-3 p-3.5 bg-blue-50 border border-blue-200 rounded-2xl">
+                      <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
+                        <Search className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-bold text-blue-800">Live flight data found</div>
+                        <div className="text-[12px] text-blue-600">
+                          {liveFlight.flightNum !== 'N/A' && `${liveFlight.flightNum} · `}
+                          {liveFlight.airline}
+                          {liveFlight.depCode && liveFlight.arrCode && ` · ${liveFlight.depCode} → ${liveFlight.arrCode}`}
+                          {liveFlight.status === 'cancelled' && ' · Cancelled'}
+                          {liveFlight.delayMin > 0 && ` · ${formatDelay(liveFlight.delayMin)} delay`}
+                        </div>
+                        {liveFlight.status === 'cancelled' && issue !== 'cancelled' && (
+                          <div className="text-[12px] font-semibold text-blue-800 mt-1">
+                            We detected this flight was cancelled — we'll assess your claim as a cancellation automatically.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Delay duration (only for delay) */}
                   {issue === 'delay' && (
                     <div>
                       <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-2">How long was the delay?</label>
                       <p className="text-[11px] text-slate-400 mb-2">Measured at your final destination on arrival.</p>
                       {liveFlight && liveFlight.delayMin > 0 && (
-                        <div className="mb-2 flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-[12px] text-blue-700">
-                          <Search className="w-4 h-4 shrink-0" />
-                          Live data shows: <strong>{formatDelay(liveFlight.delayMin)}</strong> actual delay — we'll use this automatically.
+                        <div className="mb-2 flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[12px] text-emerald-700">
+                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          Verified delay: <strong>{formatDelay(liveFlight.delayMin)}</strong> — we'll use this automatically.
                         </div>
                       )}
                       <div className="grid grid-cols-1 gap-2.5">
