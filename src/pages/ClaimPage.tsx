@@ -1206,7 +1206,9 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                     <div className="font-bold text-[14px] text-[#0f172a] mb-3">Letter of Authority <span className="text-[#dc2626]">*</span></div>
                     <label className="flex items-start gap-3 cursor-pointer text-[13px] text-[#374151] leading-relaxed mb-4">
                       <input type="checkbox" checked={loaChecked} onChange={e => setLoaChecked(e.target.checked)} className="w-4 h-4 mt-0.5 accent-[#0f2744] shrink-0" />
-                      I authorise <strong className="mx-1">ClaimVelo Ltd.</strong> to act as my authorised representative and pursue compensation on my behalf under EC Regulation 261/2004 / UK261. I agree to a <strong>30% success fee</strong> (50% if legal action is required) — no charge if unsuccessful. No-Win, No-Fee.
+                      <span className="flex-1 min-w-0">
+                        I authorise <strong>ClaimVelo Ltd.</strong> to act as my authorised representative and pursue compensation on my behalf under EC Regulation 261/2004 / UK261. I agree to a <strong>30% success fee</strong> (50% if legal action is required) — no charge if unsuccessful. No-Win, No-Fee.
+                      </span>
                     </label>
                     {loaChecked && (
                       <div ref={canvasWrapRef}>
