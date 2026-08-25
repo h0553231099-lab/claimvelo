@@ -1839,7 +1839,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
 
           {/* USERS */}
           {av === 'users' && !isWorker && (
-            <div className="max-w-[780px]">
+            <div className="">
               <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4 mb-3.5">
                 <div className="flex items-center mb-3.5">
                   <span className="font-bold text-[13px]">Workers</span>
@@ -1920,7 +1920,8 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 {workers.filter(w => w.role !== 'sales_manager' && w.role !== 'agent').length === 0 ? (
                   <div className="text-center py-10 text-[#94a3b8] text-[13px]">No workers added yet. Click "Add Worker" to get started.</div>
                 ) : (
-                  <table className="w-full border-collapse">
+                  <div className="overflow-x-auto -mx-4 px-4">
+                  <table className="border-collapse" style={{ minWidth: 760 }}>
                     <thead>
                       <tr>
                         {['Name', 'Email', 'Code', 'Claims', 'Resolved', 'Value', 'Role', 'Status', 'Added', ''].map(h => (
@@ -1971,6 +1972,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -1978,7 +1980,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
 
           {/* SALES MANAGERS (inside users view) */}
           {av === 'users' && !isWorker && (
-            <div className="max-w-[780px] mt-4 flex flex-col gap-4">
+            <div className="mt-4 flex flex-col gap-4">
 
               {/* Sales Managers card */}
               <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-4">
@@ -2157,7 +2159,8 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 )}
 
                 {workers.filter(w => w.role === 'agent').length > 0 && (
-                  <table className="w-full border-collapse">
+                  <div className="overflow-x-auto -mx-4 px-4">
+                  <table className="border-collapse" style={{ minWidth: 980 }}>
                     <thead>
                       <tr>
                         {['Name', 'Code', 'Claims', 'Resolved', 'Total Value', 'Commission', 'Earned', 'Paid', 'Balance Due', 'Status', 'Added', ''].map(h => (
@@ -2292,6 +2295,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
 
