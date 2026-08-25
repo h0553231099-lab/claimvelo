@@ -124,7 +124,7 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
     return true;
   }
 
-  async function tryLiveLookup() {
+ async function tryLiveLookup(): Promise<void> {
     const fn = flightNumber.trim();
     if (fn.length < 2 || !fdate) return;
     setLookupLoading(true);
@@ -175,7 +175,7 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
     });
   }
 
-  function next() {
+ async function next() {
     if (!canContinue()) return;
 
     if (step === 1) {
@@ -183,11 +183,14 @@ export default function CompensationChecker({ onClose, onStartClaim }: Props) {
     } else if (step === 2) {
       setStep(3);
     } else if (step === 3) {
-      // Try live lookup if flight number was provided
+      // Wait for live lookup to complete before moving on — the result
+      // is used in step 4 and for the final compensation calculation.
       if (flightNumber.trim().length >= 2) {
-        tryLiveLookup();
+        setStep(4); // show step 4 immediately with a loading spinner
+        await tryLiveLookup();
+      } else {
+        setStep(4);
       }
-      setStep(4);
     } else if (step === 4) {
       const res = computeResult();
       setResult(res);
