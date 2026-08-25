@@ -4,6 +4,7 @@ import { Claim, ClaimStatus, AdminView, UserProfile } from '../types';
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
 import { Page } from '../types';
 import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2 } from 'lucide-react';
+import BulkImport from '../components/BulkImport';
 
 interface FinanceTransaction {
   id: string;
@@ -64,6 +65,7 @@ const AV_TITLES: Record<AdminView, string> = {
   inbox:'Inbox', notifs:'Notifications', analytics:'Analytics',
   automation:'Automation', users:'Users & Roles', settings:'Settings',
   finance:'Income & Expenses', qr:'Agent QR Codes', partners:'B2B Partners',
+  bulk:'Bulk Import',
 };
 
 interface DbNotification {
@@ -1244,7 +1246,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     }
   }
 
-  const sidebarMainItems: AdminView[] = isWorker ? ['dash','claims'] : ['dash','claims','crm'];
+  const sidebarMainItems: AdminView[] = isWorker ? ['dash','claims'] : ['dash','claims','crm','bulk'];
   const sidebarSystemItems: AdminView[] = isWorker
     ? ['inbox','notifs']
     : ['inbox','notifs','analytics','automation','users','qr','partners','settings'];
@@ -1262,7 +1264,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
           {sidebarMainItems.map(id => (
             <button key={id} onClick={() => setAv(id)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] cursor-pointer text-[12px] font-medium border-none w-full text-left mb-0.5 transition-colors ${av===id?'bg-[#eff6ff] text-[#2563eb]':'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'}`}>
-              <span>{id==='dash'?'📊':id==='claims'?'📋':'🗂'}</span>
+              <span>{id==='dash'?'📊':id==='claims'?'📋':id==='bulk'?'📥':'🗂'}</span>
               {AV_TITLES[id]}
               {id==='claims' && <span className="ml-auto bg-[#2563eb] text-white text-[9px] font-bold px-1 py-0.5 rounded-[7px]">{claims.length}</span>}
             </button>
@@ -1537,6 +1539,15 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 })}
               </div>
             </div>
+          )}
+
+          {/* BULK IMPORT */}
+          {av === 'bulk' && !isWorker && (
+            <BulkImport workers={workers} onClaimsImported={() => {
+              supabase.from('claims').select('*').order('created_at', { ascending: false }).then(({ data }) => {
+                if (data) setClaims(data as Claim[]);
+              });
+            }} />
           )}
 
           {/* B2B PARTNERS */}
