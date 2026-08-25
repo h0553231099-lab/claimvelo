@@ -112,6 +112,38 @@ function parseDelayMinutes(v: unknown): number | null {
   return isNaN(n) || n < 0 ? null : Math.round(n);
 }
 
+function parseCsvLine(line: string): string[] {
+  const values: string[] = [];
+  let value = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (quoted && line[i + 1] === '"') { value += '"'; i++; }
+      else quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      values.push(value.trim()); value = '';
+    } else {
+      value += char;
+    }
+  }
+  values.push(value.trim());
+  return values;
+}
+
+function parseCsvText(text: string): Record<string, unknown>[] {
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim());
+  if (lines.length < 2) return [];
+  const headers = parseCsvLine(lines[0]);
+  return lines.slice(1).map(line => {
+    const values = parseCsvLine(line);
+    return headers.reduce<Record<string, unknown>>((row, header, index) => {
+      row[header] = values[index] || '';
+      return row;
+    }, {});
+  });
+}
+
 interface Props {
   workers: WorkerProfile[];
   onClaimsImported: () => void;
@@ -136,19 +168,26 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
     setFileName(file.name);
 
     try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array', cellDates: false });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      if (!sheet) { setParseError('No sheets found in the file.'); return; }
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
-      if (json.length === 0) { setParseError('The first sheet is empty.'); return; }
+      const isCsv = file.name.toLowerCase().endsWith('.csv');
+      let json: Record<string, unknown>[];
+      if (isCsv) {
+        json = parseCsvText(await file.text());
+      } else {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        if (!sheet) { setParseError('No sheets found in the file.'); return; }
+        json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+      }
+      if (json.length === 0) { setParseError('The file contains no data rows.'); return; }
 
       const headers = Object.keys(json[0]);
       const colMap: Record<string, string | null> = {};
       for (const field of Object.keys(HEADER_ALIASES)) {
         colMap[field] = findColumn(headers, field);
       }
-      const missingCols = Object.entries(colMap).filter(([, v]) => !v).map(([k]) => k);
+      const requiredFields = ['pnr', 'passengerName', 'email', 'phone', 'flightNumber', 'flightDate', 'origin', 'destination'];
+      const missingCols = requiredFields.filter(field => !colMap[field]);
       if (missingCols.length > 0) {
         setParseError(
           `Could not find columns for: ${missingCols.join(', ')}. ` +
@@ -179,8 +218,9 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
         };
       });
       setParsedRows(rows);
-    } catch {
-      setParseError('Failed to read the file. Please ensure it is a valid .csv or .xlsx file.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown file format error';
+      setParseError(`Failed to read the file: ${message}`);
     }
   }, []);
 
