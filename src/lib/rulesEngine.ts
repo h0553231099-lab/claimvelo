@@ -345,7 +345,17 @@ export async function evaluateClaim(claimId: string): Promise<EngineResult> {
 }
 
 async function applyDecision(claimId: string, claimRef: string, status: EngineDecision, detail: string): Promise<void> {
-  await supabase.from('claims').update({ status, notes: detail, updated_at: new Date().toISOString() }).eq('id', claimId);
+  const isEligible = status === 'Eligible';
+  const update: Record<string, unknown> = {
+    status,
+    notes: detail,
+    updated_at: new Date().toISOString(),
+  };
+  if (!isEligible) {
+    update.compensation_amount = 0;
+    update.amount = '€0';
+  }
+  await supabase.from('claims').update(update).eq('id', claimId);
   await insertNotification({ type: 'status_changed', claim_ref: claimRef, claim_id: claimId, message: `Rules Engine → ${status}: ${detail}` });
 }
 

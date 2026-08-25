@@ -26,10 +26,14 @@ interface ParsedRow {
   flightDate: string;
   origin: string;
   destination: string;
+  delayMinutes: number | null;
+  delayReason: string;
   valid: boolean;
   errors: string[];
-  status: 'pending' | 'imported' | 'error';
+  status: 'pending' | 'imported' | 'evaluating' | 'evaluated' | 'error';
   claimRef?: string;
+  engineStatus?: string;
+  engineAmount?: string;
 }
 
 const HEADER_ALIASES: Record<string, string[]> = {
@@ -41,6 +45,8 @@ const HEADER_ALIASES: Record<string, string[]> = {
   flightDate: ['departure date', 'flight date', 'date', 'dep date', 'date of flight'],
   origin: ['origin', 'origin airport', 'departure airport', 'dep airport', 'from', 'departure'],
   destination: ['destination', 'destination airport', 'arrival airport', 'arr airport', 'to', 'arrival'],
+  delayMinutes: ['delay minutes', 'delay mins', 'delay (min)', 'arrival delay', 'delay', 'delay_min'],
+  delayReason: ['delay reason', 'reason', 'delay cause', 'cause', 'disruption reason', 'airline reason'],
 };
 
 function normalizeHeader(h: string): string {
@@ -100,6 +106,12 @@ function validateRow(row: Partial<ParsedRow>): string[] {
   return errors;
 }
 
+function parseDelayMinutes(v: unknown): number | null {
+  if (v === '' || v == null) return null;
+  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.]/g, ''));
+  return isNaN(n) || n < 0 ? null : Math.round(n);
+}
+
 interface Props {
   workers: WorkerProfile[];
   onClaimsImported: () => void;
@@ -140,7 +152,8 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
       if (missingCols.length > 0) {
         setParseError(
           `Could not find columns for: ${missingCols.join(', ')}. ` +
-          `Expected: PNR Code, Passenger Name, Passenger Email, Passenger Phone, Flight Number, Departure Date, Origin Airport, Destination Airport.`
+          `Expected: PNR Code, Passenger Name, Passenger Email, Passenger Phone, Flight Number, Departure Date, Origin Airport, Destination Airport. ` +
+          `Optional but recommended: Delay Minutes, Delay Reason — these let the Rules Engine evaluate each claim using real data instead of estimates.`
         );
         return;
       }
@@ -155,11 +168,13 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
         const flightDate = parseDateValue(raw[colMap.flightDate!]);
         const origin = String(raw[colMap.origin!] || '').trim().toUpperCase().slice(0, 3);
         const destination = String(raw[colMap.destination!] || '').trim().toUpperCase().slice(0, 3);
+        const delayMinutes = colMap.delayMinutes ? parseDelayMinutes(raw[colMap.delayMinutes!]) : null;
+        const delayReason = colMap.delayReason ? String(raw[colMap.delayReason!] || '').trim() : '';
         const rowData: Partial<ParsedRow> = { pnr, passengerName, email, phone, flightNumber, flightDate, origin, destination };
         const errors = validateRow(rowData);
         return {
           rowNumber: idx + 2, pnr, passengerName, firstName, lastName, email, phone,
-          flightNumber, flightDate, origin, destination,
+          flightNumber, flightDate, origin, destination, delayMinutes, delayReason,
           valid: errors.length === 0, errors, status: 'pending' as const,
         };
       });
@@ -214,6 +229,8 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
           agent: agentCode,
           loa_signed: false,
           issue_type: 'Bulk Import — Pending Check',
+          delay_hours: row.delayMinutes != null ? Math.round((row.delayMinutes / 60) * 10) / 10 : 0,
+          airline_reason: row.delayReason || '',
         }).select('id');
         if (error) {
           failed++;
@@ -232,9 +249,38 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
     setImporting(false);
     if (success > 0) onClaimsImported();
 
-    // Run the Rules Engine on all newly imported claims
+    // Run the Rules Engine on all newly imported claims and refresh UI with results
     if (createdClaimIds.length > 0) {
-      evaluateClaims(createdClaimIds);
+      setParsedRows(prev => prev.map(r => {
+        const idx = validRows.findIndex(vr => vr.rowNumber === r.rowNumber);
+        if (idx < 0 || !createdClaimIds[idx]) return r;
+        return { ...r, status: 'evaluating' as const };
+      }));
+
+      const results = await evaluateClaims(createdClaimIds);
+
+      const { data: updatedClaims } = await supabase
+        .from('claims')
+        .select('id, status, amount, claim_ref')
+        .in('id', createdClaimIds);
+
+      const updatedMap = new Map((updatedClaims || []).map(c => [c.id, c]));
+
+      setParsedRows(prev => prev.map(r => {
+        const idx = validRows.findIndex(vr => vr.rowNumber === r.rowNumber);
+        if (idx < 0 || !createdClaimIds[idx]) return r;
+        const claimId = createdClaimIds[idx];
+        const result = results.find(res => res.claimId === claimId);
+        const updated = updatedMap.get(claimId);
+        return {
+          ...r,
+          status: 'evaluated' as const,
+          engineStatus: updated?.status || result?.decision || '',
+          engineAmount: updated?.amount || '',
+        };
+      }));
+
+      if (success > 0) onClaimsImported();
     }
   }
 
@@ -278,9 +324,19 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
           </div>
 
           <div className="flex-1">
-            <label className="block text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-1.5">
-              Spreadsheet File (.csv or .xlsx)
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <label className="block text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
+                Spreadsheet File (.csv or .xlsx)
+              </label>
+              <a
+                href="/sample-bulk-import.csv"
+                download="sample-bulk-import.csv"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#eff6ff] text-[#2563eb] rounded-[8px] text-[11px] font-bold border border-[#bfdbfe] hover:bg-[#dbeafe] hover:border-[#93c5fd] transition-all cursor-pointer whitespace-nowrap"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download Sample Template
+              </a>
+            </div>
             <div
               onDrop={handleDrop}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -325,19 +381,12 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {['PNR Code', 'Passenger Name', 'Passenger Email', 'Passenger Phone', 'Flight Number', 'Departure Date', 'Origin Airport', 'Destination Airport'].map(col => (
+          {['PNR Code', 'Passenger Name', 'Passenger Email', 'Passenger Phone', 'Flight Number', 'Departure Date', 'Origin Airport', 'Destination Airport', 'Delay Minutes', 'Delay Reason'].map(col => (
             <span key={col} className="px-2 py-0.5 bg-[#f1f5f9] text-[#64748b] rounded-[6px] text-[10px] font-medium">
               {col}
             </span>
           ))}
-          <a
-            href="/sample-bulk-import.csv"
-            download
-            className="ml-auto flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-[#2563eb] hover:text-[#1d4ed8] border-none cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Sample CSV
-          </a>
+          <span className="px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] rounded-[6px] text-[10px] font-semibold">Delay Minutes &amp; Reason = optional but recommended</span>
         </div>
       </div>
 
@@ -368,9 +417,9 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
             className="px-4 py-2 bg-[#2563eb] text-white rounded-[8px] text-[13px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {importing ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Importing {validCount} claims...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> Importing &amp; checking {validCount} claims...</>
             ) : (
-              <><Upload className="w-4 h-4" /> Import {validCount} valid {validCount === 1 ? 'claim' : 'claims'}</>
+              <><Upload className="w-4 h-4" /> Import &amp; evaluate {validCount} valid {validCount === 1 ? 'claim' : 'claims'}</>
             )}
           </button>
           {!selectedAgent && <span className="text-[11px] text-[#dc2626]">Select an agent to enable import</span>}
@@ -387,14 +436,14 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-10">
                 <tr>
-                  {['#', 'PNR', 'Passenger', 'Email', 'Phone', 'Flight', 'Date', 'Route', 'Status', 'Issues'].map(h => (
+                  {['#', 'PNR', 'Passenger', 'Email', 'Phone', 'Flight', 'Date', 'Route', 'Delay', 'Reason', 'Status', 'Issues'].map(h => (
                     <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {parsedRows.map(r => (
-                  <tr key={r.rowNumber} className={`hover:bg-[#f8fafc] ${r.status === 'imported' ? 'bg-[#f0fdf4]/40' : r.status === 'error' ? 'bg-[#fef2f2]/40' : ''}`}>
+                  <tr key={r.rowNumber} className={`hover:bg-[#f8fafc] ${r.status === 'evaluated' ? 'bg-[#f0fdf4]/40' : r.status === 'evaluating' ? 'bg-[#eff6ff]/40' : r.status === 'error' ? 'bg-[#fef2f2]/40' : ''}`}>
                     <td className="px-3 py-2 border-b border-[#e2e8f0] text-[11px] text-[#94a3b8] font-mono">{r.rowNumber}</td>
                     <td className="px-3 py-2 border-b border-[#e2e8f0] text-[11px] font-semibold text-[#0f172a]">{r.pnr || '—'}</td>
                     <td className="px-3 py-2 border-b border-[#e2e8f0] text-[11px]">
@@ -408,8 +457,25 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
                     <td className="px-3 py-2 border-b border-[#e2e8f0] text-[11px] font-semibold">{r.flightNumber || '—'}</td>
                     <td className="px-3 py-2 border-b border-[#e2e8f0] text-[11px] whitespace-nowrap">{r.flightDate || '—'}</td>
                     <td className="px-3 py-2 border-b border-[#e2e8f0] text-[11px] whitespace-nowrap font-mono">{r.origin || '?'} → {r.destination || '?'}</td>
+                    <td className="px-3 py-2 border-b border-[#e2e8f0] text-[11px] whitespace-nowrap font-semibold text-[#0f172a]">{r.delayMinutes != null ? `${r.delayMinutes}m` : <span className="text-[#94a3b8] font-normal">—</span>}</td>
+                    <td className="px-3 py-2 border-b border-[#e2e8f0] text-[11px] text-[#64748b] whitespace-nowrap max-w-[140px] truncate">{r.delayReason || '—'}</td>
                     <td className="px-3 py-2 border-b border-[#e2e8f0] text-[11px]">
-                      {r.status === 'imported' ? (
+                      {r.status === 'evaluated' ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold whitespace-nowrap ${
+                            r.engineStatus === 'Eligible' ? 'bg-[#f0fdf4] text-[#16a34a]' :
+                            r.engineStatus === 'Not Eligible - Expired' ? 'bg-[#f1f5f9] text-[#64748b]' :
+                            r.engineStatus === 'Not Eligible' ? 'bg-[#fef2f2] text-[#dc2626]' :
+                            r.engineStatus === 'Force Majeure' ? 'bg-[#fffbeb] text-[#d97706]' :
+                            'bg-[#f8fafc] text-[#64748b]'
+                          }`}>{r.engineStatus}{r.engineAmount && r.engineStatus === 'Eligible' ? ` · ${r.engineAmount}` : ''}</span>
+                          <span className="text-[9px] text-[#94a3b8]">{r.claimRef}</span>
+                        </div>
+                      ) : r.status === 'evaluating' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[10px] text-[10px] font-semibold bg-[#eff6ff] text-[#2563eb] whitespace-nowrap">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Checking...
+                        </span>
+                      ) : r.status === 'imported' ? (
                         <span className="inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold bg-[#f0fdf4] text-[#16a34a]">Imported {r.claimRef}</span>
                       ) : r.status === 'error' ? (
                         <span className="inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold bg-[#fef2f2] text-[#dc2626]">Failed</span>

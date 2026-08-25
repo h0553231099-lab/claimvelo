@@ -1,4 +1,5 @@
-PNR Code,Passenger Name,Passenger Email,Passenger Phone,Flight Number,Departure Date,Origin Airport,Destination Airport
-ABC123,John Smith,john.smith@email.com,+44 7700 900123,BA456,2026-09-15,LHR,CDG
-DEF456,Maria Garcia,maria.garcia@email.com,+353 86 123 4567,FR2389,2026-09-20,DUB,STN
-GHI789,James OConnor,james.oconnor@email.com,+44 161 555 8899,EI106,2026-10-01,MAN,ORK
+PNR Code,Passenger Name,Passenger Email,Passenger Phone,Flight Number,Departure Date,Origin Airport,Destination Airport,Delay Minutes,Delay Reason
+TLV001,Roni Levi,roni.levi@email.com,+972 50 123 4567,LY315,2021-06-15,TLV,LHR,300,Carrier
+NOT002,Jane Doe,jane.doe@email.com,+44 7700 900123,BA456,2026-09-15,LHR,CDG,120,Carrier
+ELI003,John Smith,john.smith@email.com,+44 7700 900456,FR2389,2026-09-20,DUB,STN,240,Technical
+FMJ004,Maria Garcia,maria.garcia@email.com,+353 86 123 4567,EI106,2026-10-01,MAN,ORK,500,Weather
