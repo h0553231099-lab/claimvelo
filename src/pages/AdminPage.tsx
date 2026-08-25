@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import { Claim, ClaimStatus, AdminView, UserProfile } from '../types';
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
+import { recalculateAgentPayout } from '../lib/financialService';
 import { Page } from '../types';
 import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2 } from 'lucide-react';
 import BulkImport from '../components/BulkImport';
@@ -29,6 +30,8 @@ interface WorkerProfile {
   status: string;
   agent_code: string;
   created_at: string;
+  commission_rate?: number;
+  total_payout_earned?: number;
 }
 
 interface ClaimFile {
@@ -838,6 +841,11 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [fileUploading, setFileUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Agent commission editing state
+  const [editingCommission, setEditingCommission] = useState<string | null>(null);
+  const [commissionInput, setCommissionInput] = useState('');
+  const [commissionSaving, setCommissionSaving] = useState(false);
+
   // QR generator state
   const [qrAgentName, setQrAgentName] = useState('');
   const [qrAgentId, setQrAgentId] = useState('');
@@ -845,6 +853,20 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   // Inline QR modal for agent rows
   const [qrModal, setQrModal] = useState<{ name: string; code: string; dataUrl: string } | null>(null);
   const [qrCopied, setQrCopied] = useState(false);
+
+  async function saveCommissionRate(agentId: string) {
+    const rate = parseFloat(commissionInput);
+    if (isNaN(rate) || rate < 0 || rate > 100) return;
+    setCommissionSaving(true);
+    const result = await recalculateAgentPayout(agentId, rate);
+    // Update local state
+    setWorkers(prev => prev.map(w => w.id === agentId
+      ? { ...w, commission_rate: rate, total_payout_earned: result.newTotal }
+      : w,
+    ));
+    setEditingCommission(null);
+    setCommissionSaving(false);
+  }
 
   async function generateQR() {
     const id = qrAgentId.trim() || 'AGT-001';
@@ -2099,7 +2121,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
-                        {['Name', 'Code', 'Claims', 'Resolved', 'Total Value', 'Status', 'Added', ''].map(h => (
+                        {['Name', 'Code', 'Claims', 'Resolved', 'Total Value', 'Commission', 'Earned', 'Status', 'Added', ''].map(h => (
                           <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
                         ))}
                       </tr>
@@ -2128,6 +2150,58 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                             </td>
                             <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold text-[#0f172a]">
                               {totalValue > 0 ? `€${totalValue.toLocaleString('en-EU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '—'}
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              {editingCommission === w.id ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    value={commissionInput}
+                                    onChange={e => setCommissionInput(e.target.value)}
+                                    className="w-[52px] px-1.5 py-1 border border-[#86efac] rounded-[5px] text-[11px] outline-none focus:border-[#16a34a] bg-white text-center"
+                                    autoFocus
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') saveCommissionRate(w.id);
+                                      if (e.key === 'Escape') setEditingCommission(null);
+                                    }}
+                                  />
+                                  <span className="text-[10px] text-[#64748b]">%</span>
+                                  <button
+                                    onClick={() => saveCommissionRate(w.id)}
+                                    disabled={commissionSaving}
+                                    className="px-1.5 py-0.5 bg-[#16a34a] text-white rounded-[5px] text-[10px] font-semibold border-none cursor-pointer hover:bg-[#15803d] disabled:opacity-60"
+                                  >
+                                    {commissionSaving ? '...' : 'Save'}
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingCommission(null)}
+                                    className="px-1.5 py-0.5 bg-[#f1f5f9] text-[#64748b] rounded-[5px] text-[10px] font-semibold border-none cursor-pointer hover:bg-[#e2e8f0]"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setEditingCommission(w.id);
+                                    setCommissionInput(String(w.commission_rate ?? 10));
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#f0fdf4] text-[#16a34a] rounded-[10px] text-[10px] font-semibold border border-[#bbf7d0] cursor-pointer hover:bg-[#dcfce7] transition-colors"
+                                  title="Click to edit commission rate"
+                                >
+                                  {w.commission_rate ?? 10}%
+                                  <Pencil className="w-2.5 h-2.5" />
+                                </button>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-bold text-[#16a34a]">
+                              {(() => {
+                                const earned = w.total_payout_earned ?? 0;
+                                return earned > 0 ? `€${earned.toLocaleString('en-EU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-[#cbd5e1] font-normal">—</span>;
+                              })()}
                             </td>
                             <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
                               <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${w.status === 'active' ? 'bg-[#f0fdf4] text-[#16a34a]' : 'bg-[#fffbeb] text-[#d97706]'}`}>

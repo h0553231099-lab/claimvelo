@@ -221,3 +221,83 @@ export async function applyFinancials(
 
   return { compensation, commission };
 }
+
+/**
+ * Sub-Step B — recalculates an agent's total_payout_earned from scratch
+ * using their current commission_rate. Called by the admin dashboard when
+ * an admin changes an agent's commission percentage.
+ *
+ * Iterates all eligible claims attributed to this agent, recomputes the
+ * commission for each based on the new rate, and updates the agent's
+ * total_payout_earned in one atomic write.
+ *
+ * Returns the new total and a breakdown of the recalculation.
+ */
+export async function recalculateAgentPayout(
+  agentId: string,
+  newRate: number,
+): Promise<{ newTotal: number; claimCount: number; breakdown: { claimRef: string; amount: number; commission: number }[] }> {
+  // Save the new rate first
+  await supabase
+    .from('worker_profiles')
+    .update({ commission_rate: newRate })
+    .eq('id', agentId);
+
+  // Fetch the agent's code so we can find their claims
+  const { data: agent } = await supabase
+    .from('worker_profiles')
+    .select('agent_code')
+    .eq('id', agentId)
+    .maybeSingle();
+
+  if (!agent?.agent_code) {
+    return { newTotal: 0, claimCount: 0, breakdown: [] };
+  }
+
+  // Get all eligible claims for this agent that have a compensation_amount
+  const { data: claims } = await supabase
+    .from('claims')
+    .select('id, claim_ref, compensation_amount, departure, arrival')
+    .eq('agent', agent.agent_code)
+    .eq('status', 'Eligible')
+    .not('compensation_amount', 'is', null);
+
+  if (!claims || claims.length === 0) {
+    await supabase
+      .from('worker_profiles')
+      .update({ total_payout_earned: 0 })
+      .eq('id', agentId);
+    return { newTotal: 0, claimCount: 0, breakdown: [] };
+  }
+
+  let total = 0;
+  const breakdown: { claimRef: string; amount: number; commission: number }[] = [];
+
+  for (const claim of claims) {
+    const compAmount = Number(claim.compensation_amount);
+    if (isNaN(compAmount) || compAmount <= 0) continue;
+
+    // If compensation wasn't calculated yet (e.g. pre-financial-module claim),
+    // recalculate it from the route
+    let amount = compAmount;
+    if (!amount) {
+      const result = calculateCompensation(claim.departure, claim.arrival);
+      amount = result.amount;
+      await supabase
+        .from('claims')
+        .update({ compensation_amount: amount })
+        .eq('id', claim.id);
+    }
+
+    const commission = Math.round((amount * newRate) / 100 * 100) / 100;
+    total = Math.round((total + commission) * 100) / 100;
+    breakdown.push({ claimRef: claim.claim_ref, amount, commission });
+  }
+
+  await supabase
+    .from('worker_profiles')
+    .update({ total_payout_earned: total })
+    .eq('id', agentId);
+
+  return { newTotal: total, claimCount: claims.length, breakdown };
+}
