@@ -360,10 +360,9 @@ export default function ClaimPage({ onNav, prefill }: Props) {
     const eligible = flights.filter((f: FlightLookupResult) => f.delayMin >= 180 || f.status === 'cancelled' || f.status === 'diverted');
     const allOnTime = flights.every((f: FlightLookupResult) => f.delayMin < 180 && f.status !== 'cancelled' && f.status !== 'diverted');
 
-    if (allOnTime) {
-      setHardBlocked(true);
-      return;
-    }
+    // Keep on-time results selectable so a passenger can continue to manual review.
+    // Aviation data can be incomplete or disagree with the passenger's documents.
+    setHardBlocked(allOnTime);
 
     const mapped: ConfirmedFlight[] = (eligible.length > 0 ? eligible : flights).map((f: FlightLookupResult) => ({
       flightNum: f.flightNum,
@@ -775,21 +774,21 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                       : <><Search className="w-5 h-5" /> Search Flights</>}
                   </button>
 
-                  {/* Hard block: on time */}
+                  {/* On-time result: warning only, not a hard block */}
                   {hardBlocked && (
-                    <div className="flex items-start gap-3 p-4 bg-[#fff1f2] border-2 border-[#fecdd3] rounded-xl mb-4">
-                      <div className="w-9 h-9 rounded-full bg-[#dc2626] flex items-center justify-center shrink-0">
-                        <Ban className="w-5 h-5 text-white" />
+                    <div className="flex items-start gap-3 p-4 bg-[#fffbeb] border-2 border-[#fde68a] rounded-xl mb-4">
+                      <div className="w-9 h-9 rounded-full bg-[#d97706] flex items-center justify-center shrink-0">
+                        <AlertTriangle className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <div className="font-bold text-[14px] text-[#991b1b] mb-1">Flight Not Eligible for Compensation</div>
-                        <div className="text-[13px] text-[#991b1b]">Based on official aviation data, this flight arrived on time or with less than 3 hours' delay. Therefore, it is not eligible for compensation under EC Regulation 261/2004.</div>
+                        <div className="font-bold text-[14px] text-[#92400e] mb-1">No qualifying delay found in the flight data</div>
+                        <div className="text-[13px] text-[#92400e]">The available data shows less than 3 hours' delay. Select your flight below to continue with a manual review if your documents show a longer delay or another issue.</div>
                       </div>
                     </div>
                   )}
 
                   {/* No results */}
-                  {searchDone && !hardBlocked && searchResults.length === 0 && !searching && (
+                  {searchDone && searchResults.length === 0 && !searching && (
                     <div className="flex items-center gap-3 p-4 bg-[#fffbeb] border border-[#fde68a] rounded-xl mb-4">
                       <AlertTriangle className="w-5 h-5 text-[#d97706] shrink-0" />
                       <div>
@@ -800,7 +799,7 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                   )}
 
                   {/* API error note */}
-                  {searchDone && searchError && searchResults.length === 0 && !hardBlocked && !searching && (
+                  {searchDone && searchError && searchResults.length === 0 && !searching && (
                     <div>
                       {!manualMode ? (
                         <button
@@ -850,7 +849,7 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                   )}
 
                   {/* Results list */}
-                  {searchDone && !hardBlocked && searchResults.length > 0 && !selectedFlight && (
+                  {searchDone && searchResults.length > 0 && !selectedFlight && (
                     <div className="flex flex-col gap-2 mb-4 max-h-[280px] overflow-y-auto pr-1">
                       <div className="text-[12px] font-semibold text-[#374151] mb-1">Select your flight:</div>
                       {searchResults.map(f => (
