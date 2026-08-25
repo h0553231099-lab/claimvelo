@@ -16,6 +16,11 @@ const STATUS_COLORS: Record<ClaimStatus, { bg: string; text: string; dot: string
   'Waiting':    { bg: '#fffbeb', text: '#d97706', dot: '#d97706' },
   'Resolved':   { bg: '#f0fdf4', text: '#16a34a', dot: '#16a34a' },
   'Escalated':  { bg: '#fef2f2', text: '#dc2626', dot: '#dc2626' },
+  'Pending Check': { bg: '#fff7ed', text: '#ea580c', dot: '#ea580c' },
+  'Eligible':   { bg: '#ecfdf5', text: '#059669', dot: '#059669' },
+  'Not Eligible': { bg: '#f1f5f9', text: '#64748b', dot: '#94a3b8' },
+  'Not Eligible - Expired': { bg: '#f8fafc', text: '#94a3b8', dot: '#cbd5e1' },
+  'Force Majeure': { bg: '#fef3c7', text: '#92400e', dot: '#d97706' },
 };
 
 function Badge({ status }: { status: ClaimStatus }) {

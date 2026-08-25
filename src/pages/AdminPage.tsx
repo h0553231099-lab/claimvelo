@@ -45,7 +45,7 @@ interface ClaimFile {
 
 interface Props { onNav: (p: Page) => void; user?: UserProfile; onSignOut?: () => void; }
 
-const STAGES: ClaimStatus[] = ['Untouched','Pending Check','In Progress','Submitted','Waiting','Resolved','Escalated'];
+const STAGES: ClaimStatus[] = ['Untouched','Pending Check','In Progress','Submitted','Waiting','Resolved','Escalated','Eligible','Not Eligible','Not Eligible - Expired','Force Majeure'];
 const SB: Record<string, string> = {
   'Untouched':'bg-[#f8fafc] text-[#64748b]',
   'Pending Check':'bg-[#fff7ed] text-[#ea580c]',
@@ -54,6 +54,10 @@ const SB: Record<string, string> = {
   'Waiting':'bg-[#fffbeb] text-[#d97706]',
   'Resolved':'bg-[#f0fdf4] text-[#16a34a]',
   'Escalated':'bg-[#fef2f2] text-[#dc2626]',
+  'Eligible':'bg-[#ecfdf5] text-[#059669]',
+  'Not Eligible':'bg-[#f1f5f9] text-[#64748b]',
+  'Not Eligible - Expired':'bg-[#f8fafc] text-[#94a3b8]',
+  'Force Majeure':'bg-[#fef3c7] text-[#92400e]',
 };
 const MONTHS = ['J','F','M','A','M','J','J','A','S','O','N','D'];
 

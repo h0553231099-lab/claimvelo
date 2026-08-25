@@ -1,4 +1,4 @@
-export type ClaimStatus = 'Untouched' | 'Pending Check' | 'In Progress' | 'Submitted' | 'Waiting' | 'Resolved' | 'Escalated';
+export type ClaimStatus = 'Untouched' | 'Pending Check' | 'In Progress' | 'Submitted' | 'Waiting' | 'Resolved' | 'Escalated' | 'Eligible' | 'Not Eligible' | 'Not Eligible - Expired' | 'Force Majeure';
 
 export interface Claim {
   id: string;

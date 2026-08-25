@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Page } from '../types';
 import { supabase, sendClaimEmail, insertNotification, lookupFlight, FlightLookupResult, AI_URL, AI_HEADERS } from '../lib/supabase';
+import { evaluateClaim } from '../lib/rulesEngine';
 import { Plane, ArrowRight, ArrowLeft, Check, Search, AlertTriangle, X, Upload, FileText, Image, Trash2, Ban } from 'lucide-react';
 import AirportInput from '../components/AirportInput';
 import { CheckerPrefill } from '../components/CompensationChecker';
@@ -483,6 +484,8 @@ export default function ClaimPage({ onNav, prefill }: Props) {
       const successUrl = `/claim-success?ref=${encodeURIComponent(ref)}${email ? `&email=${encodeURIComponent(email)}` : ''}`;
       window.history.pushState({}, '', successUrl);
       onNav('claim-success');
+      // Run the Rules Engine on the new claim
+      if (newClaim?.id) evaluateClaim(newClaim.id);
       insertNotification({
         type: 'new_claim',
         claim_ref: ref,

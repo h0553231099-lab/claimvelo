@@ -15,6 +15,11 @@ const STATUS_STYLE: Record<ClaimStatus, string> = {
   'Waiting':     'bg-[#fffbeb] text-[#d97706]',
   'Resolved':    'bg-[#f0fdf4] text-[#16a34a]',
   'Escalated':   'bg-[#fef2f2] text-[#dc2626]',
+  'Pending Check': 'bg-[#fff7ed] text-[#ea580c]',
+  'Eligible':    'bg-[#ecfdf5] text-[#059669]',
+  'Not Eligible': 'bg-[#f1f5f9] text-[#64748b]',
+  'Not Eligible - Expired': 'bg-[#f8fafc] text-[#94a3b8]',
+  'Force Majeure': 'bg-[#fef3c7] text-[#92400e]',
 };
 
 const STAGE_LABELS: Record<ClaimStatus, string> = {

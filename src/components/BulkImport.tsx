@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
+import { evaluateClaims } from '../lib/rulesEngine';
 import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, Loader2, X, User, Download } from 'lucide-react';
 
 interface WorkerProfile {
@@ -192,11 +193,12 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
     setImporting(true);
     let success = 0; let failed = 0;
     const agentCode = activeAgents.find(a => a.id === selectedAgent)?.agent_code || '—';
+    const createdClaimIds: string[] = [];
 
     for (const row of validRows) {
       const ref = 'CLM-' + Date.now().toString().slice(-6) + '-' + String(row.rowNumber).slice(-3);
       try {
-        const { error } = await supabase.from('claims').insert({
+        const { data, error } = await supabase.from('claims').insert({
           claim_ref: ref,
           passenger_first_name: row.firstName,
           passenger_last_name: row.lastName,
@@ -212,12 +214,13 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
           agent: agentCode,
           loa_signed: false,
           issue_type: 'Bulk Import — Pending Check',
-        });
+        }).select('id');
         if (error) {
           failed++;
           setParsedRows(prev => prev.map(r => r.rowNumber === row.rowNumber ? { ...r, status: 'error' } : r));
         } else {
           success++;
+          if (data?.[0]?.id) createdClaimIds.push(data[0].id);
           setParsedRows(prev => prev.map(r => r.rowNumber === row.rowNumber ? { ...r, status: 'imported', claimRef: ref } : r));
         }
       } catch {
@@ -228,6 +231,11 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
     setImportSummary({ success, failed });
     setImporting(false);
     if (success > 0) onClaimsImported();
+
+    // Run the Rules Engine on all newly imported claims
+    if (createdClaimIds.length > 0) {
+      evaluateClaims(createdClaimIds);
+    }
   }
 
   const validCount = parsedRows.filter(r => r.valid).length;
