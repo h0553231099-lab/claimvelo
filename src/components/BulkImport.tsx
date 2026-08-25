@@ -424,6 +424,3 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
     </div>
   );
 }
-
-
-export default BulkImport
