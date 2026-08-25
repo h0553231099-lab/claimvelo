@@ -112,6 +112,20 @@ function parseDelayMinutes(v: unknown): number | null {
   return isNaN(n) || n < 0 ? null : Math.round(n);
 }
 
+const SAMPLE_CSV_CONTENT = `PNR Code,Passenger Name,Passenger Email,Passenger Phone,Flight Number,Departure Date,Origin Airport,Destination Airport,Delay Minutes,Delay Reason\nTLV001,Roni Levi,roni.levi@email.com,+972 50 123 4567,LY315,2021-06-15,TLV,LHR,300,Carrier\nNOT002,Jane Doe,jane.doe@email.com,+44 7700 900123,BA456,2026-09-15,LHR,CDG,120,Carrier\nELI003,John Smith,john.smith@email.com,+44 7700 900456,FR2389,2026-09-20,DUB,STN,240,Technical\nFMJ004,Maria Garcia,maria.garcia@email.com,+353 86 123 4567,EI106,2026-10-01,MAN,ORK,500,Weather\n`;
+
+function downloadSampleCSV(): void {
+  const blob = new Blob([SAMPLE_CSV_CONTENT], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'sample-bulk-import.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function parseCsvLine(line: string): string[] {
   const values: string[] = [];
   let value = '';
@@ -368,14 +382,14 @@ export default function BulkImport({ workers, onClaimsImported }: Props) {
               <label className="block text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
                 Spreadsheet File (.csv or .xlsx)
               </label>
-              <a
-                href="/sample-bulk-import.csv"
-                download="sample-bulk-import.csv"
+              <button
+                type="button"
+                onClick={(event) => { event.stopPropagation(); downloadSampleCSV(); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#eff6ff] text-[#2563eb] rounded-[8px] text-[11px] font-bold border border-[#bfdbfe] hover:bg-[#dbeafe] hover:border-[#93c5fd] transition-all cursor-pointer whitespace-nowrap"
               >
                 <Download className="w-3.5 h-3.5" />
                 Download Sample Template
-              </a>
+              </button>
             </div>
             <div
               onDrop={handleDrop}
