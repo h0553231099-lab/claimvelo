@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Page, Claim, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
-import { Plane, LogOut, UserPlus, TrendingUp, Users, CheckCircle, X, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Plane, LogOut, UserPlus, TrendingUp, Users, CheckCircle, X, Eye, EyeOff, AlertCircle, Key, Copy, RefreshCw, Trash2 } from 'lucide-react';
 
 interface AgentRow {
   id: string;
@@ -10,6 +10,7 @@ interface AgentRow {
   full_name: string;
   agent_code: string;
   status: string;
+  api_key: string | null;
   created_at: string;
 }
 
@@ -19,7 +20,7 @@ interface Props {
   onSignOut: () => void;
 }
 
-type SalesView = 'overview' | 'agents' | 'add-agent';
+type SalesView = 'overview' | 'agents' | 'add-agent' | 'api-keys';
 
 export default function SalesManagerPage({ onNav, user, onSignOut }: Props) {
   const [view, setView] = useState<SalesView>('overview');
@@ -33,6 +34,10 @@ export default function SalesManagerPage({ onNav, user, onSignOut }: Props) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [keyBusy, setKeyBusy] = useState<string | null>(null);
+  const [keyError, setKeyError] = useState('');
+  const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
@@ -145,6 +150,70 @@ export default function SalesManagerPage({ onNav, user, onSignOut }: Props) {
     setTimeout(() => setView('agents'), 1500);
   }
 
+  function generateApiKey(agent: AgentRow): string {
+    const slug = agent.full_name.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20);
+    const rand = Math.random().toString(36).slice(2, 8);
+    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `cv_live_${slug}_${rand}${suffix}`;
+  }
+
+  async function createApiKey(agent: AgentRow) {
+    setKeyError('');
+    setKeyBusy(agent.id);
+    const newKey = generateApiKey(agent);
+    const { error } = await supabase
+      .from('worker_profiles')
+      .update({ api_key: newKey })
+      .eq('id', agent.id);
+    if (error) {
+      setKeyError(error.message);
+      setKeyBusy(null);
+      return;
+    }
+    setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, api_key: newKey } : a));
+    setRevealedKeys(prev => new Set(prev).add(agent.id));
+    setKeyBusy(null);
+  }
+
+  async function revokeApiKey(agent: AgentRow) {
+    if (!confirm(`Revoke API key for ${agent.full_name}? This will immediately disable their API access.`)) return;
+    setKeyBusy(agent.id);
+    const { error } = await supabase
+      .from('worker_profiles')
+      .update({ api_key: null })
+      .eq('id', agent.id);
+    if (error) {
+      setKeyError(error.message);
+      setKeyBusy(null);
+      return;
+    }
+    setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, api_key: null } : a));
+    setRevealedKeys(prev => { const next = new Set(prev); next.delete(agent.id); return next; });
+    setKeyBusy(null);
+  }
+
+  async function copyKey(key: string, agentId: string) {
+    try {
+      await navigator.clipboard.writeText(key);
+      setCopiedKey(agentId);
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch { /* clipboard not available */ }
+  }
+
+  function maskKey(key: string): string {
+    if (key.length <= 12) return key.slice(0, 4) + '••••';
+    return key.slice(0, 8) + '••••••••••••' + key.slice(-4);
+  }
+
+  function toggleReveal(agentId: string) {
+    setRevealedKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(agentId)) next.delete(agentId);
+      else next.add(agentId);
+      return next;
+    });
+  }
+
   // Per-agent stats
   function agentStats(code: string) {
     const ac = claims.filter(c => c.agent === code);
@@ -181,6 +250,7 @@ export default function SalesManagerPage({ onNav, user, onSignOut }: Props) {
             ['overview', 'Overview'],
             ['agents', 'My Agents'],
             ['add-agent', 'Add Agent'],
+            ['api-keys', 'API Keys'],
           ] as [SalesView, string][]).map(([v, label]) => (
             <button
               key={v}
@@ -471,6 +541,127 @@ export default function SalesManagerPage({ onNav, user, onSignOut }: Props) {
 
             <div className="mt-4 px-4 py-3 bg-[#fffbeb] border border-[#fcd34d] rounded-[9px] text-[11px] text-[#92400e]">
               <strong>Note:</strong> The agent will receive a sign-in confirmation email. They use the email and password you set here to access their Agent Portal.
+            </div>
+          </div>
+        )}
+
+        {/* API KEYS */}
+        {view === 'api-keys' && (
+          <div>
+            <div className="mb-6">
+              <h1 className="text-[22px] font-black text-[#0f172a] flex items-center gap-2">
+                <Key className="w-5 h-5 text-[#2563eb]" /> API Keys
+              </h1>
+              <p className="text-[13px] text-[#64748b] mt-1">
+                Generate Bearer tokens so your agents can submit leads programmatically via the B2B API.
+              </p>
+            </div>
+
+            {keyError && (
+              <div className="mb-4 flex items-center gap-2 px-3.5 py-2.5 bg-[#fef2f2] border border-[#fecaca] rounded-[9px] text-[12px] text-[#dc2626]">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {keyError}
+              </div>
+            )}
+
+            {loading ? (
+              <div className="py-10 text-center text-[13px] text-[#64748b]">Loading...</div>
+            ) : agents.length === 0 ? (
+              <div className="bg-white border border-[#e2e8f0] rounded-[12px] py-14 text-center">
+                <div className="text-[32px] mb-2">🔑</div>
+                <div className="text-[14px] font-semibold text-[#0f172a] mb-1">No agents yet</div>
+                <div className="text-[12px] text-[#64748b]">Add an agent first, then generate their API key here.</div>
+                <button onClick={() => setView('add-agent')} className="mt-4 px-4 py-2 bg-[#2563eb] text-white rounded-[8px] text-[12px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8]">
+                  Add Agent
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {agents.map(a => {
+                  const hasKey = !!a.api_key;
+                  const revealed = revealedKeys.has(a.id);
+                  return (
+                    <div key={a.id} className="bg-white border border-[#e2e8f0] rounded-[12px] p-5">
+                      <div className="flex items-center gap-4 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-[#eff6ff] flex items-center justify-center text-[#2563eb] font-bold text-[14px] shrink-0">
+                          {a.full_name?.[0] || 'A'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-[14px] text-[#0f172a]">{a.full_name}</div>
+                          <div className="text-[11px] text-[#64748b]">{a.email}</div>
+                        </div>
+                        <div className="text-center px-3">
+                          <div className="text-[11px] font-mono font-bold text-[#2563eb]">{a.agent_code}</div>
+                          <div className="text-[10px] text-[#94a3b8]">Code</div>
+                        </div>
+                        {hasKey ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-[#f0fdf4] text-[#16a34a]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a]" /> Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-[#f1f5f9] text-[#64748b]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#94a3b8]" /> No key
+                          </span>
+                        )}
+                      </div>
+
+                      {hasKey && (
+                        <div className="flex items-center gap-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-[9px] px-3 py-2.5">
+                          <Key className="w-3.5 h-3.5 text-[#94a3b8] shrink-0" />
+                          <code className="flex-1 text-[11px] font-mono text-[#0f172a] truncate">
+                            {revealed ? a.api_key : maskKey(a.api_key!)}
+                          </code>
+                          <button
+                            onClick={() => toggleReveal(a.id)}
+                            className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#94a3b8] hover:text-[#64748b] hover:bg-white border-none bg-transparent cursor-pointer transition-colors shrink-0"
+                            title={revealed ? 'Hide' : 'Reveal'}
+                          >
+                            {revealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => copyKey(a.api_key!, a.id)}
+                            className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#94a3b8] hover:text-[#2563eb] hover:bg-white border-none bg-transparent cursor-pointer transition-colors shrink-0"
+                            title="Copy"
+                          >
+                            {copiedKey === a.id ? <CheckCircle className="w-3.5 h-3.5 text-[#16a34a]" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 mt-3">
+                        <button
+                          onClick={() => createApiKey(a)}
+                          disabled={keyBusy === a.id}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-[#2563eb] text-white rounded-[8px] text-[11px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8] disabled:opacity-60 transition-colors"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${keyBusy === a.id ? 'animate-spin' : ''}`} />
+                          {hasKey ? 'Regenerate' : 'Generate Key'}
+                        </button>
+                        {hasKey && (
+                          <button
+                            onClick={() => revokeApiKey(a)}
+                            disabled={keyBusy === a.id}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-white text-[#dc2626] border border-[#fecaca] rounded-[8px] text-[11px] font-semibold cursor-pointer hover:bg-[#fef2f2] disabled:opacity-60 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" /> Revoke
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-5 px-4 py-3.5 bg-[#eff6ff] border border-[#bfdbfe] rounded-[10px]">
+              <div className="text-[12px] font-bold text-[#2563eb] mb-1">B2B API Endpoint</div>
+              <div className="text-[11px] text-[#475569] mb-2">
+                Agents send leads to this URL with their API key in the Authorization header:
+              </div>
+              <code className="block bg-white border border-[#e2e8f0] rounded-[7px] px-3 py-2 text-[11px] font-mono text-[#0f172a] overflow-x-auto">
+                POST /functions/v1/b2b-api/api/v1/leads<br />
+                Authorization: Bearer &lt;AGENT_API_KEY&gt;
+              </code>
             </div>
           </div>
         )}
