@@ -34,6 +34,7 @@ interface WorkerProfile {
   total_payout_earned?: number;
   total_paid_to_date?: number;
   api_key?: string | null;
+  webhook_url?: string | null;
 }
 
 interface ClaimFile {
@@ -870,6 +871,11 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [generatingKey, setGeneratingKey] = useState<string | null>(null);
   const [revokingKey, setRevokingKey] = useState<string | null>(null);
 
+  // Webhook URL management state
+  const [editingWebhook, setEditingWebhook] = useState<string | null>(null);
+  const [webhookInput, setWebhookInput] = useState('');
+  const [webhookSaving, setWebhookSaving] = useState(false);
+
   async function submitPayout() {
     if (!payoutAgent) return;
     const amt = parseFloat(payoutForm.amount);
@@ -999,6 +1005,17 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     navigator.clipboard.writeText(key);
     setCopiedKeyId(agentId);
     setTimeout(() => setCopiedKeyId(null), 2000);
+  }
+
+  async function saveWebhookUrl(agentId: string) {
+    setWebhookSaving(true);
+    const url = webhookInput.trim() || null;
+    const { error } = await supabase.from('worker_profiles').update({ webhook_url: url }).eq('id', agentId);
+    if (!error) {
+      setWorkers(prev => prev.map(w => w.id === agentId ? { ...w, webhook_url: url } : w));
+      setEditingWebhook(null);
+    }
+    setWebhookSaving(false);
   }
 
   function downloadQR() {
@@ -2224,10 +2241,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
 
                 {workers.filter(w => w.role === 'agent').length > 0 && (
                   <div className="overflow-x-auto -mx-4 px-4">
-                  <table className="border-collapse" style={{ minWidth: 1200 }}>
+                  <table className="border-collapse" style={{ minWidth: 1400 }}>
                     <thead>
                       <tr>
-                        {['Name', 'Code', 'API Key', 'Claims', 'Resolved', 'Total Value', 'Commission', 'Earned', 'Paid', 'Balance Due', 'Status', 'Added', ''].map(h => (
+                        {['Name', 'Code', 'API Key', 'Webhook URL', 'Claims', 'Resolved', 'Total Value', 'Commission', 'Earned', 'Paid', 'Balance Due', 'Status', 'Added', ''].map(h => (
                           <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
                         ))}
                       </tr>
@@ -2267,6 +2284,45 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                                   className="flex items-center gap-1 px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] rounded-[10px] text-[10px] font-semibold cursor-pointer hover:bg-[#dbeafe] transition-colors disabled:opacity-60"
                                 >
                                   {generatingKey === w.id ? '...' : (<><Key className="w-2.5 h-2.5" /> Generate</>)}
+                                </button>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              {editingWebhook === w.id ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="url"
+                                    value={webhookInput}
+                                    onChange={e => setWebhookInput(e.target.value)}
+                                    placeholder="https://crm.example.com/webhook"
+                                    className="w-[180px] px-1.5 py-1 border border-[#bfdbfe] rounded-[5px] text-[10px] outline-none focus:border-[#2563eb] bg-white"
+                                    autoFocus
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') saveWebhookUrl(w.id);
+                                      if (e.key === 'Escape') setEditingWebhook(null);
+                                    }}
+                                  />
+                                  <button onClick={() => saveWebhookUrl(w.id)} disabled={webhookSaving} className="px-1.5 py-0.5 bg-[#2563eb] text-white rounded-[5px] text-[10px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8] disabled:opacity-60">
+                                    {webhookSaving ? '...' : 'Save'}
+                                  </button>
+                                  <button onClick={() => setEditingWebhook(null)} className="px-1.5 py-0.5 bg-[#f1f5f9] text-[#64748b] rounded-[5px] text-[10px] font-semibold border-none cursor-pointer hover:bg-[#e2e8f0]">
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => { setEditingWebhook(w.id); setWebhookInput(w.webhook_url || ''); }}
+                                  className="text-[10px] text-[#475569] hover:text-[#2563eb] bg-transparent border-none cursor-pointer max-w-[160px] truncate text-left"
+                                  title={w.webhook_url || 'Click to set webhook URL'}
+                                >
+                                  {w.webhook_url ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#16a34a]" />
+                                      <span className="truncate">{w.webhook_url}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-[#94a3b8]">+ Add webhook</span>
+                                  )}
                                 </button>
                               )}
                             </td>

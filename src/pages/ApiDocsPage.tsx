@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Page } from '../types';
-import { supabase } from '../lib/supabase';
 import {
   Code2, Terminal, Send, CheckCircle, XCircle, AlertCircle,
   Copy, ChevronDown, ChevronRight, Key, Webhook, FileJson,
@@ -467,6 +466,98 @@ export default function ApiDocsPage({ onNav }: Props) {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Webhooks */}
+        <div className="mb-8 rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <button
+            onClick={() => setExpandedSection(expandedSection === 'webhooks' ? null : 'webhooks')}
+            className="w-full flex items-center justify-between px-5 py-4 border-none bg-transparent cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Webhook className="w-4 h-4 text-[#2563eb]" />
+              <span className="text-[13px] font-bold text-slate-900">Webhooks — Real-Time Status Updates</span>
+            </div>
+            {expandedSection === 'webhooks' ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+          </button>
+          {expandedSection === 'webhooks' && (
+            <div className="px-5 pb-5 space-y-4">
+              <p className="text-[12px] leading-relaxed text-slate-600">
+                When a claim's status changes (e.g. from "Pending Check" to "Eligible", or from "Eligible" to "Resolved"),
+                ClaimVelo automatically sends a POST request to the webhook URL configured for your agent account.
+                This lets your CRM receive updates in real time without polling.
+              </p>
+
+              <div className="rounded-lg bg-[#eff6ff] border border-blue-100 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-[#2563eb] mb-1">How to enable</div>
+                <p className="text-[11px] leading-relaxed text-slate-600">
+                  Ask your account manager to set a webhook URL for your agent profile.
+                  Once configured, every status change on any claim you submitted will trigger a delivery.
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-slate-900 p-4">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Webhook Payload Example</div>
+                <pre className="text-[11px] font-mono text-green-400 leading-relaxed overflow-x-auto">{`{
+  "event": "claim.status_changed",
+  "timestamp": "2026-08-26T12:00:00.000Z",
+  "data": {
+    "claim_ref": "CLM-384452-VY4",
+    "claim_id": "a1b2c3d4-...",
+    "old_status": "Pending Check",
+    "new_status": "Eligible",
+    "flight_number": "BA245",
+    "flight_date": "2026-07-15",
+    "departure": "LHR",
+    "arrival": "JFK",
+    "passenger_name": "John Doe",
+    "passenger_email": "john.doe@example.com",
+    "compensation_amount": 600,
+    "amount": "€600",
+    "agent_code": "021500"
+  }
+}`}</pre>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Headers</div>
+                <div className="rounded-lg border border-slate-200 divide-y divide-slate-100">
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <code className="text-[11px] font-mono text-slate-700">Content-Type</code>
+                    <code className="text-[11px] font-mono text-slate-500">application/json</code>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <code className="text-[11px] font-mono text-slate-700">X-ClaimVelo-Event</code>
+                    <code className="text-[11px] font-mono text-slate-500">claim.status_changed</code>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <code className="text-[11px] font-mono text-slate-700">X-ClaimVelo-Signature</code>
+                    <code className="text-[11px] font-mono text-slate-500">delivery_id</code>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Delivery & Retry</div>
+                <ul className="space-y-1.5 text-[11px] leading-relaxed text-slate-600 list-disc pl-5">
+                  <li>Your server must respond with HTTP 2xx to confirm receipt.</li>
+                  <li>Failed deliveries are retried up to 3 times with automatic backoff.</li>
+                  <li>After 3 failed attempts, the delivery is marked as failed and will not retry further.</li>
+                  <li>Deliveries are attempted within ~1 minute of the status change.</li>
+                  <li>All delivery attempts (status, response code, timestamps) are logged for auditing.</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Possible Status Values</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Pending Check', 'In Progress', 'Submitted', 'Waiting', 'Resolved', 'Escalated', 'Eligible', 'Not Eligible', 'Not Eligible - Expired', 'Force Majeure'].map(s => (
+                    <span key={s} className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{s}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* CTA */}
