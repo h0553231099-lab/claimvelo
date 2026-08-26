@@ -4,7 +4,7 @@ import { Claim, ClaimStatus, AdminView, UserProfile } from '../types';
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
 import { recalculateAgentPayout, logAgentPayout } from '../lib/financialService';
 import { Page } from '../types';
-import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2 } from 'lucide-react';
+import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2, Key, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import BulkImport from '../components/BulkImport';
 
 interface FinanceTransaction {
@@ -33,6 +33,7 @@ interface WorkerProfile {
   commission_rate?: number;
   total_payout_earned?: number;
   total_paid_to_date?: number;
+  api_key?: string | null;
 }
 
 interface ClaimFile {
@@ -863,6 +864,12 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [qrModal, setQrModal] = useState<{ name: string; code: string; dataUrl: string } | null>(null);
   const [qrCopied, setQrCopied] = useState(false);
 
+  // API Key management state
+  const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [generatingKey, setGeneratingKey] = useState<string | null>(null);
+  const [revokingKey, setRevokingKey] = useState<string | null>(null);
+
   async function submitPayout() {
     if (!payoutAgent) return;
     const amt = parseFloat(payoutForm.amount);
@@ -944,6 +951,54 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     navigator.clipboard.writeText(url);
     setQrCopied(true);
     setTimeout(() => setQrCopied(false), 2000);
+  }
+
+  function generateApiKey(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const length = 32;
+    const array = new Uint8Array(length);
+    crypto.getRandomValues(array);
+    let key = 'cv_live_';
+    for (let i = 0; i < length; i++) {
+      key += chars[array[i] % chars.length];
+    }
+    return key;
+  }
+
+  async function saveApiKey(agentId: string) {
+    setGeneratingKey(agentId);
+    const newKey = generateApiKey();
+    const { error } = await supabase.from('worker_profiles').update({ api_key: newKey }).eq('id', agentId);
+    if (!error) {
+      setWorkers(prev => prev.map(w => w.id === agentId ? { ...w, api_key: newKey } : w));
+      setRevealedKeys(prev => new Set(prev).add(agentId));
+    }
+    setGeneratingKey(null);
+  }
+
+  async function revokeApiKey(agentId: string) {
+    setRevokingKey(agentId);
+    const { error } = await supabase.from('worker_profiles').update({ api_key: null }).eq('id', agentId);
+    if (!error) {
+      setWorkers(prev => prev.map(w => w.id === agentId ? { ...w, api_key: null } : w));
+      setRevealedKeys(prev => { const next = new Set(prev); next.delete(agentId); return next; });
+    }
+    setRevokingKey(null);
+  }
+
+  function toggleReveal(agentId: string) {
+    setRevealedKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(agentId)) next.delete(agentId);
+      else next.add(agentId);
+      return next;
+    });
+  }
+
+  function copyApiKey(agentId: string, key: string) {
+    navigator.clipboard.writeText(key);
+    setCopiedKeyId(agentId);
+    setTimeout(() => setCopiedKeyId(null), 2000);
   }
 
   function downloadQR() {
@@ -2169,10 +2224,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
 
                 {workers.filter(w => w.role === 'agent').length > 0 && (
                   <div className="overflow-x-auto -mx-4 px-4">
-                  <table className="border-collapse" style={{ minWidth: 980 }}>
+                  <table className="border-collapse" style={{ minWidth: 1200 }}>
                     <thead>
                       <tr>
-                        {['Name', 'Code', 'Claims', 'Resolved', 'Total Value', 'Commission', 'Earned', 'Paid', 'Balance Due', 'Status', 'Added', ''].map(h => (
+                        {['Name', 'Code', 'API Key', 'Claims', 'Resolved', 'Total Value', 'Commission', 'Earned', 'Paid', 'Balance Due', 'Status', 'Added', ''].map(h => (
                           <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
                         ))}
                       </tr>
@@ -2189,6 +2244,32 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                           <tr key={w.id} className="hover:bg-[#f8fafc]">
                             <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold">{w.full_name || '—'}</td>
                             <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-mono font-semibold text-[#0f172a]">{w.agent_code || '—'}</td>
+                            <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
+                              {w.api_key ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-[10px] text-[#475569] max-w-[140px] truncate">
+                                    {revealedKeys.has(w.id) ? w.api_key : `cv_live_${'\u2022'.repeat(16)}`}
+                                  </span>
+                                  <button onClick={() => toggleReveal(w.id)} className="p-0.5 text-[#64748b] hover:text-[#0f172a] bg-transparent border-none cursor-pointer rounded transition-colors" title={revealedKeys.has(w.id) ? 'Hide' : 'Reveal'}>
+                                    {revealedKeys.has(w.id) ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                  </button>
+                                  <button onClick={() => copyApiKey(w.id, w.api_key!)} className="p-0.5 text-[#64748b] hover:text-[#0f172a] bg-transparent border-none cursor-pointer rounded transition-colors" title="Copy">
+                                    {copiedKeyId === w.id ? <CheckCircle className="w-3 h-3 text-[#16a34a]" /> : <Copy className="w-3 h-3" />}
+                                  </button>
+                                  <button onClick={() => revokeApiKey(w.id)} disabled={revokingKey === w.id} className="p-0.5 text-[#94a3b8] hover:text-[#dc2626] bg-transparent border-none cursor-pointer rounded transition-colors disabled:opacity-60" title="Revoke key">
+                                    {revokingKey === w.id ? <span className="text-[9px]">...</span> : <Trash2 className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => saveApiKey(w.id)}
+                                  disabled={generatingKey === w.id}
+                                  className="flex items-center gap-1 px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] rounded-[10px] text-[10px] font-semibold cursor-pointer hover:bg-[#dbeafe] transition-colors disabled:opacity-60"
+                                >
+                                  {generatingKey === w.id ? '...' : (<><Key className="w-2.5 h-2.5" /> Generate</>)}
+                                </button>
+                              )}
+                            </td>
                             <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] rounded-[10px] text-[10px] font-semibold">
                                 {agentClaims.length}
