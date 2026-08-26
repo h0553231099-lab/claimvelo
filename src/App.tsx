@@ -27,6 +27,7 @@ const AgentSignInPage = lazy(() => import('./pages/AgentSignInPage'));
 const SalesSignInPage = lazy(() => import('./pages/SalesSignInPage'));
 const SeoSignInPage = lazy(() => import('./pages/SeoSignInPage'));
 const PartnerPage = lazy(() => import('./pages/PartnerPage'));
+const ApiDocsPage = lazy(() => import('./pages/ApiDocsPage'));
 const IrelandPage = lazy(() => import('./pages/IrelandPage'));
 const UKPage = lazy(() => import('./pages/UKPage'));
 const ClaimSuccessPage = lazy(() => import('./pages/ClaimSuccessPage'));
@@ -193,6 +194,7 @@ export default function App() {
           {page === 'seo-signin' && <SeoSignInPage onAuth={handleAuth} onNav={nav} />}
           {page === 'privacy' && <PrivacyPolicyPage onNav={nav} />}
           {page === 'partners' && <PartnerPage onNav={nav} />}
+          {page === 'api-docs' && <ApiDocsPage onNav={nav} />}
           {page === 'ireland' && <IrelandPage onNav={nav} />}
           {page === 'united-kingdom' && <UKPage onNav={nav} />}
           {page === 'agent-dashboard' && <AgentDashboardPage onNav={nav} user={user} onSignOut={handleSignOut} />}

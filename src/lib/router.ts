@@ -19,6 +19,7 @@ export const PAGE_PATHS: Record<string, Page> = {
   'partners': 'partners',
   'ireland': 'ireland',
   'united-kingdom': 'united-kingdom',
+  'api-docs': 'api-docs',
 };
 
 export const PAGE_SLUGS: Partial<Record<Page, string>> = {
@@ -38,6 +39,7 @@ export const PAGE_SLUGS: Partial<Record<Page, string>> = {
   partners: 'partners',
   ireland: 'ireland',
   'united-kingdom': 'united-kingdom',
+  'api-docs': 'api-docs',
 };
 
 export function parseUrl(pathname: string): { locale: Locale; page: Page } {
