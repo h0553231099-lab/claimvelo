@@ -810,6 +810,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [panelTab, setPanelTab] = useState<'details' | 'loa' | 'files'>('details');
   const [noteText, setNoteText] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
+  const [noteSaved, setNoteSaved] = useState<'idle' | 'ok' | 'err'>('idle');
 
   // Workers state
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
@@ -1029,6 +1030,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
 
   useEffect(() => {
     setNoteText(panel?.notes || '');
+    setNoteSaved('idle');
     setEmailPanelOpen(false);
     setEmailSubject('');
     setEmailBody('');
@@ -1277,10 +1279,17 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   async function saveNote() {
     if (!panel) return;
     setNoteSaving(true);
-    await supabase.from('claims').update({ notes: noteText }).eq('id', panel.id);
+    setNoteSaved('idle');
+    const { error } = await supabase.from('claims').update({ notes: noteText }).eq('id', panel.id);
+    setNoteSaving(false);
+    if (error) {
+      setNoteSaved('err');
+      return;
+    }
     setClaims(cl => cl.map(c => c.id === panel.id ? { ...c, notes: noteText } : c));
     setPanel(p => p?.id === panel.id ? { ...p, notes: noteText } : p);
-    setNoteSaving(false);
+    setNoteSaved('ok');
+    setTimeout(() => setNoteSaved('idle'), 2500);
   }
 
   async function updateStatus(id: string, ns: ClaimStatus) {
@@ -2890,7 +2899,11 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   <div>
                     <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Internal Note</div>
                     <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Add a note..." rows={3} className="w-full px-3 py-2 border border-[#e2e8f0] rounded-[7px] text-xs resize-none outline-none font-sans focus:border-[#2563eb]" />
-                    <button onClick={saveNote} disabled={noteSaving} className="mt-1.5 px-2.5 py-1 bg-[#2563eb] text-white border-none rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#1d4ed8] disabled:opacity-60">{noteSaving ? 'Saving...' : 'Save Note'}</button>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <button onClick={saveNote} disabled={noteSaving} className="px-2.5 py-1 bg-[#2563eb] text-white border-none rounded-[7px] text-xs font-semibold cursor-pointer hover:bg-[#1d4ed8] disabled:opacity-60">{noteSaving ? 'Saving...' : 'Save Note'}</button>
+                      {noteSaved === 'ok' && <span className="text-[11px] text-[#16a34a] font-semibold">Saved</span>}
+                      {noteSaved === 'err' && <span className="text-[11px] text-[#dc2626] font-semibold">Failed to save — try again</span>}
+                    </div>
                   </div>
 
                   {/* Send Email to Claimant */}
