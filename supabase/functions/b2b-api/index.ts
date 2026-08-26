@@ -162,7 +162,7 @@ const MIN_ELIGIBLE_DELAY_MINUTES = 180;
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function jsonError(status: number, message: string): Response {
-  return new Response(JSON.stringify({ error: message }), {
+  return new Response(JSON.stringify({ success: false, message }), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
@@ -177,7 +177,7 @@ function jsonOk(data: unknown, status = 200): Response {
 
 function validationError(errors: { field: string; message: string }[]): Response {
   return new Response(
-    JSON.stringify({ error: "Validation failed", errors }),
+    JSON.stringify({ success: false, message: "Validation failed", errors }),
     { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 }
@@ -519,123 +519,205 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/b2b-api/, "").replace(/^\/+/, "/");
 
+  // ── Route: GET /api/v1/docs ──────────────────────────────────────────
+  if (path === "/api/v1/docs" && req.method === "GET") {
+    return jsonOk({
+      name: "ClaimVelo B2B API",
+      version: "1.0.0",
+      base_url: "https://claimvelo.co/functions/v1/b2b-api",
+      endpoints: {
+        "POST /api/v1/leads": {
+          description: "Submit a new flight delay lead for evaluation.",
+          authentication: "Bearer <AGENT_API_KEY> in the Authorization header",
+          content_type: "application/json",
+          required_fields: {
+            pnr_code: "string (6 chars, uppercase alphanumeric)",
+            "passenger.first_name": "string",
+            "passenger.last_name": "string",
+            "passenger.email": "string (valid email)",
+            "passenger.phone": "string (international format with +, e.g. +441234567890)",
+            "flight_info.flight_number": "string",
+            "flight_info.departure_date": "string (YYYY-MM-DD)",
+            "flight_info.origin": "string (3-letter IATA code)",
+            "flight_info.destination": "string (3-letter IATA code)",
+          },
+          optional_fields: {
+            "flight_info.delay_minutes": "number (integer, minutes of delay)",
+            "flight_info.delay_reason": "string (carrier, technical, crew, weather, atc, security)",
+          },
+          responses: {
+            "201": { success: true, message: "string", claim_ref: "string", evaluation_status: "string" },
+            "400": { success: false, message: "string", errors: "[{field, message}]" },
+            "401": { success: false, message: "string" },
+            "500": { success: false, message: "string" },
+          },
+        },
+      },
+      examples: {
+        curl: `curl -X POST \\
+  https://claimvelo.co/functions/v1/b2b-api/api/v1/leads \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_AGENT_API_KEY" \\
+  -d '{
+    "pnr_code": "ABC123",
+    "passenger": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "email": "john.doe@example.com",
+      "phone": "+441234567890"
+    },
+    "flight_info": {
+      "flight_number": "BA245",
+      "departure_date": "2026-07-15",
+      "origin": "LHR",
+      "destination": "JFK",
+      "delay_minutes": 240,
+      "delay_reason": "technical"
+    }
+  }'`,
+        javascript: `const response = await fetch(
+  "https://claimvelo.co/functions/v1/b2b-api/api/v1/leads",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer YOUR_AGENT_API_KEY",
+    },
+    body: JSON.stringify({
+      pnr_code: "ABC123",
+      passenger: {
+        first_name: "John",
+        last_name: "Doe",
+        email: "john.doe@example.com",
+        phone: "+441234567890",
+      },
+      flight_info: {
+        flight_number: "BA245",
+        departure_date: "2026-07-15",
+        origin: "LHR",
+        destination: "JFK",
+        delay_minutes: 240,
+        delay_reason: "technical",
+      },
+    }),
+  }
+);
+const data = await response.json();
+console.log(data);`,
+      },
+    });
+  }
+
   // ── Route: POST /api/v1/leads ──────────────────────────────────────────
   if (path === "/api/v1/leads" && req.method === "POST") {
-    // 1. Enforce JSON content type
-    const contentType = req.headers.get("Content-Type") || "";
-    if (!contentType.includes("application/json")) {
-      return jsonError(400, "Content-Type must be application/json");
-    }
-
-    // 2. Authenticate
-    const auth = await authenticateAgent(req);
-    if ("response" in auth) return auth.response;
-    const agent = auth.agent;
-
-    // 3. Parse JSON body
-    let rawBody: unknown;
     try {
-      rawBody = await req.json();
-    } catch {
-      return jsonError(400, "Request body is not valid JSON");
-    }
+      // 1. Enforce JSON content type
+      const contentType = req.headers.get("Content-Type") || "";
+      if (!contentType.includes("application/json")) {
+        return jsonError(400, "Content-Type must be application/json");
+      }
 
-    // 4. Strict validation
-    const result = leadSchema.safeParse(rawBody);
-    if (!result.success) {
-      return validationError(formatZodErrors(result.error));
-    }
+      // 2. Authenticate
+      const auth = await authenticateAgent(req);
+      if ("response" in auth) return auth.response;
+      const agent = auth.agent;
 
-    const lead: Lead = result.data;
+      // 3. Parse JSON body
+      let rawBody: unknown;
+      try {
+        rawBody = await req.json();
+      } catch {
+        return jsonError(400, "Request body is not valid JSON");
+      }
 
-    // 5. Create service-role client for DB writes
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+      // 4. Strict validation
+      const result = leadSchema.safeParse(rawBody);
+      if (!result.success) {
+        return validationError(formatZodErrors(result.error));
+      }
 
-    // 6. Generate claim reference
-    const claimRef = "CLM-" + Date.now().toString().slice(-6) + "-" + Math.random().toString(36).slice(2, 5).toUpperCase();
+      const lead: Lead = result.data;
 
-    // 7. Insert claim into database
-    const { data: claimRow, error: insertError } = await supabase
-      .from("claims")
-      .insert({
-        claim_ref: claimRef,
-        passenger_first_name: lead.passenger.first_name,
-        passenger_last_name: lead.passenger.last_name,
-        email: lead.passenger.email,
-        phone: lead.passenger.phone,
-        booking_reference: lead.pnr_code,
-        flight_number: lead.flight_info.flight_number,
-        flight_date: lead.flight_info.departure_date,
-        departure: lead.flight_info.origin,
-        arrival: lead.flight_info.destination,
-        airline_reason: lead.flight_info.delay_reason || "",
-        delay_hours: lead.flight_info.delay_minutes
-          ? Math.round((lead.flight_info.delay_minutes / 60) * 100) / 100
-          : 0,
-        issue_type: "Delay",
-        agent: agent.agent_code,
-        status: "Pending Check",
-        loa_signed: false,
-        notes: `Lead submitted via B2B API by ${agent.full_name} (${agent.email})`,
-      })
-      .select("id")
-      .single();
+      // 5. Create service-role client for DB writes
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
 
-    if (insertError || !claimRow) {
-      return jsonError(500, "Failed to create claim record: " + (insertError?.message || "unknown error"));
-    }
+      // 6. Generate claim reference
+      const claimRef = "CLM-" + Date.now().toString().slice(-6) + "-" + Math.random().toString(36).slice(2, 5).toUpperCase();
 
-    const claimId = claimRow.id;
+      // 7. Insert claim into database
+      const { data: claimRow, error: insertError } = await supabase
+        .from("claims")
+        .insert({
+          claim_ref: claimRef,
+          passenger_first_name: lead.passenger.first_name,
+          passenger_last_name: lead.passenger.last_name,
+          email: lead.passenger.email,
+          phone: lead.passenger.phone,
+          booking_reference: lead.pnr_code,
+          flight_number: lead.flight_info.flight_number,
+          flight_date: lead.flight_info.departure_date,
+          departure: lead.flight_info.origin,
+          arrival: lead.flight_info.destination,
+          airline_reason: lead.flight_info.delay_reason || "",
+          delay_hours: lead.flight_info.delay_minutes
+            ? Math.round((lead.flight_info.delay_minutes / 60) * 100) / 100
+            : 0,
+          issue_type: "Delay",
+          agent: agent.agent_code,
+          status: "Pending Check",
+          loa_signed: false,
+          notes: `Lead submitted via B2B API by ${agent.full_name} (${agent.email})`,
+        })
+        .select("id")
+        .single();
 
-    // 8. Trigger rules engine evaluation
-    let engineResult: EngineResult;
-    try {
-      engineResult = await evaluateClaim(
-        supabase,
-        claimId,
-        claimRef,
-        lead.flight_info.flight_number,
-        lead.flight_info.departure_date,
-        lead.flight_info.origin,
-        lead.flight_info.destination,
-        agent.agent_code,
-        lead.flight_info.delay_minutes,
-        lead.flight_info.delay_reason,
-      );
-    } catch (err) {
-      // Claim was created but engine failed — return partial success
+      if (insertError || !claimRow) {
+        return jsonError(500, "Internal server error");
+      }
+
+      const claimId = claimRow.id;
+
+      // 8. Trigger rules engine evaluation
+      let engineResult: EngineResult;
+      try {
+        engineResult = await evaluateClaim(
+          supabase,
+          claimId,
+          claimRef,
+          lead.flight_info.flight_number,
+          lead.flight_info.departure_date,
+          lead.flight_info.origin,
+          lead.flight_info.destination,
+          agent.agent_code,
+          lead.flight_info.delay_minutes,
+          lead.flight_info.delay_reason,
+        );
+      } catch (err) {
+        // Claim created but engine failed — return success with partial evaluation
+        return jsonOk({
+          success: true,
+          message: "Lead received and processed successfully (evaluation pending)",
+          claim_ref: claimRef,
+          evaluation_status: "Pending Check",
+        }, 201);
+      }
+
+      // 9. Return standardized success response
       return jsonOk({
-        status: "created",
-        claim_id: claimId,
+        success: true,
+        message: "Lead received and processed successfully",
         claim_ref: claimRef,
-        agent: { id: agent.id, full_name: agent.full_name },
-        engine_error: err instanceof Error ? err.message : "Evaluation failed",
-        message: "Claim created but rules engine evaluation failed. Status remains 'Pending Check'.",
+        evaluation_status: engineResult.decision,
       }, 201);
-    }
 
-    // 9. Return full success
-    return jsonOk({
-      status: "created",
-      claim_id: claimId,
-      claim_ref: claimRef,
-      agent: {
-        id: agent.id,
-        full_name: agent.full_name,
-        agent_code: agent.agent_code,
-      },
-      evaluation: {
-        decision: engineResult.decision,
-        delay_minutes: engineResult.delayMinutes,
-        reason_code: engineResult.reasonCode,
-        detail: engineResult.detail,
-      },
-      message: `Lead created and evaluated. Status: ${engineResult.decision}`,
-    }, 201);
+    } catch {
+      // Catch-all for any unhandled server error
+      return jsonError(500, "Internal server error");
+    }
   }
 
   return jsonError(404, `No route for ${req.method} ${path}`);
