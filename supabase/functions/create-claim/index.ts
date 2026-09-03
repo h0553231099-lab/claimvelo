@@ -45,8 +45,19 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ── 2. Generate claim_ref ────────────────────────────────────────────────
+    // ── 2. Generate claim_ref and access token ──────────────────────────────
     const claimRef = "CLM-" + Date.now().toString().slice(-6);
+
+    // Generate a cryptographically random access token.
+    // Only the SHA-256 hash is stored; the raw token is returned once to the client.
+    const rawAccessToken = crypto.randomUUID();
+    const tokenHashBuffer = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(rawAccessToken),
+    );
+    const accessTokenHash = Array.from(new Uint8Array(tokenHashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
 
     // ── 3. Duplicate check ────────────────────────────────────────────────────
     if (claimData.flight_number && claimData.flight_date && claimData.email) {
@@ -87,12 +98,13 @@ Deno.serve(async (req: Request) => {
       prior_signed: claimData.prior_signed || null,
       review_required: claimData.review_required || false,
       customer_user_id: customerUserId,
+      access_token_hash: accessTokenHash,
     };
 
     const { data: newClaim, error: insertError } = await admin
       .from("claims")
       .insert(insertRow)
-      .select("id, access_token")
+      .select("id")
       .single();
 
     if (insertError || !newClaim) {
@@ -175,7 +187,7 @@ Deno.serve(async (req: Request) => {
       success: true,
       claim_id: newClaim.id,
       claim_ref: claimRef,
-      access_token: newClaim.access_token,
+      access_token: rawAccessToken,
       upload_urls: uploadUrls,
       evaluation,
     }), {

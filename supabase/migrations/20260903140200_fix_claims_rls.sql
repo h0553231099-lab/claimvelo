@@ -74,7 +74,7 @@ CREATE POLICY "Staff can update claims"
 -- Requires both claim_ref AND access_token to match.
 CREATE OR REPLACE FUNCTION get_claim_by_access_token(
   p_claim_ref text,
-  p_access_token uuid
+  p_access_token text
 )
 RETURNS TABLE(
   claim_ref text,
@@ -93,6 +93,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  -- Hash the supplied token with SHA-256 and compare against the stored hash.
+  -- The raw token is never stored in the database.
   RETURN QUERY
   SELECT
     c.claim_ref,
@@ -107,10 +109,10 @@ BEGIN
     c.updated_at
   FROM claims c
   WHERE c.claim_ref = p_claim_ref
-    AND c.access_token = p_access_token;
+    AND c.access_token_hash = encode(digest(p_access_token, 'sha256'), 'hex');
 END;
 $$;
 
 -- Only anon can call this (for public claim tracking); authenticated users use RLS
-REVOKE EXECUTE ON FUNCTION get_claim_by_access_token(text, uuid) FROM authenticated;
-GRANT EXECUTE ON FUNCTION get_claim_by_access_token(text, uuid) TO anon;
+REVOKE EXECUTE ON FUNCTION get_claim_by_access_token(text, text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION get_claim_by_access_token(text, text) TO anon;

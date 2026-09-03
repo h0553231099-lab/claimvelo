@@ -2,7 +2,10 @@
  * Shared claim evaluation logic — used by create-claim and evaluate-claim
  * edge functions. Runs with the service-role client (bypasses RLS).
  *
- * NOTE: Mock fallback is retained for now (Phase B will remove it).
+ * NOTE: generateMockFlightData() is retained in this file but is NO LONGER
+ * used for automatic eligibility decisions. When no real evidence is available
+ * (neither DB delay_hours nor live API data), the engine returns "Pending Check"
+ * for manual review. Phase B will remove the mock function entirely.
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -244,11 +247,12 @@ export async function evaluateClaimInternal(
       reasonCode = claim.airline_reason ? classifyReason(claim.airline_reason) : inferReasonFromStatus(apiResult.status);
       source = "live_api";
     } else {
-      // Mock fallback (Phase B will replace with Pending Check)
-      const mock = generateMockFlightData(claim.flight_number || "", flightDate);
-      delayMinutes = mock.delayMinutes;
-      reasonCode = claim.airline_reason ? classifyReason(claim.airline_reason) : mock.reasonCode;
-      source = "mock";
+      // No delay data available from DB or live API.
+      // Do NOT use mock data for automatic decisions (Phase B will remove mock entirely).
+      // Unavailable evidence must produce Pending Check for manual review.
+      const detail = `No delay data available from database or live API — manual review required.`;
+      await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
+      return { claimId, claimRef, decision: "Pending Check", delayMinutes: 0, reasonCode: null, source: null, detail };
     }
   }
 
