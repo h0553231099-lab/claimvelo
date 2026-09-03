@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
   });
   const { data: profile } = await admin
     .from("profiles")
-    .select("role")
+    .select("role, claimvelo_email, full_name")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -63,9 +63,26 @@ Deno.serve(async (req: Request) => {
     return jsonError(403, "Only staff can send emails");
   }
 
+  // ── Sender identity protection ───────────────────────────────────────────
+  // The From address must be an approved ClaimVelo sender identity, sourced
+  // from the server-side profile — never trusted from the request payload.
+  // The allowlist is the shared inboxes plus the caller's own assigned
+  // @claimvelo.com address.
+  const APPROVED_SENDERS = ["support@claimvelo.com", "info@claimvelo.com"];
+  const callerSender = (profile.claimvelo_email || "").toLowerCase();
+  if (callerSender) APPROVED_SENDERS.push(callerSender);
+
   try {
     const payload: Payload = await req.json();
-    const { to, subject, body, fromName, fromAddress } = payload;
+    const { to, subject, body, fromAddress } = payload;
+
+    // Validate the From address against the server-side allowlist
+    if (!fromAddress || !APPROVED_SENDERS.includes(fromAddress.toLowerCase())) {
+      return jsonError(403, "Sender address is not an approved ClaimVelo identity");
+    }
+
+    // Use the authoritative display name from the staff profile
+    const fromName = profile.full_name || "ClaimVelo";
 
     if (!to || !subject || !body) {
       return new Response(JSON.stringify({ error: "Missing required fields: to, subject, body" }), {
