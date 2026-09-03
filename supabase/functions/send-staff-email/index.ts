@@ -1,10 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
+
+const STAFF_ROLES = ["admin", "super_admin", "worker"];
 
 interface Payload {
   to: string;
@@ -15,14 +18,71 @@ interface Payload {
   replyToEmailId?: string;
 }
 
+function jsonError(status: number, message: string): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+  // ── Authentication: require a valid user JWT ──────────────────────────────
+  const authHeader = req.headers.get("Authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return jsonError(401, "Authentication required");
+  }
+  const token = authHeader.replace("Bearer ", "").trim();
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: { user }, error } = await userClient.auth.getUser(token);
+  if (error || !user) {
+    return jsonError(401, "Invalid or expired token");
+  }
+
+  // ── Authorization: staff only (admin / super_admin / worker) ──────────────
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("role, claimvelo_email, full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile || !STAFF_ROLES.includes(profile.role)) {
+    return jsonError(403, "Only staff can send emails");
+  }
+
+  // ── Sender identity protection ───────────────────────────────────────────
+  // The From address must be an approved ClaimVelo sender identity, sourced
+  // from the server-side profile — never trusted from the request payload.
+  // The allowlist is the shared inboxes plus the caller's own assigned
+  // @claimvelo.com address.
+  const APPROVED_SENDERS = ["support@claimvelo.com", "info@claimvelo.com"];
+  const callerSender = (profile.claimvelo_email || "").toLowerCase();
+  if (callerSender) APPROVED_SENDERS.push(callerSender);
+
   try {
     const payload: Payload = await req.json();
-    const { to, subject, body, fromName, fromAddress } = payload;
+    const { to, subject, body, fromAddress } = payload;
+
+    // Validate the From address against the server-side allowlist
+    if (!fromAddress || !APPROVED_SENDERS.includes(fromAddress.toLowerCase())) {
+      return jsonError(403, "Sender address is not an approved ClaimVelo identity");
+    }
+
+    // Use the authoritative display name from the staff profile
+    const fromName = profile.full_name || "ClaimVelo";
 
     if (!to || !subject || !body) {
       return new Response(JSON.stringify({ error: "Missing required fields: to, subject, body" }), {

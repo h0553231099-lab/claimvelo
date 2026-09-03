@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { evaluateClaimInternal } from "../_shared/evaluate.ts";
+import { rateLimit, getClientIp } from "../_shared/rateLimit.ts";
+import { dbRateLimit } from "../_shared/dbRateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +13,32 @@ const corsHeaders = {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  // ── Abuse protection: rate limit per client IP ─────────────────────────────
+  // Public endpoint — no login required. Limits fake-claim spam that would
+  // fill the database and trigger confirmation emails. First-layer guard only
+  // (in-memory, per-isolate); a distributed limit should back this up.
+  const ip = getClientIp(req);
+  const { allowed, retryAfterMs } = rateLimit(`create-claim:${ip}`, 5, 600_000);
+  if (!allowed) {
+    return jsonError(429, `Too many claim submissions. Please try again in ${Math.ceil(retryAfterMs / 1000)}s.`);
+  }
+
+  // ── Distributed rate limit (DB-backed, authoritative across isolates) ──────
+  const { allowed: dbAllowed, retryAfterMs: dbRetryMs } = await dbRateLimit(`create-claim:${ip}`, 5, 600);
+  if (!dbAllowed) {
+    return new Response(
+      JSON.stringify({ error: `Too many claim submissions. Please try again in ${Math.ceil(dbRetryMs / 1000)}s.` }),
+      {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Retry-After": String(Math.ceil(dbRetryMs / 1000)),
+        },
+      },
+    );
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

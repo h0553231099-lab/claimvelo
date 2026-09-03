@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -149,13 +150,86 @@ function buildStatusHtml(p: EmailPayload): string {
 </html>`;
 }
 
+const STAFF_ROLES = ["admin", "super_admin", "worker"];
+
+function jsonError(status: number, message: string): Response {
+  return new Response(JSON.stringify({ ok: false, error: message }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+  // Service-role client for claim lookups (bypasses RLS)
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
   try {
+    // ── Authentication & authorization ───────────────────────────────────────
+    // Two valid callers:
+    //   1. Service-role key (server-side, e.g. create-claim) — may send
+    //      claim_submitted confirmation emails.
+    //   2. Authenticated staff JWT — may send status_changed emails only.
+    // Anonymous / non-staff callers are rejected.
+    const authHeader = req.headers.get("Authorization") || "";
+    const isServiceRole = authHeader.includes(serviceRoleKey);
+
+    if (!isServiceRole) {
+      if (!authHeader.startsWith("Bearer ")) {
+        return jsonError(401, "Authentication required");
+      }
+      const token = authHeader.replace("Bearer ", "").trim();
+      const userClient = createClient(supabaseUrl, anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: { user }, error } = await userClient.auth.getUser(token);
+      if (error || !user) {
+        return jsonError(401, "Invalid or expired token");
+      }
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!profile || !STAFF_ROLES.includes(profile.role)) {
+        return jsonError(403, "Only staff can trigger status-change emails");
+      }
+    }
+
     const payload: EmailPayload = await req.json();
+
+    // Claim-submitted confirmations are triggered exclusively server-side
+    // (by the create-claim edge function). A browser/JWT caller may never
+    // send them.
+    if (payload.type === "claim_submitted" && !isServiceRole) {
+      return jsonError(403, "Claim confirmation emails can only be triggered server-side");
+    }
+
+    // ── Validate the claim exists before sending ────────────────────────────
+    const { data: claim } = await admin
+      .from("claims")
+      .select("claim_ref, email")
+      .eq("claim_ref", payload.claimRef)
+      .maybeSingle();
+
+    if (!claim) {
+      return jsonError(404, "Claim not found");
+    }
+
+    // The recipient must match the email on file for this claim — prevents
+    // authenticated callers from sending to arbitrary addresses.
+    if (claim.email && payload.to.toLowerCase() !== claim.email.toLowerCase()) {
+      return jsonError(400, "Recipient email does not match the claim on file");
+    }
 
     const subject =
       payload.type === "claim_submitted"
