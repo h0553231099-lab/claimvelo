@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { rateLimit, getClientIp } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,24 +8,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+// ── Authorization constants ──────────────────────────────────────────────────
+const ADMIN_ROLES = ["admin", "super_admin"];
+const ALLOWED_CREATE_ROLES = ["agent", "sales_manager"];
+const APPROVED_REDIRECT_URL = "https://claimvelo.com/agent-signin";
+
 interface WelcomePayload {
   email: string;
   fullName: string;
-  role: "sales_manager" | "agent";
+  role: string; // runtime-validated against ALLOWED_CREATE_ROLES
   agentCode?: string;
 }
 
-function generateTempPassword(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#";
-  let pass = "";
-  for (let i = 0; i < 12; i++) {
-    pass += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return pass;
+function jsonError(status: number, message: string): Response {
+  return new Response(JSON.stringify({ ok: false, error: message }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 
 async function generateQrDataUrl(url: string): Promise<string> {
-  // Build a simple QR-code SVG using the goqr.me API (no npm needed)
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}&format=png`;
   return qrUrl;
 }
@@ -32,10 +35,9 @@ async function generateQrDataUrl(url: string): Promise<string> {
 function buildWelcomeHtml(p: {
   fullName: string;
   email: string;
-  tempPassword: string;
+  inviteLink: string;
   role: string;
   agentCode?: string;
-  loginUrl: string;
   qrImageUrl?: string;
 }): string {
   const roleLabel = p.role === "sales_manager" ? "Sales Manager" : "Agent";
@@ -57,22 +59,20 @@ function buildWelcomeHtml(p: {
     <div style="padding:32px;">
       <div style="font-size:22px;font-weight:800;color:#0f172a;margin-bottom:6px;">Welcome, ${p.fullName}!</div>
       <div style="font-size:14px;color:#64748b;margin-bottom:28px;">
-        Your ClaimVelo ${roleLabel} account is ready. Use the credentials below to sign in and set your own password.
+        Your ClaimVelo ${roleLabel} account has been created. Click the button below to set your password and activate your account.
       </div>
 
-      <!-- Credentials box -->
+      <!-- Account info -->
       <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:20px 24px;margin-bottom:28px;">
-        <div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:14px;">Your Sign-in Credentials</div>
+        <div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:14px;">Your Account</div>
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <tr>
             <td style="padding:5px 0;color:#64748b;width:120px;">Email</td>
             <td style="padding:5px 0;font-weight:700;color:#0f172a;">${p.email}</td>
           </tr>
           <tr>
-            <td style="padding:5px 0;color:#64748b;">Temp Password</td>
-            <td style="padding:5px 0;">
-              <span style="font-family:monospace;font-size:15px;font-weight:800;color:${accentColor};letter-spacing:0.08em;background:#e0f2fe;padding:3px 8px;border-radius:5px;">${p.tempPassword}</span>
-            </td>
+            <td style="padding:5px 0;color:#64748b;">Role</td>
+            <td style="padding:5px 0;font-weight:700;color:#0f172a;">${roleLabel}</td>
           </tr>
           ${p.agentCode ? `<tr>
             <td style="padding:5px 0;color:#64748b;">Agent Code</td>
@@ -83,8 +83,8 @@ function buildWelcomeHtml(p: {
 
       <!-- CTA button -->
       <div style="text-align:center;margin-bottom:28px;">
-        <a href="${p.loginUrl}" style="display:inline-block;padding:13px 32px;background:${accentColor};color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;border-radius:8px;letter-spacing:-0.1px;">
-          Sign In &amp; Set Password →
+        <a href="${p.inviteLink}" style="display:inline-block;padding:13px 32px;background:${accentColor};color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;border-radius:8px;letter-spacing:-0.1px;">
+          Set Your Password &rarr;
         </a>
       </div>
 
@@ -100,14 +100,14 @@ function buildWelcomeHtml(p: {
       ` : ""}
 
       <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:14px 18px;font-size:12px;color:#92400e;">
-        <strong>Important:</strong> Change your password immediately after signing in. This temporary password expires after first use.
+        <strong>Security note:</strong> This invite link is single-use and expires after 24 hours. If you didn't expect this invitation, please ignore this email.
       </div>
     </div>
 
     <!-- Footer -->
     <div style="padding:20px 32px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center;">
-      ClaimVelo Ltd. · 1265 55th St, Brooklyn, NY 11219<br>
-      support@claimvelo.com · Registered in England &amp; Wales No. 12345678
+      ClaimVelo Ltd. &middot; 1265 55th St, Brooklyn, NY 11219<br>
+      support@claimvelo.com &middot; Registered in England &amp; Wales No. 12345678
     </div>
   </div>
 </body>
@@ -119,39 +119,94 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  // ── Abuse protection: rate limit per client IP (first layer only) ──────────
+  const ip = getClientIp(req);
+  const { allowed: rlAllowed } = rateLimit(`send-welcome-email:${ip}`, 10, 600_000);
+  if (!rlAllowed) {
+    return jsonError(429, "Too many requests. Please try again shortly.");
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+  // ── Authentication: require a valid user JWT ──────────────────────────────
+  const authHeader = req.headers.get("Authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return jsonError(401, "Authentication required");
+  }
+  const token = authHeader.replace("Bearer ", "").trim();
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: { user }, error: authError } = await userClient.auth.getUser(token);
+  if (authError || !user) {
+    return jsonError(401, "Invalid or expired token");
+  }
+
+  // ── Authorization: only admin / super_admin may create staff accounts ──────
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: callerProfile } = await admin
+    .from("profiles")
+    .select("role, email, full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!callerProfile || !ADMIN_ROLES.includes(callerProfile.role)) {
+    return jsonError(403, "Only administrators can create staff accounts");
+  }
+
   try {
     const payload: WelcomePayload = await req.json();
 
+    // ── Validate required fields ──────────────────────────────────────────────
     if (!payload.email || !payload.fullName || !payload.role) {
-      return new Response(
-        JSON.stringify({ ok: false, error: "email, fullName, and role are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonError(400, "email, fullName, and role are required");
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    // ── Validate role against explicit allowlist ─────────────────────────────
+    // Only 'agent' and 'sales_manager' may be created through this endpoint.
+    // This prevents privilege escalation — admin can NEVER create or promote
+    // a super_admin, admin, worker, customer, lawyer, or seo_worker here.
+    if (!ALLOWED_CREATE_ROLES.includes(payload.role)) {
+      return jsonError(400, `Role '${payload.role}' is not allowed. Only 'agent' and 'sales_manager' can be created through this endpoint.`);
+    }
 
-    const tempPassword = generateTempPassword();
-
-    // Create auth user with temp password
-    const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+    // ── 1. Create the auth user (no password — secure invite flow) ────────────
+    const { data: authData, error: authError } = await admin.auth.admin.createUser({
       email: payload.email,
-      password: tempPassword,
       email_confirm: true,
+      // No password — the user will set their own via the invite link
     });
 
     if (authError || !authData.user) {
-      throw new Error(authError?.message || "Failed to create auth user");
+      return jsonError(400, authError?.message || "Failed to create user account");
     }
 
     const userId = authData.user.id;
 
-    // Insert profile row
-    const { error: profileError } = await adminClient.from("profiles").insert({
+    // ── 2. Generate a one-time password-set link ──────────────────────────────
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email: payload.email,
+      options: {
+        redirectTo: APPROVED_REDIRECT_URL,
+      },
+    });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      // Cleanup: delete the orphaned auth user
+      await admin.auth.admin.deleteUser(userId);
+      return jsonError(500, "Failed to generate invite link. Account was not created.");
+    }
+
+    const inviteLink = linkData.properties.action_link;
+
+    // ── 3. Insert the profile row ──────────────────────────────────────────────
+    const { error: profileError } = await admin.from("profiles").insert({
       id: userId,
       role: payload.role,
       full_name: payload.fullName,
@@ -159,14 +214,14 @@ Deno.serve(async (req: Request) => {
     });
 
     if (profileError) {
-      // Clean up auth user if profile insert fails
-      await adminClient.auth.admin.deleteUser(userId);
-      throw new Error(profileError.message);
+      // Cleanup: delete the auth user (no profile = no access)
+      await admin.auth.admin.deleteUser(userId);
+      return jsonError(500, `Failed to create profile: ${profileError.message}. Account was not created.`);
     }
 
-    // If agent, insert worker_profiles row too
+    // ── 4. Insert worker_profiles row (agents only) ────────────────────────────
     if (payload.role === "agent" && payload.agentCode) {
-      await adminClient.from("worker_profiles").insert({
+      const { error: workerError } = await admin.from("worker_profiles").insert({
         user_id: userId,
         email: payload.email,
         full_name: payload.fullName,
@@ -174,56 +229,86 @@ Deno.serve(async (req: Request) => {
         agent_code: payload.agentCode.toUpperCase(),
         status: "active",
       });
+
+      if (workerError) {
+        // Cleanup: delete profile + auth user
+        await admin.from("profiles").delete().eq("id", userId);
+        await admin.auth.admin.deleteUser(userId);
+        return jsonError(500, `Failed to create agent profile: ${workerError.message}. Account was not created.`);
+      }
     }
 
-    const siteUrl = "https://claimvelo.com";
-    const loginUrl = `${siteUrl}/agent-signin`;
-
+    // ── 5. Generate QR code (agents only) ──────────────────────────────────────
     let qrImageUrl: string | undefined;
     if (payload.agentCode) {
-      const claimUrl = `${siteUrl}/claim?agent=${encodeURIComponent(payload.agentCode)}`;
+      const claimUrl = `https://claimvelo.com/claim?agent=${encodeURIComponent(payload.agentCode)}`;
       qrImageUrl = await generateQrDataUrl(claimUrl);
     }
 
+    // ── 6. Send the welcome email with the invite link (best-effort) ───────────
     const html = buildWelcomeHtml({
       fullName: payload.fullName,
       email: payload.email,
-      tempPassword,
+      inviteLink,
       role: payload.role,
       agentCode: payload.agentCode,
-      loginUrl,
       qrImageUrl,
     });
 
-    const subject = `Welcome to ClaimVelo — Your ${payload.role === "sales_manager" ? "Sales Manager" : "Agent"} Account is Ready`;
+    const subject = `Welcome to ClaimVelo — Set Your Password to Activate Your ${payload.role === "sales_manager" ? "Sales Manager" : "Agent"} Account`;
+    let emailSent = true;
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
-
     if (resendKey) {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${resendKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: "ClaimVelo <support@claimvelo.com>",
-          to: [payload.email],
-          subject,
-          html,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.text();
-        console.error("Resend error:", err);
+      try {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "ClaimVelo <support@claimvelo.com>",
+            to: [payload.email],
+            subject,
+            html,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.text();
+          console.error("Resend error:", err);
+          emailSent = false;
+        }
+      } catch (e) {
+        console.error("Email send failed:", e);
+        emailSent = false;
       }
     } else {
-      console.log(`[WELCOME EMAIL] To: ${payload.email}`);
-      console.log(`[WELCOME EMAIL] Temp password: ${tempPassword}`);
+      console.log(`[WELCOME EMAIL] To: ${payload.email} | Invite link generated (no Resend key)`);
+    }
+
+    // ── 7. Record in audit_log (best-effort) ───────────────────────────────────
+    try {
+      await admin.from("audit_log").insert({
+        user_id: user.id,
+        user_email: callerProfile.email,
+        role: callerProfile.role,
+        action: "staff_account_created",
+        entity_type: "profile",
+        entity_id: userId,
+        new_values: {
+          created_email: payload.email,
+          created_role: payload.role,
+          created_full_name: payload.fullName,
+          email_sent: emailSent,
+        },
+      });
+    } catch (e) {
+      console.error("Audit log insert failed:", e);
     }
 
     return new Response(
-      JSON.stringify({ ok: true, userId }),
+      JSON.stringify({ ok: true, userId, emailSent }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

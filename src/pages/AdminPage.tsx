@@ -1188,10 +1188,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     setSalesSuccess('');
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({ email: salesForm.email.trim(), fullName: salesForm.full_name.trim(), role: 'sales_manager' }),
       });
       const result = await res.json();
@@ -1217,10 +1217,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     setAgentSuccess('');
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({
           email: agentForm.email.trim(),
           fullName: agentForm.full_name.trim(),
