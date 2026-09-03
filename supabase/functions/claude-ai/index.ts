@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { rateLimit, getClientIp } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,25 @@ const corsHeaders = {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  // ── Abuse protection: rate limit per client IP ──────────────────────────────
+  // Public endpoint (chat widget + boarding-pass OCR) — no login required.
+  // Limits cost abuse of the Anthropic API key.
+  const ip = getClientIp(req);
+  const { allowed, retryAfterMs } = rateLimit(`claude-ai:${ip}`, 8, 60_000);
+  if (!allowed) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests. Please try again shortly." }),
+      {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Retry-After": String(Math.ceil(retryAfterMs / 1000)),
+        },
+      },
+    );
   }
 
   try {
