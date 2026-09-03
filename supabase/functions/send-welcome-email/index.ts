@@ -59,7 +59,7 @@ function buildWelcomeHtml(p: {
     <div style="padding:32px;">
       <div style="font-size:22px;font-weight:800;color:#0f172a;margin-bottom:6px;">Welcome, ${p.fullName}!</div>
       <div style="font-size:14px;color:#64748b;margin-bottom:28px;">
-        Your ClaimVelo ${roleLabel} account has been created. Click the button below to set your password and activate your account.
+        Your ClaimVelo ${roleLabel} account has been created. Click the button below to activate your account and set your password.
       </div>
 
       <!-- Account info -->
@@ -175,34 +175,23 @@ Deno.serve(async (req: Request) => {
       return jsonError(400, `Role '${payload.role}' is not allowed. Only 'agent' and 'sales_manager' can be created through this endpoint.`);
     }
 
-    // ── 1. Create the auth user (no password — secure invite flow) ────────────
-    const { data: authData, error: authError } = await admin.auth.admin.createUser({
-      email: payload.email,
-      email_confirm: true,
-      // No password — the user will set their own via the invite link
-    });
-
-    if (authError || !authData.user) {
-      return jsonError(400, authError?.message || "Failed to create user account");
-    }
-
-    const userId = authData.user.id;
-
-    // ── 2. Generate a one-time password-set link ──────────────────────────────
+    // ── 1. Create the auth user + generate invite link (single step) ──────────
+    // generateLink({ type: 'invite' }) creates the user and returns a one-time
+    // link the user clicks to confirm their email and set their own password.
+    // No plaintext password is ever generated or sent.
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-      type: "recovery",
+      type: "invite",
       email: payload.email,
       options: {
         redirectTo: APPROVED_REDIRECT_URL,
       },
     });
 
-    if (linkError || !linkData?.properties?.action_link) {
-      // Cleanup: delete the orphaned auth user
-      await admin.auth.admin.deleteUser(userId);
-      return jsonError(500, "Failed to generate invite link. Account was not created.");
+    if (linkError || !linkData?.user?.id || !linkData?.properties?.action_link) {
+      return jsonError(400, linkError?.message || "Failed to create user account");
     }
 
+    const userId = linkData.user.id;
     const inviteLink = linkData.properties.action_link;
 
     // ── 3. Insert the profile row ──────────────────────────────────────────────

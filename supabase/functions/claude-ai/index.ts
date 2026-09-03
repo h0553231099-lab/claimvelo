@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { rateLimit, getClientIp } from "../_shared/rateLimit.ts";
+import { dbRateLimit } from "../_shared/dbRateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +27,22 @@ Deno.serve(async (req: Request) => {
           ...corsHeaders,
           "Content-Type": "application/json",
           "Retry-After": String(Math.ceil(retryAfterMs / 1000)),
+        },
+      },
+    );
+  }
+
+  // ── Distributed rate limit (DB-backed, authoritative across isolates) ──────
+  const { allowed: dbAllowed, retryAfterMs: dbRetryMs } = await dbRateLimit(`claude-ai:${ip}`, 8, 60);
+  if (!dbAllowed) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests. Please try again shortly." }),
+      {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Retry-After": String(Math.ceil(dbRetryMs / 1000)),
         },
       },
     );
