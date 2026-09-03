@@ -60,6 +60,10 @@ export async function insertNotification(payload: {
   claim_id?: string;
   message: string;
 }) {
+  // Notifications are now inserted server-side by edge functions (create-claim,
+  // evaluate-claim) using the service_role key. This client-side function is
+  // kept for staff-side notification creation (admin dashboard) where the
+  // user is authenticated as staff and RLS allows INSERT.
   try {
     await supabase.from('notifications').insert({
       type: payload.type,
@@ -68,7 +72,7 @@ export async function insertNotification(payload: {
       message: payload.message,
     });
   } catch {
-    // Non-blocking
+    // Non-blocking — staff may not have insert permission if not staff role
   }
 }
 

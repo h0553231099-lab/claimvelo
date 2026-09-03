@@ -28,6 +28,10 @@ const PUBLIC_ROUTES = [
 const skipPrerender = process.env.SKIP_PRERENDER === 'true';
 
 export default defineConfig({
+  server: {
+    host: true,
+    allowedHosts: true,
+  },
   plugins: [
     react(),
     ...(!skipPrerender

@@ -1,6 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
+// PHASE B REQUIRED: BulkImport currently uses the client-side rulesEngine
+// (src/lib/rulesEngine.ts) for evaluation. This must be migrated to call the
+// secure server-side evaluate-claim edge function, which uses the service
+// role key and the shared evaluate.ts logic. The client-side engine has
+// mock data fallbacks and runs with the anon key (subject to RLS).
 import { evaluateClaims } from '../lib/rulesEngine';
 import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, Loader2, X, User, Download } from 'lucide-react';
 

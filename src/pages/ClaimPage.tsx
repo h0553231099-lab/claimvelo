@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Page } from '../types';
-import { supabase, sendClaimEmail, insertNotification, lookupFlight, FlightLookupResult, AI_URL, AI_HEADERS } from '../lib/supabase';
-import { evaluateClaim } from '../lib/rulesEngine';
+import { supabase, lookupFlight, FlightLookupResult, AI_URL, AI_HEADERS } from '../lib/supabase';
 import { Plane, ArrowRight, ArrowLeft, Check, Search, AlertTriangle, X, Upload, FileText, Image, Trash2, Ban } from 'lucide-react';
 import AirportInput from '../components/AirportInput';
 import { CheckerPrefill } from '../components/CompensationChecker';
@@ -401,110 +400,103 @@ export default function ClaimPage({ onNav, prefill }: Props) {
       return;
     }
     setSubmitting(true);
-    const ref = 'CLM-' + Date.now().toString().slice(-6);
     const sf = selectedFlight;
     const nameParts = fullName.trim().split(/\s+/);
     const firstName = nameParts[0] || 'Passenger';
     const lastName = nameParts.slice(1).join(' ') || '';
 
-    // Duplicate check
-    if (sf) {
-      const { data: existing } = await supabase
-        .from('claims')
-        .select('claim_ref')
-        .eq('flight_number', sf.flightNum)
-        .eq('flight_date', flightDate)
-        .eq('email', email)
-        .maybeSingle();
-      if (existing) {
-        alert(`This flight claim has already been submitted under reference ${existing.claim_ref}`);
-        setSubmitting(false);
-        return;
-      }
+    // Build file metadata for the server to generate pre-signed upload URLs
+    const fileMetadata: Array<{ name: string; size: number; type: string; note: string }> = [];
+    if (uploadedFiles.booking) fileMetadata.push({ name: uploadedFiles.booking.name, size: uploadedFiles.booking.size, type: uploadedFiles.booking.type, note: 'Booking Confirmation' });
+    if (uploadedFiles.passport) fileMetadata.push({ name: uploadedFiles.passport.name, size: uploadedFiles.passport.size, type: uploadedFiles.passport.type, note: 'Passport / ID' });
+    if (uploadedFiles.boarding) fileMetadata.push({ name: uploadedFiles.boarding.name, size: uploadedFiles.boarding.size, type: uploadedFiles.boarding.type, note: 'Boarding Pass' });
+
+    // Get the current session token (if authenticated)
+    const { data: { session } } = await supabase.auth.getSession();
+    const authToken = session?.access_token
+      ? `Bearer ${session.access_token}`
+      : `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
+
+    // Call the secure server-side create-claim edge function
+    let res: Response;
+    try {
+      res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-claim`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authToken,
+        },
+        body: JSON.stringify({
+          claim: {
+            passenger_first_name: firstName,
+            passenger_last_name: lastName,
+            email,
+            phone,
+            address: '',
+            country: 'United Kingdom',
+            flight_number: sf?.flightNum || '',
+            flight_date: flightDate || null,
+            departure: dep,
+            arrival: arr,
+            airline: sf?.airline || '',
+            issue_type: 'Flight Disruption',
+            airline_reason: airlineReason,
+            agent: agentCode || '—',
+            loa_signed: hasSig && loaChecked,
+            signature_data: sigDataRef.current,
+            prior_comp_type: priorComp === 'Yes' ? priorCompType || null : null,
+            prior_signed: priorComp === 'Yes' ? priorSigned || null : null,
+            review_required: priorReviewFlag,
+          },
+          files: fileMetadata,
+        }),
+      });
+    } catch {
+      alert('Network error — please try again.');
+      setSubmitting(false);
+      return;
     }
 
-    const { error } = await supabase.from('claims').insert({
-      claim_ref: ref,
-      passenger_first_name: firstName,
-      passenger_last_name: lastName,
-      email,
-      phone,
-      address: '',
-      country: 'United Kingdom',
-      flight_number: sf?.flightNum || '',
-      flight_date: flightDate || null,
-      departure: dep,
-      arrival: arr,
-      airline: sf?.airline || '',
-      issue_type: 'Flight Disruption',
-      airline_reason: airlineReason,
-      status: 'Untouched',
-      amount: '€600',
-      agent: agentCode || '—',
-      loa_signed: hasSig && loaChecked,
-      signature_data: sigDataRef.current,
-      prior_comp_type: priorComp === 'Yes' ? priorCompType || null : null,
-      prior_signed: priorComp === 'Yes' ? priorSigned || null : null,
-      review_required: priorReviewFlag,
-    });
+    const data = await res.json();
 
-    if (!error) {
-      // Fetch the claim id so we can attach files
-      const { data: newClaim } = await supabase
-        .from('claims')
-        .select('id')
-        .eq('claim_ref', ref)
-        .maybeSingle();
+    if (!res.ok || !data.success) {
+      if (res.status === 409) {
+        alert(data.error || 'This claim has already been submitted.');
+      } else {
+        alert(data.error || 'Submission failed. Please try again.');
+      }
+      setSubmitting(false);
+      return;
+    }
 
-      // Upload passenger documents to storage + claim_files table
-      if (newClaim?.id) {
-        const filesToUpload: { key: string; file: File; label: string }[] = [];
-        if (uploadedFiles.booking) filesToUpload.push({ key: 'booking', file: uploadedFiles.booking, label: 'Booking Confirmation' });
-        if (uploadedFiles.passport) filesToUpload.push({ key: 'passport', file: uploadedFiles.passport, label: 'Passport / ID' });
-        if (uploadedFiles.boarding) filesToUpload.push({ key: 'boarding', file: uploadedFiles.boarding, label: 'Boarding Pass' });
+    const ref = data.claim_ref as string;
 
-        for (const { file, label } of filesToUpload) {
-          const storagePath = `claim-files/${newClaim.id}/${Date.now()}-${file.name}`;
-          const { error: storageErr } = await supabase.storage
-            .from('claim-files')
-            .upload(storagePath, file, { upsert: false });
+    // Upload files to the pre-signed URLs returned by the server
+    if (data.upload_urls && Array.isArray(data.upload_urls)) {
+      const fileMap: Record<string, File> = {};
+      if (uploadedFiles.booking) fileMap[uploadedFiles.booking.name] = uploadedFiles.booking;
+      if (uploadedFiles.passport) fileMap[uploadedFiles.passport.name] = uploadedFiles.passport;
+      if (uploadedFiles.boarding) fileMap[uploadedFiles.boarding.name] = uploadedFiles.boarding;
 
-          await supabase.from('claim_files').insert({
-            claim_id: newClaim.id,
-            file_name: file.name,
-            file_size: file.size,
-            file_type: file.type,
-            storage_path: storageErr ? '' : storagePath,
-            note: label,
+      for (const { name, url } of data.upload_urls) {
+        const file = fileMap[name];
+        if (!file || !url) continue;
+        try {
+          await fetch(url, {
+            method: 'PUT',
+            body: file,
+            headers: { 'Content-Type': file.type },
           });
+        } catch {
+          // Non-blocking — file upload failure shouldn't block claim submission
         }
       }
-
-      // Redirect to /claim-success with ref and email as query params
-      const successUrl = `/claim-success?ref=${encodeURIComponent(ref)}${email ? `&email=${encodeURIComponent(email)}` : ''}`;
-      window.history.pushState({}, '', successUrl);
-      onNav('claim-success');
-      // Run the Rules Engine on the new claim
-      if (newClaim?.id) evaluateClaim(newClaim.id);
-      insertNotification({
-        type: 'new_claim',
-        claim_ref: ref,
-        message: `New claim from ${fullName.trim()} — ${sf?.airline || 'Unknown airline'} ${dep && arr ? `${dep} → ${arr}` : ''}`.trim(),
-      });
-      if (email) {
-        sendClaimEmail({
-          type: 'claim_submitted',
-          to: email,
-          passengerName: fullName.trim(),
-          claimRef: ref,
-          airline: sf?.airline || '',
-          route: dep && arr ? `${dep} → ${arr}` : undefined,
-          amount: '€600',
-        });
-      }
-    } else {
-      alert('Submission failed. Please try again.');
     }
+
+    // Redirect to /claim-success with ref and email as query params
+    const successUrl = `/claim-success?ref=${encodeURIComponent(ref)}${email ? `&email=${encodeURIComponent(email)}` : ''}`;
+    window.history.pushState({}, '', successUrl);
+    onNav('claim-success');
     setSubmitting(false);
   }
 
