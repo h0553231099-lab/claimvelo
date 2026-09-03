@@ -161,7 +161,7 @@ function timeAgo(iso: string) {
 }
 
 function InternalInbox({ currentUser }: { currentUser?: UserProfile }) {
-  const isAdminUser = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
+  const isAdminUser = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
   const [tab, setTab] = useState<'inbox' | 'support' | 'staff'>(isAdminUser ? 'support' : 'inbox');
 
   // @claimvelo.com emails

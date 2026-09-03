@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Plane, Calendar, MapPin, Clock, User, Mail, Phone, ChevronRight, ChevronLeft, CheckCircle } from 'lucide-react';
 import AirportInput from './AirportInput';
-import { supabase, insertNotification } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 interface Props {
   open: boolean;
@@ -71,7 +71,6 @@ export default function ClaimModal({ open, onClose, onSubmitSuccess }: Props) {
     if (!canAdvance()) return;
     setSubmitting(true);
 
-    const ref = `LEAD-${Date.now()}`;
     const nameParts = form.fullName.trim().split(/\s+/);
     const firstName = nameParts[0] ?? '';
     const lastName = nameParts.slice(1).join(' ') || '—';
@@ -83,33 +82,42 @@ export default function ClaimModal({ open, onClose, onSubmitSuccess }: Props) {
       'cancelled': 'Cancellation',
     };
 
-    await supabase.from('claims').insert({
-      claim_ref: ref,
-      passenger_first_name: firstName,
-      passenger_last_name: lastName,
-      email: form.email,
-      phone: form.phone || '',
-      address: '',
-      country: '',
-      flight_number: form.flightNumber,
-      flight_date: form.flightDate || null,
-      departure: form.departure,
-      arrival: form.destination,
-      airline: '',
-      issue_type: 'Enquiry',
-      airline_reason: delayLabel[form.delayDuration] ?? form.delayDuration,
-      status: 'Untouched',
-      amount: '—',
-      agent: '—',
-      loa_signed: false,
-      signature_data: '',
-    });
+    // Get the current session token (if authenticated)
+    const { data: { session } } = await supabase.auth.getSession();
+    const authToken = session?.access_token
+      ? `Bearer ${session.access_token}`
+      : `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
 
-    await insertNotification({
-      type: 'new_lead',
-      claim_ref: ref,
-      message: `New lead from ${form.fullName.trim()} — ${form.flightNumber} ${form.departure} → ${form.destination} (${delayLabel[form.delayDuration] ?? form.delayDuration})`,
-    });
+    try {
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-claim`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authToken,
+        },
+        body: JSON.stringify({
+          claim: {
+            passenger_first_name: firstName,
+            passenger_last_name: lastName,
+            email: form.email,
+            phone: form.phone || '',
+            flight_number: form.flightNumber,
+            flight_date: form.flightDate || null,
+            departure: form.departure,
+            arrival: form.destination,
+            airline: '',
+            issue_type: 'Enquiry',
+            airline_reason: delayLabel[form.delayDuration] ?? form.delayDuration,
+            agent: '—',
+            loa_signed: false,
+            signature_data: '',
+          },
+          files: [],
+        }),
+      });
+    } catch {
+      // Non-blocking — claim creation failure shouldn't crash the modal
+    }
 
     setSubmitting(false);
     setSubmitted(true);

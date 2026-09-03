@@ -27,7 +27,7 @@ export interface Claim {
   updated_at: string;
 }
 
-export type UserRole = 'admin' | 'worker' | 'customer' | 'agent' | 'sales_manager' | 'seo_worker';
+export type UserRole = 'admin' | 'super_admin' | 'worker' | 'customer' | 'agent' | 'sales_manager' | 'seo_worker';
 
 export interface UserProfile {
   id: string;
