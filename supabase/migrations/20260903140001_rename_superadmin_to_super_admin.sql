@@ -124,8 +124,8 @@ CREATE POLICY "Staff can view staff emails"
   ON staff_emails FOR SELECT TO authenticated
   USING (
     to_user_id = auth.uid()
-    OR to_user_id IS NULL
-    AND EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin', 'worker'))
+    OR (to_user_id IS NULL
+        AND EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin', 'worker')))
   );
 
 DROP POLICY IF EXISTS "Staff can insert staff emails" ON staff_emails;
