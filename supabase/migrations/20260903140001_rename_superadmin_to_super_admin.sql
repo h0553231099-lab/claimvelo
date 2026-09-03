@@ -6,22 +6,24 @@
   - super_admin: full system owner (finance, settings, everything)
 
   ## Changes
-  1. Update the profiles role CHECK constraint to include 'super_admin'.
+  1. Drop the existing CHECK constraint (so the UPDATE below doesn't fail).
   2. Migrate any existing 'superadmin' rows to 'super_admin'.
-  3. Drop and recreate every RLS policy that references 'superadmin'
+  3. Add the FINAL CHECK constraint with super_admin (not superadmin) + lawyer.
+  4. Drop and recreate every RLS policy that referenced 'superadmin'
      to use 'super_admin' instead.
 */
 
--- Step 1: Update the CHECK constraint
+-- Step 1: Drop the existing constraint so the data migration can proceed
 ALTER TABLE public.profiles
   DROP CONSTRAINT IF EXISTS profiles_role_check;
 
+-- Step 2: Migrate existing data BEFORE installing the final constraint
+UPDATE public.profiles SET role = 'super_admin' WHERE role = 'superadmin';
+
+-- Step 3: Add the FINAL CHECK constraint (super_admin, NOT superadmin, includes lawyer)
 ALTER TABLE public.profiles
   ADD CONSTRAINT profiles_role_check
-  CHECK (role IN ('admin', 'super_admin', 'worker', 'customer', 'sales_manager', 'agent', 'seo_worker'));
-
--- Step 2: Migrate existing data
-UPDATE public.profiles SET role = 'super_admin' WHERE role = 'superadmin';
+  CHECK (role IN ('admin', 'super_admin', 'worker', 'customer', 'sales_manager', 'agent', 'seo_worker', 'lawyer'));
 
 -- Step 3: Recreate RLS policies that referenced 'superadmin'
 
