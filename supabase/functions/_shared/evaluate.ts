@@ -202,15 +202,18 @@ const BRAZIL_CARRIERS = new Set(["JJ","LA","G3","AD","RJ","2Z","O6","W3"]);
 // ── Compensation constants ───────────────────────────────────────────────────
 
 // 50% reduction thresholds (minutes) per distance category — Article 7(2)
+// These apply to the COMPENSATION AMOUNT, not to eligibility.
 const REDUCTION_THRESHOLDS = {
-  short: 120,   // ≤1500km: 2-hour threshold
+  short: 120,   // ≤1500km: 2-hour threshold (cancellation re-routing only)
   medium: 180,  // 1500-3500km: 3-hour threshold
   long: 240,    // >3500km: 4-hour threshold
 };
 
-// Eligibility thresholds (minutes)
-const MIN_DELAY_SHORT_HAUL_EU = 120;  // ≤1500km: 2h (eligible with 50% reduction)
-const MIN_DELAY_OTHER_EU = 180;       // >1500km: 3h
+// Delay compensation ELIGIBILITY threshold (minutes) — Sturgeon ruling
+// 3 hours (180 min) at final destination for ALL distance bands under EU261/UK261.
+// The distance-band thresholds above only affect the AMOUNT (50% reduction),
+// not whether the passenger qualifies for compensation at all.
+const MIN_DELAY_COMPENSATION_EU_UK = 180;
 const MIN_DELAY_IL = 480;             // Israel: 8h
 
 const KM_SHORT = 1500;
@@ -419,14 +422,21 @@ function calcDelayCompensation(
   const comp = COMPENSATION[jurKey][cat];
   const currency = jurisdiction === "UK261" ? "GBP" : jurisdiction === "ISRAEL" ? "ILS" : "EUR";
 
-  // 50% reduction per Article 7(2) thresholds
+  // 50% reduction per Article 7(2) thresholds — affects AMOUNT only, not eligibility.
+  // Eligibility is uniformly 180min (Sturgeon); this function is only called for
+  // delays ≥180min, so the short-haul 120min threshold never triggers here.
   let amount: number;
   if (cat === "short") {
-    amount = (delayMinutes >= REDUCTION_THRESHOLDS.short && delayMinutes < MIN_DELAY_OTHER_EU) ? comp.reduced : comp.full;
+    // Short-haul (≤1500km): full compensation for all delays ≥180min.
+    // The 120min Article 7(2) threshold is below the 180min eligibility gate,
+    // so the 50% reduction only applies to cancellation re-routing, not delay.
+    amount = comp.full;
   } else if (cat === "medium") {
+    // Medium (1500-3500km): 50% reduction for 180-239min, full for ≥240min.
     amount = (delayMinutes >= REDUCTION_THRESHOLDS.medium && delayMinutes < REDUCTION_THRESHOLDS.long) ? comp.reduced : comp.full;
   } else {
-    amount = (delayMinutes >= MIN_DELAY_OTHER_EU && delayMinutes < REDUCTION_THRESHOLDS.long) ? comp.reduced : comp.full;
+    // Long (>3500km): 50% reduction for 180-239min, full for ≥240min.
+    amount = (delayMinutes >= MIN_DELAY_COMPENSATION_EU_UK && delayMinutes < REDUCTION_THRESHOLDS.long) ? comp.reduced : comp.full;
   }
 
   // Israel has no 50% reduction
@@ -1070,17 +1080,19 @@ export async function evaluateClaimInternal(
     return pendingCheck(supabase, claimId, claimRef, `Reported reason "${reasonCode.toLowerCase()}" may be extraordinary — requires manual verification.`, "EXTRAORDINARY_CIRCUMSTANCES", { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details });
   }
 
-  // ── Stage 6: Delay threshold (distance-dependent for EU/UK) ──────────────────
+  // ── Stage 6: Delay compensation eligibility — 3-hour threshold (Sturgeon) ───
+  // EU261/UK261: 180 minutes (3 hours) for ALL distance bands.
+  // The 120/180/240 distance-band thresholds are Article 7(2) AMOUNT reductions,
+  // not eligibility gates.  Israel uses a separate 8-hour threshold.
   let threshold: number;
   if (jur.jurisdiction === "ISRAEL") {
     threshold = MIN_DELAY_IL;
   } else {
-    const cat = getDistanceCategory(departure, arrival);
-    threshold = cat === "short" ? MIN_DELAY_SHORT_HAUL_EU : MIN_DELAY_OTHER_EU;
+    threshold = MIN_DELAY_COMPENSATION_EU_UK; // 180 min — uniform for all EU/UK distance bands
   }
 
   if (delayMinutes < threshold) {
-    const detail = `Delay of ${delayMinutes}min is below the ${threshold}min threshold. (source: ${primarySource})`;
+    const detail = `Delay of ${delayMinutes}min is below the 3-hour (${threshold}min) delay compensation threshold. (source: ${primarySource})`;
     await applyDecision(supabase, claimId, claimRef, "Not Eligible", detail);
     await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details, decision: "Not Eligible", decisionReason: detail });
     return { claimId, claimRef, decision: "Not Eligible", delayMinutes, reasonCode, source: primarySource, detail };
