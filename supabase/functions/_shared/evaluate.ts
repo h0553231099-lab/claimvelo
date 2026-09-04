@@ -255,6 +255,7 @@ const AIRPORT_COORDS: Record<string, [number, number]> = {
   OTP:[44.572,26.102], SOF:[42.696,23.411], ZAG:[45.743,16.069],
   RIX:[56.924,23.971], TLL:[59.413,24.832], VNO:[54.634,25.285],
   JFK:[40.640,-73.779], LAX:[33.943,-118.408], ORD:[41.978,-87.905], ATL:[33.640,-84.427],
+  DXB:[25.253,55.363],
   GRU:[-23.432,-46.469], GIG:[-22.808,-43.244], BSB:[-15.869,-47.920], CNF:[-19.633,-43.968],
 };
 
@@ -591,12 +592,19 @@ function crossCheck(
   }
 
   const allFlights = providers.flatMap((p) => p.flights);
-  const matched = allFlights.find((f) =>
+  // Find ALL matches across providers (same flight number, date, origin, destination)
+  const allMatches = allFlights.filter((f) =>
     normalizeFlightNumber(f.flightNumber) === cFn &&
     normalizeDate(f.flightDate) === cDate &&
     normalizeIata(f.origin) === cOrigin &&
     normalizeIata(f.destination) === cDest,
   );
+  // Prefer cancelled status (for cancellation detection), then actual arrival data,
+  // then first match. This handles providers disagreeing on flight status.
+  const isCancelledStatus = (s: string) => s && ["cancelled", "canceled"].includes(s.toLowerCase());
+  const matched = allMatches.find((f) => isCancelledStatus(f.status))
+    || allMatches.find((f) => f.actualArrival)
+    || allMatches[0] || null;
 
   if (!matched) {
     const ref = allFlights[0];
