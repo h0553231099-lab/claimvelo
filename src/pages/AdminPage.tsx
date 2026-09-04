@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
-import { Claim, ClaimStatus, OperationalStatus, EligibilityStatus, Priority, ClaimStatusHistory, FlightEvidenceSummary, FlightSegmentSummary, AdminView, UserProfile } from '../types';
+import { Claim, ClaimStatus, OperationalStatus, EligibilityStatus, Priority, ClaimStatusHistory, FlightEvidenceSummary, FlightSegmentSummary, AdminView, UserProfile, InfoRequest } from '../types';
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
 import { recalculateAgentPayout, logAgentPayout } from '../lib/financialService';
 import { Page } from '../types';
-import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2, Key, Eye, EyeOff, CheckCircle, Flag, UserCheck, History } from 'lucide-react';
+import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2, Key, Eye, EyeOff, CheckCircle, Flag, UserCheck, History, HelpCircle } from 'lucide-react';
 import BulkImport from '../components/BulkImport';
 import ReviewQueue from '../components/ReviewQueue';
 import OverridePanel from '../components/OverridePanel';
 import ClaimTimeline from '../components/ClaimTimeline';
+import InfoRequestPanel from '../components/InfoRequestPanel';
 
 interface FinanceTransaction {
   id: string;
@@ -49,6 +50,7 @@ interface ClaimFile {
   file_type: string;
   storage_path: string;
   note: string;
+  info_request_id: string | null;
   created_at: string;
 }
 
@@ -855,7 +857,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [bulkStatus, setBulkStatus] = useState<OperationalStatus | ''>('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [panel, setPanel] = useState<Claim | null>(null);
-  const [panelTab, setPanelTab] = useState<'details' | 'timeline' | 'loa' | 'files'>('details');
+  const [panelTab, setPanelTab] = useState<'details' | 'timeline' | 'loa' | 'files' | 'requests'>('details');
   const [statusHistory, setStatusHistory] = useState<ClaimStatusHistory[]>([]);
   const [flightEvidence, setFlightEvidence] = useState<FlightEvidenceSummary | null>(null);
   const [flightSegments, setFlightSegments] = useState<FlightSegmentSummary[]>([]);
@@ -893,6 +895,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [fileNote, setFileNote] = useState('');
   const [fileUploading, setFileUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Info requests state
+  const [infoRequests, setInfoRequests] = useState<InfoRequest[]>([]);
+  const [infoRequestsLoading, setInfoRequestsLoading] = useState(false);
 
   // Agent commission editing state
   const [editingCommission, setEditingCommission] = useState<string | null>(null);
@@ -1159,14 +1165,27 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   }, [panel?.id]);
 
   useEffect(() => {
-    if (!panel) { setClaimFiles([]); return; }
+    if (!panel) { setClaimFiles([]); setInfoRequests([]); return; }
     setFilesLoading(true);
     supabase.from('claim_files').select('*').eq('claim_id', panel.id).order('created_at', { ascending: false })
       .then(({ data }) => {
         if (data) setClaimFiles(data as ClaimFile[]);
         setFilesLoading(false);
       });
+    setInfoRequestsLoading(true);
+    supabase.from('claim_info_requests').select('*').eq('claim_id', panel.id).order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) setInfoRequests(data as InfoRequest[]);
+        setInfoRequestsLoading(false);
+      });
   }, [panel]);
+
+  async function refreshInfoRequests() {
+    if (!panel) return;
+    const { data } = await supabase.from('claim_info_requests').select('*').eq('claim_id', panel.id).order('created_at', { ascending: false });
+    if (data) setInfoRequests(data as InfoRequest[]);
+    loadStatusHistory(panel.id);
+  }
 
   async function sendClaimantEmail() {
     if (!panel || !emailSubject.trim() || !emailBody.trim()) return;
@@ -3230,7 +3249,8 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 { id: 'timeline', label: 'Timeline', icon: <History className="w-3.5 h-3.5" />, badge: statusHistory.length > 0 ? String(statusHistory.length) : null },
                 { id: 'loa', label: 'LOA Document', icon: <FileText className="w-3.5 h-3.5" />, badge: panel.loa_signed ? 'Signed' : null },
                 { id: 'files', label: 'Files', icon: <Paperclip className="w-3.5 h-3.5" />, badge: claimFiles.length > 0 ? String(claimFiles.length) : null },
-              ] as { id: 'details' | 'timeline' | 'loa' | 'files'; label: string; icon?: React.ReactNode; badge?: string | null }[]).map(t => (
+                { id: 'requests', label: 'Requests', icon: <HelpCircle className="w-3.5 h-3.5" />, badge: infoRequests.filter(r => r.status === 'requested').length > 0 ? String(infoRequests.filter(r => r.status === 'requested').length) : null },
+              ] as { id: 'details' | 'timeline' | 'loa' | 'files' | 'requests'; label: string; icon?: React.ReactNode; badge?: string | null }[]).map(t => (
                 <button
                   key={t.id}
                   onClick={() => setPanelTab(t.id)}
@@ -3515,6 +3535,19 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
 
               {panelTab === 'timeline' && (
                 <ClaimTimeline events={statusHistory} isAdmin={!isWorker} />
+              )}
+
+              {panelTab === 'requests' && (
+                <InfoRequestPanel
+                  claimId={panel.id}
+                  claimRef={panel.claim_ref}
+                  claimEmail={panel.email}
+                  passengerName={`${panel.passenger_first_name} ${panel.passenger_last_name}`.trim()}
+                  user={user}
+                  requests={infoRequests}
+                  loading={infoRequestsLoading}
+                  onRefresh={refreshInfoRequests}
+                />
               )}
 
               {panelTab === 'loa' && (

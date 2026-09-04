@@ -77,7 +77,7 @@ export interface Claim {
 export interface ClaimStatusHistory {
   id: string;
   claim_id: string;
-  field_name: 'status' | 'eligibility_status' | 'priority' | 'assigned_to' | 'document_upload' | 'override' | 'review_decision';
+  field_name: 'status' | 'eligibility_status' | 'priority' | 'assigned_to' | 'document_upload' | 'override' | 'review_decision' | 'info_request';
   from_status: string | null;
   to_status: string;
   changed_by: string | null;
@@ -100,6 +100,23 @@ export interface FlightEvidenceSummary {
   actual_departure: string | null;
   actual_arrival: string | null;
   confidence_score: number | null;
+}
+
+export interface InfoRequest {
+  id: string;
+  claim_id: string;
+  request_type: 'document' | 'information';
+  title: string;
+  description: string;
+  status: 'requested' | 'received' | 'overdue' | 'cancelled';
+  requested_by: string | null;
+  requested_at: string;
+  due_at: string | null;
+  fulfilled_at: string | null;
+  fulfilled_by_file_id: string | null;
+  reminder_sent_at: string | null;
+  created_at: string;
+  requester_name?: string | null;
 }
 
 export interface ReviewNote {

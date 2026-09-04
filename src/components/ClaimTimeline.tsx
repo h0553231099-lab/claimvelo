@@ -1,7 +1,7 @@
 import { ClaimStatusHistory } from '../types';
 import {
   PlusCircle, ArrowRightLeft, CheckCircle, Flag, UserCheck,
-  Paperclip, Gavel,
+  Paperclip, Gavel, HelpCircle,
 } from 'lucide-react';
 
 interface Props {
@@ -17,6 +17,7 @@ const EVENT_META: Record<string, { icon: typeof PlusCircle; bg: string; ring: st
   assigned_to:      { icon: UserCheck,       bg: 'bg-[#7c3aed]', ring: 'border-[#7c3aed]',  label: 'Assignment' },
   document_upload:  { icon: Paperclip,       bg: 'bg-[#0891b2]', ring: 'border-[#0891b2]',  label: 'Document' },
   override:         { icon: Gavel,           bg: 'bg-[#92400e]', ring: 'border-[#92400e]',  label: 'Override' },
+  info_request:     { icon: HelpCircle,      bg: 'bg-[#6366f1]', ring: 'border-[#6366f1]',  label: 'Info Request' },
 };
 
 function formatTimestamp(iso: string): string {
@@ -64,7 +65,11 @@ export default function ClaimTimeline({ events, isAdmin }: Props) {
           // Human-readable description of what changed.
           let description: string;
           if (h.field_name === 'document_upload') {
-            description = `Uploaded: ${h.to_status}`;
+            description = h.reason
+              ? `${h.to_status} — ${h.reason}`
+              : `Uploaded: ${h.to_status}`;
+          } else if (h.field_name === 'info_request') {
+            description = h.reason || `Requested: ${h.to_status}`;
           } else if (h.field_name === 'assigned_to') {
             description = h.from_status
               ? `${h.from_status} → ${h.to_status}`
