@@ -422,18 +422,16 @@ function calcDelayCompensation(
   const comp = COMPENSATION[jurKey][cat];
   const currency = jurisdiction === "UK261" ? "GBP" : jurisdiction === "ISRAEL" ? "ILS" : "EUR";
 
-  // 50% reduction per Article 7(2) thresholds — affects AMOUNT only, not eligibility.
-  // Eligibility is uniformly 180min (Sturgeon); this function is only called for
-  // delays ≥180min, so the short-haul 120min threshold never triggers here.
+  // Ordinary DELAY compensation — no Article 7(2) reduction for short/medium.
+  // Only long-haul (>3500km) gets 50% reduction for 180-239min delays
+  // (Germanwings v Henning, C-529/14). Short and medium-haul always get full.
   let amount: number;
   if (cat === "short") {
     // Short-haul (≤1500km): full compensation for all delays ≥180min.
-    // The 120min Article 7(2) threshold is below the 180min eligibility gate,
-    // so the 50% reduction only applies to cancellation re-routing, not delay.
     amount = comp.full;
   } else if (cat === "medium") {
-    // Medium (1500-3500km): 50% reduction for 180-239min, full for ≥240min.
-    amount = (delayMinutes >= REDUCTION_THRESHOLDS.medium && delayMinutes < REDUCTION_THRESHOLDS.long) ? comp.reduced : comp.full;
+    // Medium (1500-3500km): full compensation for all delays ≥180min.
+    amount = comp.full;
   } else {
     // Long (>3500km): 50% reduction for 180-239min, full for ≥240min.
     amount = (delayMinutes >= MIN_DELAY_COMPENSATION_EU_UK && delayMinutes < REDUCTION_THRESHOLDS.long) ? comp.reduced : comp.full;
