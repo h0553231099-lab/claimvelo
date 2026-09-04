@@ -79,9 +79,10 @@ Deno.serve(async (req: Request) => {
       return jsonError(409, "Claim already overridden — override fields are immutable. Create a new claim if a further change is needed.");
     }
 
-    // Apply override
+    // Apply override — eligibility goes to eligibility_status, NOT operational status.
+    // Terminal decisions also close the operational lifecycle (status = 'Resolved').
     const update: Record<string, unknown> = {
-      status: decision,
+      eligibility_status: decision,
       override_decision: decision,
       override_reason: reason.trim(),
       overridden_by: user.id,
@@ -93,6 +94,7 @@ Deno.serve(async (req: Request) => {
     } else if (decision === "Not Eligible" || decision === "Force Majeure") {
       update.compensation_amount = 0;
       update.amount = decision === "Force Majeure" ? "Force Majeure" : "€0";
+      update.status = "Resolved";
     } else if (decision === "Pending Check") {
       update.compensation_amount = null;
       update.amount = "Pending";

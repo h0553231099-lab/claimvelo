@@ -189,6 +189,13 @@ export default function DashboardPage({ onNav, user }: Props) {
                   <span className={`inline-flex px-2.5 py-1 rounded-[10px] text-[11px] font-semibold ${STATUS_STYLE[selected.status]}`}>
                     {selected.status}
                   </span>
+                  {selected.eligibility_status && (
+                    <div className="mt-1.5">
+                      <span className={`inline-flex px-2 py-0.5 rounded-[8px] text-[10px] font-semibold ${STATUS_STYLE[selected.eligibility_status as ClaimStatus] || 'bg-[#f8fafc] text-[#64748b]'}`}>
+                        {selected.eligibility_status}
+                      </span>
+                    </div>
+                  )}
                   <div className="text-[11px] font-bold text-[#16a34a] mt-1.5">{selected.amount}</div>
                 </div>
               </div>

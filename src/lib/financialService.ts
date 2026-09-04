@@ -259,7 +259,7 @@ export async function recalculateAgentPayout(
     .from('claims')
     .select('id, claim_ref, compensation_amount, departure, arrival')
     .eq('agent', agent.agent_code)
-    .eq('status', 'Eligible')
+    .eq('eligibility_status', 'Eligible')
     .not('compensation_amount', 'is', null);
 
   if (!claims || claims.length === 0) {
