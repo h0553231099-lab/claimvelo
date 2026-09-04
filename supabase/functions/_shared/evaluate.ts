@@ -1,23 +1,24 @@
 /**
  * Shared claim evaluation logic — the canonical, server-side Rules Engine.
  *
- * Used by the create-claim and evaluate-claim Edge Functions (service-role
- * client, bypasses RLS). The B2B API also delegates here so there is exactly
- * ONE decision path.
+ * Used by create-claim, evaluate-claim, and b2b-api Edge Functions (service-role
+ * client, bypasses RLS). Exactly ONE decision path.
  *
- * Phase B.1 safety & data-integrity guarantees:
- *  - No mock / fabricated flight data. `generateMockFlightData()` is GONE.
- *  - Every automatic decision is backed by real provider flight data that
- *    has been cross-checked against the claim (flight number, flight date,
- *    origin, destination). A mismatch is never silently accepted.
- *  - Extraordinary circumstances (WEATHER / ATC / SECURITY / STRIKE) can NEVER
- *    be auto-marked Eligible from the reported reason — they go to Pending Check.
- *  - When evidence is missing, incomplete, conflicting, the flight cannot be
- *    confidently matched, or airport coordinates are unavailable, the engine
- *    returns Pending Check. It never guesses or uses arbitrary defaults
- *    (the old 2000 km fallback is removed).
- *  - Raw provider responses are persisted to the `flight_evidence` table
- *    (RLS-locked, server-side only) and never returned to the frontend.
+ * Phase A/B.1/B.2A/B.2 guarantees:
+ *  - No mock / fabricated flight data.
+ *  - Every automatic decision backed by real provider data, cross-checked.
+ *  - Extraordinary circumstances NEVER auto-Eligible.
+ *  - Missing/incomplete/conflicting evidence → Pending Check with structured
+ *    reason code.
+ *  - Raw provider JSON stored server-side only (flight_evidence / segments),
+ *    never returned to the frontend.
+ *  - Operating carrier derived from verified provider data, never from
+ *    customer-entered airline. Provider disagreement → Pending Check.
+ *  - Separate EU261 / UK261 jurisdiction with distinct compensation amounts.
+ *  - Brazil routes → always Pending Check (no automatic BRL compensation).
+ *  - Customer-entered replacement times never create automatic eligibility
+ *    when provider verification is available.
+ *  - Admin override requires mandatory reason; actor + timestamp immutable.
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -27,7 +28,26 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 type DelayReasonCode = "CARRIER" | "CREW" | "TECHNICAL" | "WEATHER" | "ATC" | "SECURITY" | "STRIKE";
 type EngineDecision = "Not Eligible - Expired" | "Not Eligible" | "Eligible" | "Pending Check";
 type DataSource = "aerodatabox" | "aviationstack" | "none";
-type CrossCheckStatus = "matched" | "mismatch" | "incomplete" | "conflict" | "no_data" | "cancelled";
+type CrossCheckStatus = "matched" | "mismatch" | "incomplete" | "conflict" | "no_data" | "cancelled" | "carrier_conflict";
+
+type Jurisdiction = "EU261" | "UK261" | "ISRAEL" | "BRAZIL_REVIEW" | "NONE";
+
+type ReviewReasonCode =
+  | "NO_PROVIDER_DATA"
+  | "FLIGHT_MISMATCH"
+  | "PROVIDER_CONFLICT"
+  | "PROVIDER_CARRIER_CONFLICT"
+  | "CANCELLED_MISSING_NOTICE"
+  | "CANCELLED_REPLACEMENT_UNVERIFIED"
+  | "CANCELLED_PASSENGER_DECLINED"
+  | "DENIED_BOARDING_INCOMPLETE"
+  | "DENIED_BOARDING_REQUIRES_EVIDENCE"
+  | "JURISDICTION_UNKNOWN_CARRIER"
+  | "EXTRAORDINARY_CIRCUMSTANCES"
+  | "INCOMPLETE_EVIDENCE"
+  | "COORDS_UNAVAILABLE"
+  | "CONNECTING_MISSING_SEGMENT_DATA"
+  | "BRAZIL_MANUAL_REVIEW";
 
 export interface EngineResult {
   claimId: string;
@@ -40,48 +60,48 @@ export interface EngineResult {
 }
 
 interface ProviderFlight {
-  flightNumber: string;     // normalized
-  flightDate: string;       // YYYY-MM-DD
-  origin: string;           // IATA
-  destination: string;      // IATA
-  scheduledDeparture: string | null; // ISO 8601
+  flightNumber: string;
+  flightDate: string;
+  origin: string;
+  destination: string;
+  scheduledDeparture: string | null;
   scheduledArrival: string | null;
   actualDeparture: string | null;
   actualArrival: string | null;
   delayMinutes: number | null;
   status: string;
+  operatingCarrier: string | null;   // IATA code from provider
+  operatingCarrierName: string | null;
+  marketingCarrier: string | null;    // IATA code (codeshare only)
+  codeshareStatus: string | null;
 }
 
 interface ProviderResult {
   source: "aerodatabox" | "aviationstack";
   flights: ProviderFlight[];
-  raw: unknown;             // raw provider JSON — stored server-side only
+  raw: unknown;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MIN_ELIGIBLE_DELAY_MINUTES_EU = 180; // 3h
-const MIN_ELIGIBLE_DELAY_MINUTES_IL = 480; // 8h
 const PROVIDER_DELAY_CONFLICT_TOLERANCE_MIN = 10;
 
-/** Reasons that may constitute extraordinary circumstances — never auto-Eligible. */
 const EXTRAORDINARY_REASONS = new Set<DelayReasonCode>(["WEATHER", "ATC", "SECURITY", "STRIKE"]);
 
 const REASON_MAP: Record<string, DelayReasonCode> = {
-  carrier: "CARRIER",
-  technical: "TECHNICAL",
-  crew: "CREW",
-  weather: "WEATHER",
-  atc: "ATC",
-  "air traffic control": "ATC",
-  security: "SECURITY",
-  strike: "STRIKE",
+  carrier: "CARRIER", technical: "TECHNICAL", crew: "CREW",
+  weather: "WEATHER", atc: "ATC", "air traffic control": "ATC",
+  security: "SECURITY", strike: "STRIKE",
 };
 
-const ISRAELI_AIRPORT_CODES = new Set(["TLV", "BGW", "ETM", "HFA", "SDV", "VDA", "KCN"]);
+// ── Airport code sets (separate UK from EU/EEA) ──────────────────────────────
 
-const EU_AIRPORT_CODES = new Set([
-  "LHR","LGW","STN","LTN","MAN","BHX","GLA","EDI","BRS","NCL","ABZ","LCY","SEN","LPL","EMA","LBA","CWL","BFS","SOU",
+const UK_AIRPORT_CODES = new Set([
+  "LHR","LGW","STN","LTN","LCY","SEN","MAN","EDI","BHX","GLA","BRS","NCL","ABZ",
+  "LPL","EMA","LBA","CWL","BFS","SOU","EXT","NWI","INV","JER","GCI","IOM",
+]);
+
+const EU_EEA_AIRPORT_CODES = new Set([
   "CDG","ORY","NCE","LYS","MRS","TLS","BOD","BIA","NTE","MPL",
   "FRA","MUC","DUS","HAM","BER","CGN","STR","HAJ","LEJ","DRS","NUE",
   "AMS","RTM","EIN","BRU","CRL","LUX",
@@ -112,8 +132,111 @@ const EU_AIRPORT_CODES = new Set([
   "IST","SAW","AYT","ADB","ESB",
 ]);
 
-// Airport coordinates for compensation distance (no arbitrary default —
-// missing coordinates force Pending Check instead of a guessed distance).
+const ISRAELI_AIRPORT_CODES = new Set(["TLV", "BGW", "ETM", "HFA", "SDV", "VDA", "KCN"]);
+
+const BRAZIL_AIRPORT_CODES = new Set([
+  "GRU","GIG","BSB","CGH","SDU","CNF","POA","REC","SSA","FOR","CWB","MAO","BEL",
+  "GYN","VCP","FLN","NAT","MCZ","VIX","CGB","SLZ","UDI","RAO","ATM","JPA","MCP",
+  "PVH","STM","BPS","MGB","THE","MCZ",
+]);
+
+// ── Carrier country mappings (IATA code → jurisdiction relevance) ───────────
+
+const UK_CARRIERS = new Set([
+  "BA","VS","U2","LS","BE","GR","WQ","T3","JD","EX","MM",
+]);
+
+const EU_CARRIERS = new Set([
+  // Germany
+  "LH","LX","OS","SN","EN","DE","EW","4U","AB",
+  // France
+  "AF","U2","A5","TO","SS","XL","BJ",
+  // Netherlands
+  "KL","HV","WA",
+  // Spain
+  "IB","UX","FR","VY","QS",
+  // Ireland
+  "EI","WI","FR",
+  // Italy
+  "AZ","NO","IG","EI","VE","XR","W6",
+  // Scandinavia
+  "SK","DY","W6","FI","RC","EF",
+  // Portugal
+  "TP","S4",
+  // Greece
+  "A3","OA","EG","W6",
+  // Poland
+  "LO","W6","BT","RJ",
+  // Baltics
+  "BT","LO","RJ","PS",
+  // Czech
+  "OK","QS",
+  // Hungary
+  "MA","W6",
+  // Romania
+  "RO","W6","0B",
+  // Bulgaria
+  "FB","W6",
+  // Croatia
+  "OU",
+  // Slovenia
+  "JP",
+  // Slovakia
+  "W6","OK",
+  // Malta
+  "KM",
+  // Cyprus
+  "CY","W6",
+  // Turkey
+  "TK","PC",
+  // Iceland
+  "FI",
+  // Finland
+  "AY","W6",
+  // Austria
+  "OS","W6",
+]);
+
+const BRAZIL_CARRIERS = new Set(["JJ","LA","G3","AD","RJ","2Z","O6","W3"]);
+
+// ── Compensation constants ───────────────────────────────────────────────────
+
+// 50% reduction thresholds (minutes) per distance category — Article 7(2)
+const REDUCTION_THRESHOLDS = {
+  short: 120,   // ≤1500km: 2-hour threshold
+  medium: 180,  // 1500-3500km: 3-hour threshold
+  long: 240,    // >3500km: 4-hour threshold
+};
+
+// Eligibility thresholds (minutes)
+const MIN_DELAY_SHORT_HAUL_EU = 120;  // ≤1500km: 2h (eligible with 50% reduction)
+const MIN_DELAY_OTHER_EU = 180;       // >1500km: 3h
+const MIN_DELAY_IL = 480;             // Israel: 8h
+
+const KM_SHORT = 1500;
+const KM_MEDIUM = 3500;
+
+// Compensation amounts per jurisdiction
+const COMPENSATION = {
+  EU261: {
+    short: { full: 250, reduced: 125 },
+    medium: { full: 400, reduced: 200 },
+    long: { full: 600, reduced: 300 },
+  },
+  UK261: {
+    short: { full: 220, reduced: 110 },
+    medium: { full: 350, reduced: 175 },
+    long: { full: 520, reduced: 260 },
+  },
+  ISRAEL: {
+    short: { full: 1470, reduced: 1470 },  // no 50% reduction
+    medium: { full: 2390, reduced: 2390 },
+    long: { full: 3530, reduced: 3530 },
+  },
+} as const;
+
+// ── Airport coordinates ─────────────────────────────────────────────────────
+
 const AIRPORT_COORDS: Record<string, [number, number]> = {
   TLV:[32.011,34.887], SDV:[32.419,34.880], ETM:[29.698,35.013], VDA:[29.569,35.009], KCN:[29.632,35.014],
   LHR:[51.477,-0.461], LGW:[51.148,-0.190], STN:[51.885,0.235], LTN:[51.874,-0.368], LCY:[51.505,0.055],
@@ -132,7 +255,7 @@ const AIRPORT_COORDS: Record<string, [number, number]> = {
   OTP:[44.572,26.102], SOF:[42.696,23.411], ZAG:[45.743,16.069],
   RIX:[56.924,23.971], TLL:[59.413,24.832], VNO:[54.634,25.285],
   JFK:[40.640,-73.779], LAX:[33.943,-118.408], ORD:[41.978,-87.905], ATL:[33.640,-84.427],
-  GRU:[-23.432,-46.469], GIG:[-22.808,-43.244],
+  GRU:[-23.432,-46.469], GIG:[-22.808,-43.244], BSB:[-15.869,-47.920], CNF:[-19.633,-43.968],
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -142,19 +265,103 @@ function classifyReason(raw: string): DelayReasonCode {
   for (const [key, code] of Object.entries(REASON_MAP)) {
     if (lower.includes(key)) return code;
   }
-  // No reason given — the legal default is carrier responsibility (the airline
-  // bears the burden of proving extraordinary circumstances). This is NOT a
-  // guess about extraordinary circumstances; an empty reason is simply not an
-  // extraordinary-circumstance claim.
   return "CARRIER";
 }
 
 function isIsraeliRoute(dep: string, arr: string): boolean {
   return ISRAELI_AIRPORT_CODES.has(dep.toUpperCase()) || ISRAELI_AIRPORT_CODES.has(arr.toUpperCase());
 }
-function isEuRoute(dep: string, arr: string): boolean {
-  return EU_AIRPORT_CODES.has(dep.toUpperCase()) || EU_AIRPORT_CODES.has(arr.toUpperCase());
+
+function isUkAirport(code: string): boolean {
+  return UK_AIRPORT_CODES.has(code.toUpperCase());
 }
+
+function isEuEeaAirport(code: string): boolean {
+  return EU_EEA_AIRPORT_CODES.has(code.toUpperCase());
+}
+
+function isBrazilianRoute(dep: string, arr: string): boolean {
+  return BRAZIL_AIRPORT_CODES.has(dep.toUpperCase()) || BRAZIL_AIRPORT_CODES.has(arr.toUpperCase());
+}
+
+function isUkCarrier(iata: string | null): boolean {
+  return iata !== null && UK_CARRIERS.has(iata.toUpperCase());
+}
+
+function isEuCarrier(iata: string | null): boolean {
+  return iata !== null && EU_CARRIERS.has(iata.toUpperCase());
+}
+
+function isBrazilianCarrier(iata: string | null): boolean {
+  return iata !== null && BRAZIL_CARRIERS.has(iata.toUpperCase());
+}
+
+function carrierCountry(iata: string | null): "UK" | "EU" | "BR" | "non_eu" | "unknown" {
+  if (!iata) return "unknown";
+  const u = iata.toUpperCase();
+  if (UK_CARRIERS.has(u)) return "UK";
+  if (EU_CARRIERS.has(u)) return "EU";
+  if (BRAZIL_CARRIERS.has(u)) return "BR";
+  return "non_eu";
+}
+
+/**
+ * Determine jurisdiction based on departure, arrival, and VERIFIED operating
+ * carrier from provider data.  Customer-entered airline is never used here.
+ */
+function determineJurisdiction(
+  dep: string,
+  arr: string,
+  operatingCarrierIata: string | null,
+): { jurisdiction: Jurisdiction; detail: string } {
+  const d = dep.toUpperCase();
+  const a = arr.toUpperCase();
+
+  // Brazil — always Pending Check, no automatic compensation
+  if (isBrazilianRoute(d, a)) {
+    return { jurisdiction: "BRAZIL_REVIEW", detail: "Brazilian route — manual review required (ANAC rules not yet automated)." };
+  }
+
+  // Israel
+  if (isIsraeliRoute(d, a)) {
+    return { jurisdiction: "ISRAEL", detail: "Israeli Aviation Services Law applies." };
+  }
+
+  // UK261: departing from UK → applies regardless of carrier
+  if (isUkAirport(d)) {
+    return { jurisdiction: "UK261", detail: "UK261 applies (departure from UK airport)." };
+  }
+
+  // EU261: departing from EU/EEA → applies regardless of carrier
+  if (isEuEeaAirport(d)) {
+    return { jurisdiction: "EU261", detail: "EU261 applies (departure from EU/EEA airport)." };
+  }
+
+  // Non-EU/UK departure → arriving at UK → UK261 only if UK-licensed carrier
+  if (isUkAirport(a)) {
+    if (isUkCarrier(operatingCarrierIata)) {
+      return { jurisdiction: "UK261", detail: "UK261 applies (non-UK departure, UK-licensed operating carrier arriving at UK)." };
+    }
+    if (carrierCountry(operatingCarrierIata) === "unknown") {
+      return { jurisdiction: "NONE", detail: "Cannot determine operating carrier country for UK arrival route." };
+    }
+    return { jurisdiction: "NONE", detail: "UK261 does not apply (non-UK carrier on non-UK→UK route)." };
+  }
+
+  // Non-EU/UK departure → arriving at EU/EEA → EU261 only if EU-licensed carrier
+  if (isEuEeaAirport(a)) {
+    if (isEuCarrier(operatingCarrierIata)) {
+      return { jurisdiction: "EU261", detail: "EU261 applies (non-EU departure, EU-licensed operating carrier arriving at EU)." };
+    }
+    if (carrierCountry(operatingCarrierIata) === "unknown") {
+      return { jurisdiction: "NONE", detail: "Cannot determine operating carrier country for EU arrival route." };
+    }
+    return { jurisdiction: "NONE", detail: "EU261 does not apply (non-EU carrier on non-EU→EU route)." };
+  }
+
+  return { jurisdiction: "NONE", detail: "Route not covered by EU261/UK261/Israeli/Brazilian regulations." };
+}
+
 function yearsBetween(from: Date, to: Date): number {
   let y = to.getFullYear() - from.getFullYear();
   const m = to.getMonth() - from.getMonth();
@@ -162,17 +369,9 @@ function yearsBetween(from: Date, to: Date): number {
   return y;
 }
 
-function normalizeFlightNumber(s: string): string {
-  return s.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-}
-function normalizeDate(s: string): string {
-  // Accept ISO or YYYY-MM-DD; return YYYY-MM-DD
-  if (!s) return "";
-  return s.slice(0, 10);
-}
-function normalizeIata(s: string): string {
-  return s.trim().toUpperCase();
-}
+function normalizeFlightNumber(s: string): string { return s.replace(/[^A-Za-z0-9]/g, "").toUpperCase(); }
+function normalizeDate(s: string): string { return s ? s.slice(0, 10) : ""; }
+function normalizeIata(s: string): string { return s.trim().toUpperCase(); }
 
 function haversineKm(a: [number, number], b: [number, number]): number {
   const R = 6371;
@@ -184,36 +383,100 @@ function haversineKm(a: [number, number], b: [number, number]): number {
   return Math.round(2 * R * Math.asin(Math.sqrt(h)));
 }
 
-function calcCompensation(dep: string, arr: string, delayMinutes?: number): { amount: number; currency: string; distanceKm: number } | null {
-  // Returns null when airport coordinates are unavailable — the caller must
-  // then return Pending Check rather than guessing a distance.
+function getDistanceCategory(dep: string, arr: string): "short" | "medium" | "long" | null {
   const coordA = AIRPORT_COORDS[dep.toUpperCase()];
   const coordB = AIRPORT_COORDS[arr.toUpperCase()];
   if (!coordA || !coordB) return null;
-  const distanceKm = haversineKm(coordA, coordB);
-  const isIL = isIsraeliRoute(dep, arr);
-  const currency = isIL ? "ILS" : "EUR";
-  const KM_SHORT = 1500, KM_MEDIUM = 3500;
-  let amount: number;
-  if (isIL) {
-    amount = distanceKm <= 2200 ? 1470 : distanceKm <= 4600 ? 2390 : 3530;
-  } else {
-    if (distanceKm <= KM_SHORT) amount = 250;
-    else if (distanceKm <= KM_MEDIUM) amount = 400;
-    else {
-      // Long-haul >3500km: 50% reduction for 3–4h delay (EC261 Article 7(2))
-      amount = (delayMinutes !== undefined && delayMinutes >= 180 && delayMinutes <= 240) ? 300 : 600;
-    }
-  }
-  return { amount, currency, distanceKm };
+  const km = haversineKm(coordA, coordB);
+  if (km <= KM_SHORT) return "short";
+  if (km <= KM_MEDIUM) return "medium";
+  return "long";
 }
 
-// ── Provider fetching (server-side; raw evidence stored, never sent to FE) ──
+function getDistanceKm(dep: string, arr: string): number | null {
+  const coordA = AIRPORT_COORDS[dep.toUpperCase()];
+  const coordB = AIRPORT_COORDS[arr.toUpperCase()];
+  if (!coordA || !coordB) return null;
+  return haversineKm(coordA, coordB);
+}
 
-async function fetchAeroDataBox(flightNumber: string, date: string, apiKey: string | undefined): Promise<ProviderResult | null> {
-  if (!apiKey || !flightNumber || !date) return null;
+/**
+ * Calculate compensation for a DELAY.
+ * Applies 50% reduction per distance category and jurisdiction.
+ */
+function calcDelayCompensation(
+  dep: string, arr: string,
+  delayMinutes: number,
+  jurisdiction: Jurisdiction,
+): { amount: number; currency: string; distanceKm: number } | null {
+  const cat = getDistanceCategory(dep, arr);
+  if (!cat) return null;
+  const distKm = getDistanceKm(dep, arr);
+  if (distKm === null) return null;
+
+  const jurKey = jurisdiction === "UK261" ? "UK261" : jurisdiction === "ISRAEL" ? "ISRAEL" : "EU261";
+  const comp = COMPENSATION[jurKey][cat];
+  const currency = jurisdiction === "UK261" ? "GBP" : jurisdiction === "ISRAEL" ? "ILS" : "EUR";
+
+  // 50% reduction per Article 7(2) thresholds
+  let amount: number;
+  if (cat === "short") {
+    amount = (delayMinutes >= REDUCTION_THRESHOLDS.short && delayMinutes < MIN_DELAY_OTHER_EU) ? comp.reduced : comp.full;
+  } else if (cat === "medium") {
+    amount = (delayMinutes >= REDUCTION_THRESHOLDS.medium && delayMinutes < REDUCTION_THRESHOLDS.long) ? comp.reduced : comp.full;
+  } else {
+    amount = (delayMinutes >= MIN_DELAY_OTHER_EU && delayMinutes < REDUCTION_THRESHOLDS.long) ? comp.reduced : comp.full;
+  }
+
+  // Israel has no 50% reduction
+  if (jurisdiction === "ISRAEL") amount = comp.full;
+
+  return { amount, currency, distanceKm: distKm };
+}
+
+/**
+ * Calculate compensation for a CANCELLATION with replacement flight (re-routing).
+ * Uses Article 7(2) re-routing thresholds per distance category.
+ */
+function calcReRoutingCompensation(
+  dep: string, arr: string,
+  replacementDelayMinutes: number,
+  jurisdiction: Jurisdiction,
+): { amount: number; currency: string; distanceKm: number } | null {
+  const cat = getDistanceCategory(dep, arr);
+  if (!cat) return null;
+  const distKm = getDistanceKm(dep, arr);
+  if (distKm === null) return null;
+
+  const jurKey = jurisdiction === "UK261" ? "UK261" : jurisdiction === "ISRAEL" ? "ISRAEL" : "EU261";
+  const comp = COMPENSATION[jurKey][cat];
+  const currency = jurisdiction === "UK261" ? "GBP" : jurisdiction === "ISRAEL" ? "ILS" : "EUR";
+
+  // Article 7(2) re-routing thresholds: within threshold → 50% reduction
+  let amount: number;
+  if (cat === "short") {
+    amount = replacementDelayMinutes <= REDUCTION_THRESHOLDS.short ? comp.reduced : comp.full;
+  } else if (cat === "medium") {
+    amount = replacementDelayMinutes <= REDUCTION_THRESHOLDS.medium ? comp.reduced : comp.full;
+  } else {
+    amount = replacementDelayMinutes <= REDUCTION_THRESHOLDS.long ? comp.reduced : comp.full;
+  }
+
+  if (jurisdiction === "ISRAEL") amount = comp.full;
+
+  return { amount, currency, distanceKm: distKm };
+}
+
+function currencySymbol(currency: string): string {
+  return currency === "ILS" ? "₪" : currency === "GBP" ? "£" : "€";
+}
+
+// ── Provider fetching ───────────────────────────────────────────────────────
+
+async function fetchAeroDataBox(fn: string, date: string, apiKey: string | undefined): Promise<ProviderResult | null> {
+  if (!apiKey || !fn || !date) return null;
   try {
-    const iata = normalizeFlightNumber(flightNumber);
+    const iata = normalizeFlightNumber(fn);
     const res = await fetch(
       `https://aerodatabox.p.rapidapi.com/flights/number/${iata}/${date}`,
       { headers: { "x-rapidapi-host": "aerodatabox.p.rapidapi.com", "x-rapidapi-key": apiKey } },
@@ -224,18 +487,13 @@ async function fetchAeroDataBox(flightNumber: string, date: string, apiKey: stri
     const flights: ProviderFlight[] = data.map((f: Record<string, unknown>) => {
       const dep = f.departure as Record<string, unknown> | undefined;
       const arr = f.arrival as Record<string, unknown> | undefined;
+      const airline = f.airline as Record<string, unknown> | undefined;
       const depAirport = dep?.airport as Record<string, unknown> | undefined;
       const arrAirport = arr?.airport as Record<string, unknown> | undefined;
       const depSched = dep?.scheduledTime as Record<string, unknown> | undefined;
       const arrSched = arr?.scheduledTime as Record<string, unknown> | undefined;
       const schedDep = (depSched?.utc || depSched?.local) as string | null;
       const schedArr = (arrSched?.utc || arrSched?.local) as string | null;
-      // AeroDataBox stores the confirmed actual event in `runwayTime` (only set
-      // after the runway event occurred). We fall back to `revisedTime` ONLY
-      // when it differs from the scheduled time: for cancelled/scheduled flights
-      // `revisedTime` merely echoes `scheduledTime`, which would fabricate a
-      // zero delay. A missing actual time correctly forces "incomplete" →
-      // Pending Check rather than guessing.
       const depRunway = (dep?.runwayTime?.utc || dep?.runwayTime?.local) as string | null;
       const depRevised = (dep?.revisedTime?.utc || dep?.revisedTime?.local) as string | null;
       const arrRunway = (arr?.runwayTime?.utc || arr?.runwayTime?.local) as string | null;
@@ -247,28 +505,27 @@ async function fetchAeroDataBox(flightNumber: string, date: string, apiKey: stri
         delayMinutes = Math.max(0, Math.round((new Date(actualArr).getTime() - new Date(schedArr).getTime()) / 60000));
       }
       return {
-        flightNumber: normalizeFlightNumber((f.number as string) || flightNumber),
+        flightNumber: normalizeFlightNumber((f.number as string) || fn),
         flightDate: normalizeDate(date),
         origin: normalizeIata((depAirport?.iata as string) || ""),
         destination: normalizeIata((arrAirport?.iata as string) || ""),
-        scheduledDeparture: schedDep,
-        scheduledArrival: schedArr,
-        actualDeparture: actualDep,
-        actualArrival: actualArr,
-        delayMinutes,
-        status: (f.status as string) || "scheduled",
+        scheduledDeparture: schedDep, scheduledArrival: schedArr,
+        actualDeparture: actualDep, actualArrival: actualArr,
+        delayMinutes, status: (f.status as string) || "scheduled",
+        operatingCarrier: (airline?.iata as string) || null,
+        operatingCarrierName: (airline?.name as string) || null,
+        marketingCarrier: null, // AeroDataBox doesn't expose marketing carrier separately
+        codeshareStatus: (f.codeshareStatus as string) || null,
       };
     });
     return { source: "aerodatabox", flights, raw: data };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-async function fetchAviationStack(flightNumber: string, date: string, apiKey: string | undefined): Promise<ProviderResult | null> {
-  if (!apiKey || !flightNumber || !date) return null;
+async function fetchAviationStack(fn: string, date: string, apiKey: string | undefined): Promise<ProviderResult | null> {
+  if (!apiKey || !fn || !date) return null;
   try {
-    const iata = normalizeFlightNumber(flightNumber);
+    const iata = normalizeFlightNumber(fn);
     const params = new URLSearchParams({ access_key: apiKey, flight_iata: iata, flight_date: date });
     const res = await fetch(`http://api.aviationstack.com/v1/flights?${params}`);
     const raw = await res.json();
@@ -277,6 +534,7 @@ async function fetchAviationStack(flightNumber: string, date: string, apiKey: st
       const dep = f.departure as Record<string, unknown> | undefined;
       const arr = f.arrival as Record<string, unknown> | undefined;
       const flight = f.flight as Record<string, unknown> | undefined;
+      const airline = f.airline as Record<string, unknown> | undefined;
       const schedDep = (dep?.scheduled as string) || null;
       const actualDep = (dep?.actual || dep?.estimated) as string | null;
       const schedArr = (arr?.scheduled as string) || null;
@@ -287,32 +545,36 @@ async function fetchAviationStack(flightNumber: string, date: string, apiKey: st
       } else if (dep?.delay) {
         delayMinutes = Number(dep.delay) || null;
       }
+      // AviationStack: airline = OPERATING carrier; flight.codeshared = MARKETING carrier
+      const codeshared = flight?.codeshared as Record<string, unknown> | undefined;
+      // For codeshare flights, use the marketing flight number (what the customer
+      // searched for) so the cross-check can match it against the claim.
+      const marketingFlightIata = (codeshared?.flight_iata as string) || null;
       return {
-        flightNumber: normalizeFlightNumber((flight?.iata as string) || flightNumber),
+        flightNumber: normalizeFlightNumber(marketingFlightIata || (flight?.iata as string) || fn),
         flightDate: normalizeDate((f.flight_date as string) || date),
         origin: normalizeIata((dep?.iata as string) || ""),
         destination: normalizeIata((arr?.iata as string) || ""),
-        scheduledDeparture: schedDep,
-        scheduledArrival: schedArr,
-        actualDeparture: actualDep,
-        actualArrival: actualArr,
-        delayMinutes,
-        status: (f.flight_status as string) || "scheduled",
+        scheduledDeparture: schedDep, scheduledArrival: schedArr,
+        actualDeparture: actualDep, actualArrival: actualArr,
+        delayMinutes, status: (f.flight_status as string) || "scheduled",
+        operatingCarrier: (airline?.iata as string) || null,
+        operatingCarrierName: (airline?.name as string) || null,
+        marketingCarrier: (codeshared?.airline_iata as string) || null,
+        codeshareStatus: codeshared ? "IsCodeshared" : "IsOperator",
       };
     });
     return { source: "aviationstack", flights, raw };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-// ── Cross-check: claim vs provider ────────────────────────────────────────────
+// ── Cross-check ──────────────────────────────────────────────────────────────
 
 interface CrossCheckResult {
   status: CrossCheckStatus;
   matched: ProviderFlight | null;
-  details: Record<string, string | boolean>;
-  perField: { flightNumber: boolean; flightDate: boolean; origin: boolean; destination: boolean };
+  details: Record<string, unknown>;
+  operatingCarrierConflict: boolean;
 }
 
 function crossCheck(
@@ -325,18 +587,10 @@ function crossCheck(
   const cDest = normalizeIata(claim.destination);
 
   if (providers.length === 0 || providers.every((p) => p.flights.length === 0)) {
-    return {
-      status: "no_data",
-      matched: null,
-      details: { reason: "No flight data returned by any provider" },
-      perField: { flightNumber: false, flightDate: false, origin: false, destination: false },
-    };
+    return { status: "no_data", matched: null, details: { reason: "No flight data returned by any provider" }, operatingCarrierConflict: false };
   }
 
-  // Collect every candidate flight across providers
-  const allFlights: ProviderFlight[] = providers.flatMap((p) => p.flights);
-
-  // Find a flight matching ALL FOUR identity fields
+  const allFlights = providers.flatMap((p) => p.flights);
   const matched = allFlights.find((f) =>
     normalizeFlightNumber(f.flightNumber) === cFn &&
     normalizeDate(f.flightDate) === cDate &&
@@ -344,31 +598,17 @@ function crossCheck(
     normalizeIata(f.destination) === cDest,
   );
 
-  // Per-field comparison against the first available flight (for diagnostics)
-  const ref = allFlights[0];
-  const perField = {
-    flightNumber: ref ? normalizeFlightNumber(ref.flightNumber) === cFn : false,
-    flightDate: ref ? normalizeDate(ref.flightDate) === cDate : false,
-    origin: ref ? normalizeIata(ref.origin) === cOrigin : false,
-    destination: ref ? normalizeIata(ref.destination) === cDest : false,
-  };
-
   if (!matched) {
+    const ref = allFlights[0];
     const mismatches: string[] = [];
-    if (!perField.flightNumber) mismatches.push("flight number");
-    if (!perField.flightDate) mismatches.push("flight date");
-    if (!perField.origin) mismatches.push("origin");
-    if (!perField.destination) mismatches.push("destination");
-    return {
-      status: "mismatch",
-      matched: null,
-      details: { reason: `Flight could not be confidently matched (mismatch on: ${mismatches.join(", ") || "no candidates"})` },
-      perField,
-    };
+    if (ref && normalizeFlightNumber(ref.flightNumber) !== cFn) mismatches.push("flight number");
+    if (ref && normalizeDate(ref.flightDate) !== cDate) mismatches.push("flight date");
+    if (ref && normalizeIata(ref.origin) !== cOrigin) mismatches.push("origin");
+    if (ref && normalizeIata(ref.destination) !== cDest) mismatches.push("destination");
+    return { status: "mismatch", matched: null, details: { reason: `Mismatch on: ${mismatches.join(", ") || "no candidates"}` }, operatingCarrierConflict: false };
   }
 
-  // Conflict check: if two providers both matched the same flight but disagree
-  // on the actual arrival delay beyond tolerance, the evidence is uncertain.
+  // Provider conflict on delay
   let providerConflict = false;
   const matchedPerProvider: ProviderFlight[] = [];
   for (const p of providers) {
@@ -389,17 +629,21 @@ function crossCheck(
     }
   }
 
+  // Operating carrier conflict between providers
+  let carrierConflict = false;
+  if (matchedPerProvider.length >= 2) {
+    const carriers = matchedPerProvider
+      .map((f) => f.operatingCarrier)
+      .filter((c): c is string => c !== null && c !== "");
+    const uniqueCarriers = new Set(carriers.map((c) => c.toUpperCase()));
+    if (uniqueCarriers.size > 1) carrierConflict = true;
+  }
+
+  const status: CrossCheckStatus = carrierConflict ? "carrier_conflict" : providerConflict ? "conflict" : "matched";
   return {
-    status: providerConflict ? "conflict" : "matched",
-    matched,
-    details: {
-      flight_number: "match",
-      flight_date: "match",
-      origin: "match",
-      destination: "match",
-      provider_conflict: providerConflict,
-    },
-    perField: { flightNumber: true, flightDate: true, origin: true, destination: true },
+    status, matched,
+    details: { flight_number: "match", flight_date: "match", origin: "match", destination: "match", provider_conflict: providerConflict, carrier_conflict: carrierConflict },
+    operatingCarrierConflict: carrierConflict,
   };
 }
 
@@ -409,44 +653,56 @@ async function persistEvidence(
   supabase: ReturnType<typeof createClient>,
   claimId: string,
   args: {
-    dataSource: DataSource;
-    fetchTimestamp: string;
-    flight: ProviderFlight | null;
-    crossCheckStatus: CrossCheckStatus;
-    crossCheckDetails: Record<string, unknown>;
+    dataSource: DataSource; fetchTimestamp: string; flight: ProviderFlight | null;
+    crossCheckStatus: CrossCheckStatus; crossCheckDetails: Record<string, unknown>;
     providerEvidence: Record<string, unknown> | null;
-    decision: EngineDecision;
-    decisionReason: string;
+    decision: EngineDecision; decisionReason: string;
+    reviewReasonCode?: ReviewReasonCode;
   },
 ): Promise<void> {
+  // Build evidence checklist
+  const f = args.flight;
+  const checklist = [
+    { item: "flight_identity_verified", status: args.crossCheckStatus === "matched" ? "passed" : "missing" },
+    { item: "actual_arrival_time", status: f?.actualArrival ? "passed" : "missing" },
+    { item: "operating_carrier_identified", status: f?.operatingCarrier ? "passed" : "missing" },
+    { item: "airline_reason_provided", status: "passed" },
+    { item: "cancellation_notice_date", status: "not_applicable" },
+    { item: "replacement_flight_verified", status: "not_applicable" },
+    { item: "denied_boarding_evidence", status: "not_applicable" },
+    { item: "connecting_segment_data", status: "not_applicable" },
+  ];
+  const detailsWithChecklist = { ...args.crossCheckDetails, checklist };
+
   const row = {
     claim_id: claimId,
     data_source: args.dataSource,
     fetch_timestamp: args.fetchTimestamp,
-    flight_number_verified: args.flight?.flightNumber ?? null,
-    flight_date_verified: args.flight?.flightDate ?? null,
-    origin_verified: args.flight?.origin ?? null,
-    destination_verified: args.flight?.destination ?? null,
-    scheduled_departure: args.flight?.scheduledDeparture ?? null,
-    scheduled_arrival: args.flight?.scheduledArrival ?? null,
-    actual_departure: args.flight?.actualDeparture ?? null,
-    actual_arrival: args.flight?.actualArrival ?? null,
-    delay_minutes: args.flight?.delayMinutes ?? null,
-    flight_status: args.flight?.status ?? null,
+    flight_number_verified: f?.flightNumber ?? null,
+    flight_date_verified: f?.flightDate ?? null,
+    origin_verified: f?.origin ?? null,
+    destination_verified: f?.destination ?? null,
+    scheduled_departure: f?.scheduledDeparture ?? null,
+    scheduled_arrival: f?.scheduledArrival ?? null,
+    actual_departure: f?.actualDeparture ?? null,
+    actual_arrival: f?.actualArrival ?? null,
+    delay_minutes: f?.delayMinutes ?? null,
+    flight_status: f?.status ?? null,
     cross_check_status: args.crossCheckStatus,
-    cross_check_details: args.crossCheckDetails,
+    cross_check_details: detailsWithChecklist,
     provider_evidence: args.providerEvidence,
     decision: args.decision,
     decision_reason: args.decisionReason,
   };
-  // Best-effort: a persistence failure must never break or roll back an
-  // eligibility decision that has already been written to the claim. The
-  // decision itself is the source of truth on claims.status; this table is
-  // the reproducible audit trail behind it.
   try {
     await supabase.from("flight_evidence").upsert(row, { onConflict: "claim_id" });
-  } catch (err) {
-    console.error("flight_evidence persist failed (non-blocking):", err);
+  } catch (err) { console.error("flight_evidence persist failed (non-blocking):", err); }
+
+  // Set review_reason_code on claims for Pending Check
+  if (args.decision === "Pending Check" && args.reviewReasonCode) {
+    try {
+      await supabase.from("claims").update({ review_reason_code: args.reviewReasonCode }).eq("id", claimId);
+    } catch { /* non-blocking */ }
   }
 }
 
@@ -454,10 +710,8 @@ async function persistEvidence(
 
 async function applyDecision(
   supabase: ReturnType<typeof createClient>,
-  claimId: string,
-  claimRef: string,
-  status: EngineDecision,
-  detail: string,
+  claimId: string, claimRef: string,
+  status: EngineDecision, detail: string,
 ): Promise<void> {
   const update: Record<string, unknown> = { status, notes: detail, updated_at: new Date().toISOString() };
   if (status === "Not Eligible" || status === "Not Eligible - Expired") {
@@ -469,30 +723,26 @@ async function applyDecision(
   }
   await supabase.from("claims").update(update).eq("id", claimId);
   await supabase.from("notifications").insert({
-    type: "status_changed",
-    claim_ref: claimRef,
-    claim_id: claimId,
+    type: "status_changed", claim_ref: claimRef, claim_id: claimId,
     message: `Rules Engine → ${status}: ${detail}`,
   });
 }
 
 async function applyFinancials(
   supabase: ReturnType<typeof createClient>,
-  claimId: string,
-  claimRef: string,
-  departure: string,
-  arrival: string,
+  claimId: string, claimRef: string,
+  departure: string, arrival: string,
   delayMinutes: number,
+  jurisdiction: Jurisdiction,
   agentCode: string | null,
 ): Promise<void> {
-  const comp = calcCompensation(departure, arrival, delayMinutes);
-  // calcCompensation returns null when coordinates are unavailable — but the
-  // caller guarantees coordinates exist before reaching here.
+  const comp = calcDelayCompensation(departure, arrival, delayMinutes, jurisdiction);
   if (!comp) return;
-  const symbol = comp.currency === "ILS" ? "₪" : "€";
+  const sym = currencySymbol(comp.currency);
   await supabase.from("claims").update({
     compensation_amount: comp.amount,
-    amount: `${symbol}${comp.amount}`,
+    amount: `${sym}${comp.amount}`,
+    jurisdiction,
     updated_at: new Date().toISOString(),
   }).eq("id", claimId);
 
@@ -500,23 +750,31 @@ async function applyFinancials(
     const { data: agent } = await supabase
       .from("worker_profiles")
       .select("id, commission_rate, total_payout_earned")
-      .eq("agent_code", agentCode)
-      .eq("role", "agent")
-      .eq("status", "active")
-      .maybeSingle();
+      .eq("agent_code", agentCode).eq("role", "agent").eq("status", "active").maybeSingle();
     if (agent) {
       const rate = Number(agent.commission_rate) || 10;
       const commission = Math.round((comp.amount * rate) / 100 * 100) / 100;
       const newTotal = Math.round((Number(agent.total_payout_earned || 0) + commission) * 100) / 100;
       await supabase.from("worker_profiles").update({ total_payout_earned: newTotal }).eq("id", agent.id);
       await supabase.from("notifications").insert({
-        type: "commission_earned",
-        claim_ref: claimRef,
-        claim_id: claimId,
-        message: `Agent ${agentCode} earned ${symbol}${commission} commission (${rate}% of ${symbol}${comp.amount}). Total payout: ${symbol}${newTotal}.`,
+        type: "commission_earned", claim_ref: claimRef, claim_id: claimId,
+        message: `Agent ${agentCode} earned ${sym}${commission} commission (${rate}% of ${sym}${comp.amount}).`,
       });
     }
   }
+}
+
+// ── Pending Check helper ─────────────────────────────────────────────────────
+
+async function pendingCheck(
+  supabase: ReturnType<typeof createClient>,
+  claimId: string, claimRef: string,
+  detail: string, reasonCode: ReviewReasonCode,
+  evidenceArgs: Parameters<typeof persistEvidence>[1],
+): Promise<EngineResult> {
+  await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
+  await persistEvidence(supabase, claimId, { ...evidenceArgs, decision: "Pending Check", decisionReason: detail, reviewReasonCode: reasonCode });
+  return { claimId, claimRef, decision: "Pending Check", delayMinutes: evidenceArgs.flight?.delayMinutes ?? null, reasonCode: null, source: evidenceArgs.dataSource === "none" ? null : evidenceArgs.dataSource, detail };
 }
 
 // ── Main evaluation ───────────────────────────────────────────────────────────
@@ -532,7 +790,7 @@ export async function evaluateClaimInternal(
 
   const { data: claim, error } = await supabase
     .from("claims")
-    .select("id, claim_ref, flight_number, flight_date, departure, arrival, airline_reason, issue_type, agent")
+    .select("id, claim_ref, flight_number, flight_date, departure, arrival, airline_reason, issue_type, agent, cancellation_notice_date, replacement_offered, replacement_accepted, replacement_flight_number, replacement_scheduled_dep_verified, replacement_scheduled_arr_verified, replacement_actual_arr_verified, boarding_type, confirmed_reservation, checked_in_on_time, denial_reason, is_single_booking, original_scheduled_final_arrival")
     .eq("id", claimId)
     .maybeSingle();
 
@@ -549,6 +807,7 @@ export async function evaluateClaimInternal(
   const fetchTimestamp = now.toISOString();
   const aerodataboxKey = Deno.env.get("AERODATABOX_API_KEY");
   const aviationstackKey = Deno.env.get("AVIATIONSTACK_API_KEY");
+  const issueType = (claim.issue_type || "").toLowerCase();
 
   // ── Stage 1: Statute of limitations ────────────────────────────────────────
   if (flightDate) {
@@ -557,35 +816,36 @@ export async function evaluateClaimInternal(
     if (isIsraeliRoute(departure, arrival) && ageYears > 4) {
       const detail = `Israeli route older than 4 years (${ageYears}y) — statute of limitations exceeded.`;
       await applyDecision(supabase, claimId, claimRef, "Not Eligible - Expired", detail);
-      await persistEvidence(supabase, claimId, {
-        dataSource: "none", fetchTimestamp, flight: null,
-        crossCheckStatus: "no_data", crossCheckDetails: { reason: "statute of limitations" },
-        providerEvidence: null, decision: "Not Eligible - Expired", decisionReason: detail,
-      });
+      await persistEvidence(supabase, claimId, { dataSource: "none", fetchTimestamp, flight: null, crossCheckStatus: "no_data", crossCheckDetails: { reason: "statute of limitations" }, providerEvidence: null, decision: "Not Eligible - Expired", decisionReason: detail });
       return { claimId, claimRef, decision: "Not Eligible - Expired", delayMinutes: null, reasonCode: null, source: null, detail };
     }
-    if (isEuRoute(departure, arrival) && ageYears > 6) {
-      const detail = `EU route older than 6 years (${ageYears}y) — statute of limitations exceeded.`;
+    if ((isUkAirport(departure) || isEuEeaAirport(departure) || isUkAirport(arrival) || isEuEeaAirport(arrival)) && ageYears > 6) {
+      const detail = `EU/UK route older than 6 years (${ageYears}y) — statute of limitations exceeded.`;
       await applyDecision(supabase, claimId, claimRef, "Not Eligible - Expired", detail);
-      await persistEvidence(supabase, claimId, {
-        dataSource: "none", fetchTimestamp, flight: null,
-        crossCheckStatus: "no_data", crossCheckDetails: { reason: "statute of limitations" },
-        providerEvidence: null, decision: "Not Eligible - Expired", decisionReason: detail,
-      });
+      await persistEvidence(supabase, claimId, { dataSource: "none", fetchTimestamp, flight: null, crossCheckStatus: "no_data", crossCheckDetails: { reason: "statute of limitations" }, providerEvidence: null, decision: "Not Eligible - Expired", decisionReason: detail });
       return { claimId, claimRef, decision: "Not Eligible - Expired", delayMinutes: null, reasonCode: null, source: null, detail };
     }
   }
 
-  // ── Stage 1b: Jurisdiction — EC261/UK261/Israeli law applicability ──────────
-  if (!isEuRoute(departure, arrival) && !isIsraeliRoute(departure, arrival)) {
-    const detail = "Route not covered by EU261/UK261 or Israeli Aviation Services Law — manual review required.";
-    await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
-    await persistEvidence(supabase, claimId, {
+  // ── Stage 1b: Brazil — always Pending Check ────────────────────────────────
+  if (isBrazilianRoute(departure, arrival)) {
+    const detail = "Brazilian route — manual review required (ANAC rules not yet automated).";
+    return pendingCheck(supabase, claimId, claimRef, detail, "BRAZIL_MANUAL_REVIEW", {
       dataSource: "none", fetchTimestamp, flight: null,
-      crossCheckStatus: "no_data", crossCheckDetails: { reason: "jurisdiction: route outside EU/UK/IL" },
-      providerEvidence: null, decision: "Pending Check", decisionReason: detail,
+      crossCheckStatus: "no_data", crossCheckDetails: { reason: "brazil_review" },
+      providerEvidence: null,
     });
-    return { claimId, claimRef, decision: "Pending Check", delayMinutes: null, reasonCode: null, source: null, detail };
+  }
+
+  // ── Stage 1c: Quick non-covered route check (no EU/UK/IL/BR airport at all) ─
+  // If neither departure nor arrival is in EU/UK/Israel/Brazil, the route is
+  // not covered by any regulation. No need to fetch providers or check carrier.
+  if (!isUkAirport(departure) && !isEuEeaAirport(departure) && !isIsraeliRoute(departure, arrival) &&
+      !isUkAirport(arrival) && !isEuEeaAirport(arrival)) {
+    const detail = "Route not covered by EU261/UK261/Israeli/Brazilian regulations — no airport in EU/UK/IL/BR.";
+    await applyDecision(supabase, claimId, claimRef, "Not Eligible", detail);
+    await persistEvidence(supabase, claimId, { dataSource: "none", fetchTimestamp, flight: null, crossCheckStatus: "no_data", crossCheckDetails: { reason: "no_coverage" }, providerEvidence: null, decision: "Not Eligible", decisionReason: detail });
+    return { claimId, claimRef, decision: "Not Eligible", delayMinutes: null, reasonCode: null, source: null, detail };
   }
 
   // ── Stage 2: Fetch provider flight data ─────────────────────────────────────
@@ -599,91 +859,199 @@ export async function evaluateClaimInternal(
   for (const p of providers) providerEvidence[p.source] = p.raw;
 
   // ── Stage 3: Cross-check claim vs provider ──────────────────────────────────
-  const cc = crossCheck(
-    { flightNumber, flightDate, origin: departure, destination: arrival },
-    providers,
-  );
+  const cc = crossCheck({ flightNumber, flightDate, origin: departure, destination: arrival }, providers);
 
   const primarySource: DataSource = cc.matched
     ? (aero && aero.flights.includes(cc.matched) ? "aerodatabox" : "aviationstack")
     : (providers.length > 0 ? providers[0].source : "none");
 
-  // No provider data at all
+  const evBase = { dataSource: primarySource, fetchTimestamp, providerEvidence };
+
   if (cc.status === "no_data") {
-    const detail = "No flight data available from any provider — manual review required.";
-    await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
-    await persistEvidence(supabase, claimId, {
-      dataSource: "none", fetchTimestamp, flight: null,
-      crossCheckStatus: "no_data", crossCheckDetails: cc.details,
-      providerEvidence: Object.keys(providerEvidence).length ? providerEvidence : null,
-      decision: "Pending Check", decisionReason: detail,
-    });
-    return { claimId, claimRef, decision: "Pending Check", delayMinutes: null, reasonCode: null, source: null, detail };
+    return pendingCheck(supabase, claimId, claimRef, "No flight data available from any provider.", "NO_PROVIDER_DATA", { ...evBase, flight: null, crossCheckStatus: "no_data", crossCheckDetails: cc.details });
   }
-
-  // Mismatch — flight identity does not match the claim
   if (cc.status === "mismatch") {
-    const detail = `Cross-check failed: ${cc.details.reason}. Manual review required.`;
-    await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
-    await persistEvidence(supabase, claimId, {
-      dataSource: primarySource, fetchTimestamp, flight: null,
-      crossCheckStatus: "mismatch", crossCheckDetails: cc.details,
-      providerEvidence, decision: "Pending Check", decisionReason: detail,
-    });
-    return { claimId, claimRef, decision: "Pending Check", delayMinutes: null, reasonCode: null, source: primarySource, detail };
+    return pendingCheck(supabase, claimId, claimRef, `Cross-check failed: ${cc.details.reason}.`, "FLIGHT_MISMATCH", { ...evBase, flight: null, crossCheckStatus: "mismatch", crossCheckDetails: cc.details });
   }
-
-  // Providers conflict on the delay
   if (cc.status === "conflict") {
-    const detail = "Providers returned conflicting delay data for the matched flight — manual review required.";
-    await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
-    await persistEvidence(supabase, claimId, {
-      dataSource: primarySource, fetchTimestamp, flight: cc.matched,
-      crossCheckStatus: "conflict", crossCheckDetails: cc.details,
-      providerEvidence, decision: "Pending Check", decisionReason: detail,
-    });
-    return { claimId, claimRef, decision: "Pending Check", delayMinutes: cc.matched?.delayMinutes ?? null, reasonCode: null, source: primarySource, detail };
+    return pendingCheck(supabase, claimId, claimRef, "Providers returned conflicting delay data.", "PROVIDER_CONFLICT", { ...evBase, flight: cc.matched, crossCheckStatus: "conflict", crossCheckDetails: cc.details });
   }
-
-  // ── Stage 3b: Denied boarding — cannot be verified from flight data ──────────
-  if (claim.issue_type && claim.issue_type.toLowerCase() === "denied boarding") {
-    const detail = "Denied boarding claim — requires manual verification. Flight provider data cannot confirm denied boarding events.";
-    await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
-    await persistEvidence(supabase, claimId, {
-      dataSource: primarySource, fetchTimestamp, flight: cc.matched,
-      crossCheckStatus: cc.status, crossCheckDetails: cc.details,
-      providerEvidence, decision: "Pending Check", decisionReason: detail,
-    });
-    return { claimId, claimRef, decision: "Pending Check", delayMinutes: cc.matched?.delayMinutes ?? null, reasonCode: null, source: primarySource, detail };
-  }
-
-  // ── Stage 4: Completeness — actual times required to determine delay ────────
   const matched = cc.matched!;
 
-  // Cancellation detection — cancelled flights need manual review for notice
-  // period and re-routing under EC261 Article 5.  Provider data shows the
-  // original flight as "cancelled" with no actual arrival; the replacement
-  // flight (different number) cannot be matched by the cross-check.
-  if (matched.status && ["cancelled", "canceled"].includes(matched.status.toLowerCase())) {
-    const detail = "Flight was cancelled — manual review required to assess notice period and re-routing under EC261 Article 5.";
-    await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
-    await persistEvidence(supabase, claimId, {
-      dataSource: primarySource, fetchTimestamp, flight: matched,
-      crossCheckStatus: "cancelled", crossCheckDetails: cc.details,
-      providerEvidence, decision: "Pending Check", decisionReason: detail,
-    });
-    return { claimId, claimRef, decision: "Pending Check", delayMinutes: null, reasonCode: null, source: primarySource, detail };
+  // ── Stage 3b: Denied boarding hard exclusions (before carrier conflict) ────
+  // These don't need jurisdiction — customer answers alone determine Not Eligible.
+  if (issueType === "denied boarding") {
+    if (claim.boarding_type === "voluntary") {
+      const detail = "Voluntary denied boarding — passenger accepted compensation, not eligible under EC261.";
+      await applyDecision(supabase, claimId, claimRef, "Not Eligible", detail);
+      await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details, decision: "Not Eligible", decisionReason: detail });
+      return { claimId, claimRef, decision: "Not Eligible", delayMinutes: null, reasonCode: null, source: primarySource, detail };
+    }
+    if (claim.confirmed_reservation === false) {
+      const detail = "No confirmed reservation — not eligible for denied boarding compensation.";
+      await applyDecision(supabase, claimId, claimRef, "Not Eligible", detail);
+      await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details, decision: "Not Eligible", decisionReason: detail });
+      return { claimId, claimRef, decision: "Not Eligible", delayMinutes: null, reasonCode: null, source: primarySource, detail };
+    }
+    if (claim.checked_in_on_time === false) {
+      const detail = "Did not check in on time — not eligible for denied boarding compensation.";
+      await applyDecision(supabase, claimId, claimRef, "Not Eligible", detail);
+      await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details, decision: "Not Eligible", decisionReason: detail });
+      return { claimId, claimRef, decision: "Not Eligible", delayMinutes: null, reasonCode: null, source: primarySource, detail };
+    }
+    const dr = (claim.denial_reason || "").toLowerCase();
+    if (["health", "safety", "security", "documents"].includes(dr)) {
+      const detail = `Denied boarding for ${dr} reasons — reasonable denial, not eligible for compensation.`;
+      await applyDecision(supabase, claimId, claimRef, "Not Eligible", detail);
+      await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details, decision: "Not Eligible", decisionReason: detail });
+      return { claimId, claimRef, decision: "Not Eligible", delayMinutes: null, reasonCode: null, source: primarySource, detail };
+    }
+    // Missing required fields
+    if (!claim.boarding_type || claim.confirmed_reservation === null || claim.checked_in_on_time === null || !claim.denial_reason) {
+      return pendingCheck(supabase, claimId, claimRef, "Denied boarding claim — required fields missing.", "DENIED_BOARDING_INCOMPLETE", { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details });
+    }
+    // Fall through — involuntary + overbooking needs jurisdiction (carrier conflict check below)
   }
 
+  // ── Stage 3c: Carrier conflict (after denied boarding hard exclusions) ──────
+  if (cc.status === "carrier_conflict") {
+    return pendingCheck(supabase, claimId, claimRef, "Providers disagree on the operating carrier — cannot determine jurisdiction.", "PROVIDER_CARRIER_CONFLICT", { ...evBase, flight: matched, crossCheckStatus: "carrier_conflict", crossCheckDetails: cc.details });
+  }
+
+  // ── Stage 3d: Jurisdiction determination (requires verified operating carrier) ─
+  const operatingCarrier = matched.operatingCarrier;
+  const jur = determineJurisdiction(departure, arrival, operatingCarrier);
+
+  if (jur.jurisdiction === "NONE") {
+    if (jur.detail.includes("Cannot determine")) {
+      return pendingCheck(supabase, claimId, claimRef, jur.detail, "JURISDICTION_UNKNOWN_CARRIER", { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details });
+    }
+    const detail = jur.detail;
+    await applyDecision(supabase, claimId, claimRef, "Not Eligible", detail);
+    await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details, decision: "Not Eligible", decisionReason: detail });
+    return { claimId, claimRef, decision: "Not Eligible", delayMinutes: matched.delayMinutes, reasonCode: null, source: primarySource, detail };
+  }
+
+  // Persist jurisdiction + operating carrier on claims
+  await supabase.from("claims").update({
+    jurisdiction: jur.jurisdiction,
+    operating_carrier: operatingCarrier || null,
+    operating_carrier_name: matched.operatingCarrierName || null,
+    operating_carrier_source: primarySource,
+    is_codeshare: matched.marketingCarrier !== null && matched.marketingCarrier !== operatingCarrier,
+    marketing_carrier: matched.marketingCarrier || null,
+  }).eq("id", claimId);
+
+  // ── Stage 3d: Denied boarding — involuntary (needs jurisdiction) ────────────
+  if (issueType === "denied boarding") {
+    return pendingCheck(supabase, claimId, claimRef, "Involuntary denied boarding claim — requires manual evidence verification. Provider data cannot confirm overbooking.", "DENIED_BOARDING_REQUIRES_EVIDENCE", { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details });
+  }
+
+  // ── Stage 4: Cancellation detection (Article 5) ─────────────────────────────
+  if (matched.status && ["cancelled", "canceled"].includes(matched.status.toLowerCase())) {
+    // Check notice date first
+    if (!claim.cancellation_notice_date) {
+      return pendingCheck(supabase, claimId, claimRef, "Flight cancelled — cancellation notice date missing, cannot apply Article 5 rules.", "CANCELLED_MISSING_NOTICE", { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: cc.details });
+    }
+
+    const noticeDate = new Date(claim.cancellation_notice_date);
+    const depDate = new Date(flightDate);
+    const daysNotice = Math.round((depDate.getTime() - noticeDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Notice ≥14 days → no Article 7 compensation (regardless of replacement)
+    if (daysNotice >= 14) {
+      const detail = `Cancellation notified ${daysNotice} days before departure (≥14 days) — no Article 7 compensation. Refund/re-routing rights are separate.`;
+      await applyDecision(supabase, claimId, claimRef, "Not Eligible", detail);
+      await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice }, decision: "Not Eligible", decisionReason: detail });
+      return { claimId, claimRef, decision: "Not Eligible", delayMinutes: null, reasonCode: null, source: primarySource, detail };
+    }
+
+    // Notice <14 days → continue Article 5 analysis
+    // Check replacement flight
+    if (!claim.replacement_offered) {
+      // No replacement offered — but still need to check extraordinary circumstances
+      const reasonCode = classifyReason(claim.airline_reason || "");
+      if (EXTRAORDINARY_REASONS.has(reasonCode)) {
+        return pendingCheck(supabase, claimId, claimRef, `Cancellation with ${reasonCode.toLowerCase()} — extraordinary circumstance requires manual verification.`, "EXTRAORDINARY_CIRCUMSTANCES", { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice } });
+      }
+      // No replacement, notice <14 days, not extraordinary → Eligible
+      const comp = calcDelayCompensation(departure, arrival, 999, jur.jurisdiction); // full compensation (no reduction)
+      if (!comp) {
+        return pendingCheck(supabase, claimId, claimRef, `Airport coordinates unavailable for ${departure}/${arrival}.`, "COORDS_UNAVAILABLE", { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice } });
+      }
+      const detail = `Cancellation with ${daysNotice} days notice, no replacement offered — eligible for compensation.`;
+      await applyDecision(supabase, claimId, claimRef, "Eligible", detail);
+      const sym = currencySymbol(comp.currency);
+      await supabase.from("claims").update({ compensation_amount: comp.amount, amount: `${sym}${comp.amount}`, updated_at: new Date().toISOString() }).eq("id", claimId);
+      await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice }, decision: "Eligible", decisionReason: detail });
+      return { claimId, claimRef, decision: "Eligible", delayMinutes: null, reasonCode, source: primarySource, detail };
+    }
+
+    // Replacement offered
+    if (!claim.replacement_accepted) {
+      return pendingCheck(supabase, claimId, claimRef, "Passenger declined replacement flight — manual review required.", "CANCELLED_PASSENGER_DECLINED", { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice } });
+    }
+
+    // Replacement accepted — need verified times from provider
+    const replVerifiedArr = claim.replacement_actual_arr_verified || claim.replacement_scheduled_arr_verified;
+    if (!replVerifiedArr) {
+      return pendingCheck(supabase, claimId, claimRef, "Replacement flight times not verified by provider data — customer-entered times alone are insufficient for automatic eligibility.", "CANCELLED_REPLACEMENT_UNVERIFIED", { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice } });
+    }
+
+    // Compute replacement delay (actual arrival vs original scheduled arrival)
+    const originalSchedArr = matched.scheduledArrival;
+    if (!originalSchedArr) {
+      return pendingCheck(supabase, claimId, claimRef, "Original scheduled arrival time missing — cannot compute replacement delay.", "INCOMPLETE_EVIDENCE", { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice } });
+    }
+    const replDelayMin = Math.max(0, Math.round((new Date(replVerifiedArr).getTime() - new Date(originalSchedArr).getTime()) / 60000));
+
+    // Check extraordinary circumstances
+    const reasonCode = classifyReason(claim.airline_reason || "");
+    if (EXTRAORDINARY_REASONS.has(reasonCode)) {
+      return pendingCheck(supabase, claimId, claimRef, `Cancellation with ${reasonCode.toLowerCase()} — extraordinary circumstance requires manual verification.`, "EXTRAORDINARY_CIRCUMSTANCES", { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice, replacement_delay_min: replDelayMin } });
+    }
+
+    // Apply Article 5 timing rules
+    let adequate = false;
+    if (daysNotice >= 7) {
+      // 7-13 days: dep ≤2h before, arr ≤4h after → adequate
+      const replSchedDep = claim.replacement_scheduled_dep_verified;
+      if (replSchedDep && originalSchedArr) {
+        const depDelta = Math.round((new Date(replSchedDep).getTime() - new Date(matched.scheduledDeparture || "").getTime()) / 60000);
+        adequate = depDelta <= 120 && replDelayMin <= 240;
+      }
+    } else {
+      // <7 days: dep ≤1h before, arr ≤2h after → adequate
+      const replSchedDep = claim.replacement_scheduled_dep_verified;
+      if (replSchedDep && matched.scheduledDeparture) {
+        const depDelta = Math.round((new Date(replSchedDep).getTime() - new Date(matched.scheduledDeparture).getTime()) / 60000);
+        adequate = depDelta <= 60 && replDelayMin <= 120;
+      }
+    }
+
+    if (adequate) {
+      const detail = `Cancellation with ${daysNotice} days notice, adequate re-routing (replacement arrives ${replDelayMin}min after original) — not eligible for compensation.`;
+      await applyDecision(supabase, claimId, claimRef, "Not Eligible", detail);
+      await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice, replacement_delay_min: replDelayMin, adequate_rerouting: true }, decision: "Not Eligible", decisionReason: detail });
+      return { claimId, claimRef, decision: "Not Eligible", delayMinutes: replDelayMin, reasonCode, source: primarySource, detail };
+    }
+
+    // Inadequate re-routing → Eligible with Article 7(2) reduction
+    const comp = calcReRoutingCompensation(departure, arrival, replDelayMin, jur.jurisdiction);
+    if (!comp) {
+      return pendingCheck(supabase, claimId, claimRef, `Airport coordinates unavailable for ${departure}/${arrival}.`, "COORDS_UNAVAILABLE", { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice, replacement_delay_min: replDelayMin } });
+    }
+    const detail = `Cancellation with ${daysNotice} days notice, inadequate re-routing (replacement arrives ${replDelayMin}min after original) — eligible for compensation.`;
+    await applyDecision(supabase, claimId, claimRef, "Eligible", detail);
+    const sym = currencySymbol(comp.currency);
+    await supabase.from("claims").update({ compensation_amount: comp.amount, amount: `${sym}${comp.amount}`, updated_at: new Date().toISOString() }).eq("id", claimId);
+    await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "cancelled", crossCheckDetails: { ...cc.details, days_notice: daysNotice, replacement_delay_min: replDelayMin, adequate_rerouting: false }, decision: "Eligible", decisionReason: detail });
+    return { claimId, claimRef, decision: "Eligible", delayMinutes: replDelayMin, reasonCode, source: primarySource, detail };
+  }
+
+  // ── Stage 4b: Completeness — actual times required ──────────────────────────
   if (!matched.actualArrival || !matched.scheduledArrival || matched.delayMinutes == null) {
-    const detail = "Provider data incomplete: actual/scheduled arrival times unavailable — manual review required.";
-    await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
-    await persistEvidence(supabase, claimId, {
-      dataSource: primarySource, fetchTimestamp, flight: matched,
-      crossCheckStatus: "incomplete", crossCheckDetails: cc.details,
-      providerEvidence, decision: "Pending Check", decisionReason: detail,
-    });
-    return { claimId, claimRef, decision: "Pending Check", delayMinutes: null, reasonCode: null, source: primarySource, detail };
+    return pendingCheck(supabase, claimId, claimRef, "Provider data incomplete: actual/scheduled arrival times unavailable.", "INCOMPLETE_EVIDENCE", { ...evBase, flight: matched, crossCheckStatus: "incomplete", crossCheckDetails: cc.details });
   }
 
   const delayMinutes = matched.delayMinutes;
@@ -691,50 +1059,33 @@ export async function evaluateClaimInternal(
 
   // ── Stage 5: Extraordinary circumstances — NEVER auto-Eligible ──────────────
   if (EXTRAORDINARY_REASONS.has(reasonCode)) {
-    const detail = `Reported reason "${reasonCode.toLowerCase()}" may be an extraordinary circumstance — requires manual verification. Cannot be auto-marked eligible.`;
-    await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
-    await persistEvidence(supabase, claimId, {
-      dataSource: primarySource, fetchTimestamp, flight: matched,
-      crossCheckStatus: "matched", crossCheckDetails: cc.details,
-      providerEvidence, decision: "Pending Check", decisionReason: detail,
-    });
-    return { claimId, claimRef, decision: "Pending Check", delayMinutes, reasonCode, source: primarySource, detail };
+    return pendingCheck(supabase, claimId, claimRef, `Reported reason "${reasonCode.toLowerCase()}" may be extraordinary — requires manual verification.`, "EXTRAORDINARY_CIRCUMSTANCES", { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details });
   }
 
-  // ── Stage 6: Delay threshold ────────────────────────────────────────────────
-  const threshold = isIsraeliRoute(departure, arrival) ? MIN_ELIGIBLE_DELAY_MINUTES_IL : MIN_ELIGIBLE_DELAY_MINUTES_EU;
+  // ── Stage 6: Delay threshold (distance-dependent for EU/UK) ──────────────────
+  let threshold: number;
+  if (jur.jurisdiction === "ISRAEL") {
+    threshold = MIN_DELAY_IL;
+  } else {
+    const cat = getDistanceCategory(departure, arrival);
+    threshold = cat === "short" ? MIN_DELAY_SHORT_HAUL_EU : MIN_DELAY_OTHER_EU;
+  }
+
   if (delayMinutes < threshold) {
     const detail = `Delay of ${delayMinutes}min is below the ${threshold}min threshold. (source: ${primarySource})`;
     await applyDecision(supabase, claimId, claimRef, "Not Eligible", detail);
-    await persistEvidence(supabase, claimId, {
-      dataSource: primarySource, fetchTimestamp, flight: matched,
-      crossCheckStatus: "matched", crossCheckDetails: cc.details,
-      providerEvidence, decision: "Not Eligible", decisionReason: detail,
-    });
+    await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details, decision: "Not Eligible", decisionReason: detail });
     return { claimId, claimRef, decision: "Not Eligible", delayMinutes, reasonCode, source: primarySource, detail };
   }
 
-  // ── Stage 7: Carrier fault + sufficient delay → Eligible (coords required) ──
-  // Coordinates are required to compute compensation. If unavailable, we do
-  // NOT guess a distance (the old 2000 km default is removed) — Pending Check.
-  if (!calcCompensation(departure, arrival, delayMinutes)) {
-    const detail = `Airport coordinates unavailable for ${departure}/${arrival} — cannot compute compensation. Manual review required.`;
-    await applyDecision(supabase, claimId, claimRef, "Pending Check", detail);
-    await persistEvidence(supabase, claimId, {
-      dataSource: primarySource, fetchTimestamp, flight: matched,
-      crossCheckStatus: "matched", crossCheckDetails: cc.details,
-      providerEvidence, decision: "Pending Check", decisionReason: detail,
-    });
-    return { claimId, claimRef, decision: "Pending Check", delayMinutes, reasonCode, source: primarySource, detail };
+  // ── Stage 7: Carrier fault + sufficient delay → Eligible ────────────────────
+  if (!calcDelayCompensation(departure, arrival, delayMinutes, jur.jurisdiction)) {
+    return pendingCheck(supabase, claimId, claimRef, `Airport coordinates unavailable for ${departure}/${arrival}.`, "COORDS_UNAVAILABLE", { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details });
   }
 
-  const detail = `Delay of ${delayMinutes}min caused by ${reasonCode.toLowerCase()} issue — carrier responsibility. Flight identity cross-checked and matched. (source: ${primarySource})`;
+  const detail = `Delay of ${delayMinutes}min caused by ${reasonCode.toLowerCase()} issue — carrier responsibility. Jurisdiction: ${jur.jurisdiction}. (source: ${primarySource})`;
   await applyDecision(supabase, claimId, claimRef, "Eligible", detail);
-  await applyFinancials(supabase, claimId, claimRef, departure, arrival, delayMinutes, claim.agent || null);
-  await persistEvidence(supabase, claimId, {
-    dataSource: primarySource, fetchTimestamp, flight: matched,
-    crossCheckStatus: "matched", crossCheckDetails: cc.details,
-    providerEvidence, decision: "Eligible", decisionReason: detail,
-  });
+  await applyFinancials(supabase, claimId, claimRef, departure, arrival, delayMinutes, jur.jurisdiction, claim.agent || null);
+  await persistEvidence(supabase, claimId, { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details, decision: "Eligible", decisionReason: detail });
   return { claimId, claimRef, decision: "Eligible", delayMinutes, reasonCode, source: primarySource, detail };
 }

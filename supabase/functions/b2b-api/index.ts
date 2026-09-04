@@ -58,6 +58,15 @@ const leadSchema = z.object({
       .regex(/^[A-Z]{3}$/, "flight_info.destination must be a 3-letter IATA code (uppercase)"),
     delay_minutes: z.number().int().min(0).optional(),
     delay_reason: z.string().optional(),
+    // Phase B.2 optional fields
+    issue_type: z.enum(["delay", "cancellation", "denied_boarding"]).optional(),
+    cancellation_notice_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    replacement_flight_number: z.string().optional(),
+    boarding_type: z.enum(["involuntary", "voluntary"]).optional(),
+    confirmed_reservation: z.boolean().optional(),
+    checked_in_on_time: z.boolean().optional(),
+    denial_reason: z.string().optional(),
+    is_single_booking: z.boolean().optional(),
   }),
 });
 
@@ -270,6 +279,10 @@ console.log(data);`,
       //    delay_hours from the payload is stored for reference, but it is NOT
       //    used for automatic decisions — the shared engine cross-checks the
       //    flight against live provider data and only decides on verified evidence.
+      const issueType = lead.flight_info.issue_type === "cancellation" ? "Cancellation"
+        : lead.flight_info.issue_type === "denied_boarding" ? "Denied Boarding"
+        : "Delay";
+
       const { data: claimRow, error: insertError } = await supabase
         .from("claims")
         .insert({
@@ -287,11 +300,20 @@ console.log(data);`,
           delay_hours: lead.flight_info.delay_minutes
             ? Math.round((lead.flight_info.delay_minutes / 60) * 100) / 100
             : 0,
-          issue_type: "Delay",
+          issue_type: issueType,
           agent: agent.agent_code,
           status: "Pending Check",
           loa_signed: false,
           notes: `Lead submitted via B2B API by ${agent.full_name} (${agent.email})`,
+          // Phase B.2 optional fields
+          cancellation_notice_date: lead.flight_info.cancellation_notice_date || null,
+          replacement_flight_number: lead.flight_info.replacement_flight_number || "",
+          replacement_offered: !!lead.flight_info.replacement_flight_number,
+          boarding_type: lead.flight_info.boarding_type || "",
+          confirmed_reservation: lead.flight_info.confirmed_reservation ?? null,
+          checked_in_on_time: lead.flight_info.checked_in_on_time ?? null,
+          denial_reason: lead.flight_info.denial_reason || "",
+          is_single_booking: lead.flight_info.is_single_booking || false,
         })
         .select("id")
         .single();

@@ -127,6 +127,20 @@ Deno.serve(async (req: Request) => {
       review_required: claimData.review_required || false,
       customer_user_id: customerUserId,
       access_token_hash: accessTokenHash,
+      // Phase B.2 fields
+      cancellation_notice_date: claimData.cancellation_notice_date || null,
+      cancellation_notice_source: claimData.cancellation_notice_source || '',
+      replacement_offered: claimData.replacement_offered || false,
+      replacement_accepted: claimData.replacement_accepted || false,
+      replacement_flight_number: claimData.replacement_flight_number || '',
+      replacement_scheduled_dep_customer: claimData.replacement_scheduled_dep_customer || null,
+      replacement_scheduled_arr_customer: claimData.replacement_scheduled_arr_customer || null,
+      boarding_type: claimData.boarding_type || '',
+      confirmed_reservation: claimData.confirmed_reservation ?? null,
+      checked_in_on_time: claimData.checked_in_on_time ?? null,
+      denial_reason: claimData.denial_reason || '',
+      is_single_booking: claimData.is_single_booking || false,
+      original_scheduled_final_arrival: claimData.original_scheduled_final_arrival || null,
     };
 
     const { data: newClaim, error: insertError } = await admin

@@ -70,3 +70,30 @@ export async function evaluateClaims(claimIds: string[]): Promise<EngineResult[]
   }
   return results;
 }
+
+/**
+ * Override the automated eligibility decision on a claim.
+ * Requires staff authentication and a mandatory reason (min 10 chars).
+ * The override is immutable once applied.
+ */
+export async function overrideEligibility(
+  claimId: string,
+  decision: 'Eligible' | 'Not Eligible' | 'Force Majeure' | 'Pending Check',
+  reason: string,
+): Promise<{ success: boolean; message: string }> {
+  if (!reason || reason.trim().length < 10) {
+    return { success: false, message: 'Override reason is mandatory (min 10 characters)' };
+  }
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/override-eligibility`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session?.access_token || ''}`,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ claimId, decision, reason }),
+  });
+  const data = await res.json();
+  return { success: data.success || false, message: data.message || data.error || 'Override failed' };
+}
