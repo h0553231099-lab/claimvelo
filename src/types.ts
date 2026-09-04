@@ -1,4 +1,15 @@
-export type ClaimStatus = 'Untouched' | 'Pending Check' | 'In Progress' | 'Submitted' | 'Waiting' | 'Resolved' | 'Escalated' | 'Eligible' | 'Not Eligible' | 'Not Eligible - Expired' | 'Force Majeure';
+// Operational workflow statuses — the claim lifecycle from intake to resolution.
+// These are the ONLY values allowed in claims.status.
+export type OperationalStatus = 'Untouched' | 'In Progress' | 'Submitted' | 'Waiting' | 'Escalated' | 'Resolved';
+
+// Eligibility decision statuses — set by the rules engine or admin override.
+// These live in claims.eligibility_status, separate from the operational status.
+export type EligibilityStatus = 'Pending Check' | 'Eligible' | 'Not Eligible' | 'Not Eligible - Expired' | 'Force Majeure';
+
+// Union kept for backwards-compatible badge/style maps that handle both types.
+export type ClaimStatus = OperationalStatus | EligibilityStatus;
+
+export type Priority = 'low' | 'medium' | 'high' | 'urgent';
 
 export interface Claim {
   id: string;
@@ -49,6 +60,23 @@ export interface Claim {
   override_reason?: string;
   overridden_by?: string;
   overridden_at?: string;
+  // Phase 1 — separated eligibility
+  eligibility_status?: EligibilityStatus | null;
+  // Phase 2 — priority + assignment
+  priority?: Priority;
+  assigned_to?: string | null;
+}
+
+export interface ClaimStatusHistory {
+  id: string;
+  claim_id: string;
+  field_name: 'status' | 'eligibility_status';
+  from_status: string | null;
+  to_status: string;
+  changed_by: string | null;
+  reason: string | null;
+  source: 'staff' | 'system' | 'insert';
+  created_at: string;
 }
 
 export interface ClaimFlightSegment {

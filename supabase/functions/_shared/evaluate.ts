@@ -729,10 +729,19 @@ async function applyDecision(
   claimId: string, claimRef: string,
   status: EngineDecision, detail: string,
 ): Promise<void> {
-  const update: Record<string, unknown> = { status, notes: detail, updated_at: new Date().toISOString() };
+  // Eligibility decisions go to eligibility_status, NOT the operational status.
+  // Terminal decisions (Not Eligible / Force Majeure) also close the operational
+  // lifecycle by setting status = 'Resolved'. Non-terminal decisions leave the
+  // operational status untouched so staff can continue the workflow.
+  const update: Record<string, unknown> = {
+    eligibility_status: status,
+    notes: detail,
+    updated_at: new Date().toISOString(),
+  };
   if (status === "Not Eligible" || status === "Not Eligible - Expired") {
     update.compensation_amount = 0;
     update.amount = "€0";
+    update.status = "Resolved";
   } else if (status === "Pending Check") {
     update.compensation_amount = null;
     update.amount = "Pending";

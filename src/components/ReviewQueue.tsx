@@ -82,7 +82,7 @@ export default function ReviewQueue() {
     const { data } = await supabase
       .from('claims')
       .select('id, claim_ref, flight_number, flight_date, departure, arrival, issue_type, airline_reason, status, review_reason_code, review_assigned_to, review_status, jurisdiction, operating_carrier, operating_carrier_name, operating_carrier_source, email, passenger_first_name, passenger_last_name')
-      .eq('status', 'Pending Check')
+      .eq('eligibility_status', 'Pending Check')
       .order('created_at', { ascending: false });
     if (data) setClaims(data as ReviewClaim[]);
 

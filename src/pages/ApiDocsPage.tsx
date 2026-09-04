@@ -483,7 +483,8 @@ export default function ApiDocsPage({ onNav }: Props) {
           {expandedSection === 'webhooks' && (
             <div className="px-5 pb-5 space-y-4">
               <p className="text-[12px] leading-relaxed text-slate-600">
-                When a claim's status changes (e.g. from "Pending Check" to "Eligible", or from "Eligible" to "Resolved"),
+                When a claim's operational status or eligibility decision changes (e.g. eligibility from "Pending Check" to "Eligible",
+                or operational status from "In Progress" to "Submitted"),
                 ClaimVelo automatically sends a POST request to the webhook URL configured for your agent account.
                 This lets your CRM receive updates in real time without polling.
               </p>
@@ -504,8 +505,10 @@ export default function ApiDocsPage({ onNav }: Props) {
   "data": {
     "claim_ref": "CLM-384452-VY4",
     "claim_id": "a1b2c3d4-...",
-    "old_status": "Pending Check",
-    "new_status": "Eligible",
+    "old_status": "Untouched",
+    "new_status": "In Progress",
+    "old_eligibility_status": "Pending Check",
+    "new_eligibility_status": "Eligible",
     "flight_number": "BA245",
     "flight_date": "2026-07-15",
     "departure": "LHR",
@@ -549,9 +552,15 @@ export default function ApiDocsPage({ onNav }: Props) {
               </div>
 
               <div className="space-y-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Possible Status Values</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Possible Eligibility Status Values (evaluation_status)</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {['Pending Check', 'In Progress', 'Submitted', 'Waiting', 'Resolved', 'Escalated', 'Eligible', 'Not Eligible', 'Not Eligible - Expired', 'Force Majeure'].map(s => (
+                  {['Pending Check', 'Eligible', 'Not Eligible', 'Not Eligible - Expired'].map(s => (
+                    <span key={s} className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{s}</span>
+                  ))}
+                </div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 pt-2">Possible Operational Status Values (status)</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Untouched', 'In Progress', 'Submitted', 'Waiting', 'Escalated', 'Resolved'].map(s => (
                     <span key={s} className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{s}</span>
                   ))}
                 </div>

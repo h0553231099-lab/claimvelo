@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
-import { Claim, ClaimStatus, AdminView, UserProfile } from '../types';
+import { Claim, ClaimStatus, OperationalStatus, EligibilityStatus, Priority, ClaimStatusHistory, AdminView, UserProfile } from '../types';
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
 import { recalculateAgentPayout, logAgentPayout } from '../lib/financialService';
 import { Page } from '../types';
-import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2, Key, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2, Key, Eye, EyeOff, CheckCircle, Flag, UserCheck, History } from 'lucide-react';
 import BulkImport from '../components/BulkImport';
 import ReviewQueue from '../components/ReviewQueue';
 import OverridePanel from '../components/OverridePanel';
@@ -53,7 +53,26 @@ interface ClaimFile {
 
 interface Props { onNav: (p: Page) => void; user?: UserProfile; onSignOut?: () => void; }
 
-const STAGES: ClaimStatus[] = ['Untouched','Pending Check','In Progress','Submitted','Waiting','Resolved','Escalated','Eligible','Not Eligible','Not Eligible - Expired','Force Majeure'];
+// Operational lifecycle stages — the only values allowed in claims.status
+const STAGES: OperationalStatus[] = ['Untouched', 'In Progress', 'Submitted', 'Waiting', 'Escalated', 'Resolved'];
+
+// Eligibility decision statuses — live in claims.eligibility_status
+const ELIGIBILITY_STATUSES: EligibilityStatus[] = ['Pending Check', 'Eligible', 'Not Eligible', 'Not Eligible - Expired', 'Force Majeure'];
+
+const PRIORITY_OPTIONS: Priority[] = ['low', 'medium', 'high', 'urgent'];
+const PRIORITY_STYLE: Record<Priority, string> = {
+  low: 'bg-[#f1f5f9] text-[#64748b]',
+  medium: 'bg-[#eff6ff] text-[#2563eb]',
+  high: 'bg-[#fff7ed] text-[#ea580c]',
+  urgent: 'bg-[#fef2f2] text-[#dc2626]',
+};
+const PRIORITY_DOT: Record<Priority, string> = {
+  low: '#94a3b8',
+  medium: '#2563eb',
+  high: '#ea580c',
+  urgent: '#dc2626',
+};
+
 const SB: Record<string, string> = {
   'Untouched':'bg-[#f8fafc] text-[#64748b]',
   'Pending Check':'bg-[#fff7ed] text-[#ea580c]',
@@ -68,6 +87,17 @@ const SB: Record<string, string> = {
   'Force Majeure':'bg-[#fef3c7] text-[#92400e]',
 };
 const MONTHS = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+
+// Mirrors the DB is_valid_status_transition() function — used to disable
+// invalid transition buttons in the UI before the request reaches the DB.
+const VALID_TRANSITIONS: Record<OperationalStatus, OperationalStatus[]> = {
+  'Untouched':   ['In Progress', 'Submitted', 'Resolved'],
+  'In Progress': ['Submitted', 'Waiting', 'Escalated', 'Resolved'],
+  'Submitted':   ['Waiting', 'Escalated', 'Resolved', 'In Progress'],
+  'Waiting':     ['Escalated', 'Resolved', 'Submitted', 'In Progress'],
+  'Escalated':   ['Resolved', 'Waiting', 'In Progress'],
+  'Resolved':    ['In Progress'],
+};
 
 function Badge({ status }: { status: string }) {
   return <span className={`inline-flex px-2 py-0.5 rounded-[10px] text-[10px] font-semibold ${SB[status] || 'bg-[#f8fafc] text-[#64748b]'}`}>{status}</span>;
@@ -810,8 +840,12 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [showMyClaims, setShowMyClaims] = useState(false);
   const [panel, setPanel] = useState<Claim | null>(null);
   const [panelTab, setPanelTab] = useState<'details' | 'loa' | 'files'>('details');
+  const [statusHistory, setStatusHistory] = useState<ClaimStatusHistory[]>([]);
   const [noteText, setNoteText] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteSaved, setNoteSaved] = useState<'idle' | 'ok' | 'err'>('idle');
@@ -1344,10 +1378,18 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     if (av === 'finance') loadFinance();
   }, [av]);
 
+  useEffect(() => {
+    if (panel) loadStatusHistory(panel.id);
+    else setStatusHistory([]);
+  }, [panel?.id]);
+
   const filtered = claims.filter(c => {
     const q = search.toLowerCase();
     return (!q || [c.claim_ref, c.passenger_first_name, c.passenger_last_name, c.airline, c.departure, c.arrival].join(' ').toLowerCase().includes(q))
-      && (!statusFilter || c.status === statusFilter);
+      && (!statusFilter || c.status === statusFilter)
+      && (!priorityFilter || c.priority === priorityFilter)
+      && (!assigneeFilter || (assigneeFilter === 'unassigned' ? !c.assigned_to : c.assigned_to === assigneeFilter))
+      && (!showMyClaims || c.assigned_to === user?.id);
   });
 
   async function saveNote() {
@@ -1366,11 +1408,16 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     setTimeout(() => setNoteSaved('idle'), 2500);
   }
 
-  async function updateStatus(id: string, ns: ClaimStatus) {
+  async function updateStatus(id: string, ns: OperationalStatus) {
     const oldClaim = claims.find(c => c.id === id);
-    await supabase.from('claims').update({ status: ns }).eq('id', id);
+    const { error } = await supabase.from('claims').update({ status: ns }).eq('id', id);
+    if (error) {
+      alert(`Status update failed: ${error.message}`);
+      return;
+    }
     setClaims(cl => cl.map(c => c.id === id ? { ...c, status: ns } : c));
     setPanel(p => p?.id === id ? { ...p, status: ns } : p);
+    if (panel?.id === id) loadStatusHistory(id);
     if (oldClaim && oldClaim.status !== ns) {
       const passengerName = `${oldClaim.passenger_first_name} ${oldClaim.passenger_last_name}`.trim();
       insertNotification({
@@ -1393,6 +1440,27 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
         });
       }
     }
+  }
+
+  async function updatePriority(id: string, priority: Priority) {
+    await supabase.from('claims').update({ priority }).eq('id', id);
+    setClaims(cl => cl.map(c => c.id === id ? { ...c, priority } : c));
+    setPanel(p => p?.id === id ? { ...p, priority } : p);
+  }
+
+  async function assignClaim(id: string, staffId: string) {
+    await supabase.from('claims').update({ assigned_to: staffId || null }).eq('id', id);
+    setClaims(cl => cl.map(c => c.id === id ? { ...c, assigned_to: staffId || null } : c));
+    setPanel(p => p?.id === id ? { ...p, assigned_to: staffId || null } : p);
+  }
+
+  async function loadStatusHistory(claimId: string) {
+    const { data } = await supabase
+      .from('claim_status_history')
+      .select('*')
+      .eq('claim_id', claimId)
+      .order('created_at', { ascending: false });
+    setStatusHistory(data as ClaimStatusHistory[] || []);
   }
 
   const sidebarMainItems: AdminView[] = isWorker ? ['dash','claims'] : ['dash','claims','crm','review','bulk'];
@@ -1601,24 +1669,55 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   <option value="">All statuses</option>
                   {STAGES.map(s=><option key={s}>{s}</option>)}
                 </select>
+                <select value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)} className="px-2.5 py-1.5 border border-[#e2e8f0] rounded-[7px] text-xs outline-none bg-white cursor-pointer">
+                  <option value="">All priorities</option>
+                  {PRIORITY_OPTIONS.map(p=><option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+                </select>
+                <select value={assigneeFilter} onChange={e=>setAssigneeFilter(e.target.value)} className="px-2.5 py-1.5 border border-[#e2e8f0] rounded-[7px] text-xs outline-none bg-white cursor-pointer">
+                  <option value="">All staff</option>
+                  <option value="unassigned">Unassigned</option>
+                  {workers.map(w=><option key={w.id} value={w.id}>{w.full_name}</option>)}
+                </select>
+                <button
+                  onClick={() => setShowMyClaims(v => !v)}
+                  className={`px-2.5 py-1.5 rounded-[7px] text-xs font-semibold border cursor-pointer transition-colors ${showMyClaims ? 'bg-[#2563eb] text-white border-[#2563eb]' : 'bg-[#f8fafc] text-[#64748b] border-[#e2e8f0] hover:bg-[#e2e8f0]'}`}
+                >
+                  <UserCheck className="w-3 h-3 inline mr-1" />My Claims
+                </button>
                 <span className="ml-auto text-[11px] text-[#64748b]">{filtered.length} claims</span>
               </div>
               <table className="w-full border-collapse">
                 <thead><tr>
-                  {['ID','Passenger','Route','Airline','Issue','Amount','Status','Filed',''].map(h => (
+                  {['ID','Passenger','Route','Airline','Issue','Amount','Priority','Status','Filed',''].map(h => (
                     <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
-                  {filtered.map(c => (
+                  {filtered.map(c => {
+                    const assignee = c.assigned_to ? workers.find(w => w.id === c.assigned_to) : null;
+                    return (
                     <tr key={c.id} className="hover:bg-[#f8fafc] group">
                       <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold text-[#2563eb] cursor-pointer" onClick={() => setPanel(c)}>{c.claim_ref}</td>
-                      <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs cursor-pointer" onClick={() => setPanel(c)}>{c.passenger_first_name} {c.passenger_last_name}</td>
+                      <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs cursor-pointer" onClick={() => setPanel(c)}>
+                        {c.passenger_first_name} {c.passenger_last_name}
+                        {assignee && <div className="text-[9px] text-[#64748b] font-normal">👤 {assignee.full_name}</div>}
+                      </td>
                       <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs cursor-pointer" onClick={() => setPanel(c)}>{c.departure}→{c.arrival}</td>
                       <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs cursor-pointer" onClick={() => setPanel(c)}>{c.airline}</td>
                       <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs max-w-[120px] truncate cursor-pointer" onClick={() => setPanel(c)}>{c.issue_type}</td>
                       <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold cursor-pointer" onClick={() => setPanel(c)}>{c.amount}</td>
-                      <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs cursor-pointer" onClick={() => setPanel(c)}><Badge status={c.status} /></td>
+                      <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs cursor-pointer" onClick={() => setPanel(c)}>
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${PRIORITY_STYLE[c.priority || 'medium']}`}>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: PRIORITY_DOT[c.priority || 'medium'] }} />
+                          {c.priority || 'medium'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs cursor-pointer" onClick={() => setPanel(c)}>
+                        <Badge status={c.status} />
+                        {c.eligibility_status && (
+                          <div className="mt-0.5"><span className={`inline-flex px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${SB[c.eligibility_status] || 'bg-[#f8fafc] text-[#64748b]'}`}>{c.eligibility_status}</span></div>
+                        )}
+                      </td>
                       <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs text-[#64748b] cursor-pointer" onClick={() => setPanel(c)}>{c.created_at?.split('T')[0]}</td>
                       <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs">
                         {!isWorker && (
@@ -1645,7 +1744,8 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1668,7 +1768,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                         const agentWorker = c.agent && c.agent !== '—' ? workers.find(w => w.agent_code === c.agent) : null;
                         return (
                           <div key={c.id} onClick={() => { setPanel(c); }} className="bg-white border border-[#e2e8f0] rounded-[7px] p-2.5 mb-1.5 cursor-pointer hover:shadow-md hover:-translate-y-px transition-all">
-                            <div className="text-[10px] text-[#64748b]">{c.claim_ref}</div>
+                            <div className="flex items-center justify-between">
+                              <div className="text-[10px] text-[#64748b]">{c.claim_ref}</div>
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: PRIORITY_DOT[c.priority || 'medium'] }} title={c.priority || 'medium'} />
+                            </div>
                             <div className="font-semibold text-xs my-0.5">{c.passenger_first_name} {c.passenger_last_name}</div>
                             <div className="text-[11px] text-[#64748b] mb-1">✈ {c.departure}→{c.arrival}</div>
                             {agentWorker && (
@@ -3009,34 +3112,86 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                       ))}
                     </div>
                   </div>
+
+                  {/* Eligibility status */}
                   <div className="mb-4">
-                    <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Status Timeline</div>
-                    <ul className="list-none">
-                      {STAGES.map((s,i) => {
-                        const si = STAGES.indexOf(panel.status);
-                        const done = i <= si;
-                        return (
-                          <li key={s} className="flex gap-2.5 pb-3 relative last:pb-0">
-                            {i < STAGES.length - 1 && <div className="absolute left-[9px] top-5 bottom-0 w-px bg-[#e2e8f0]" />}
-                            <div className={`w-[19px] h-[19px] rounded-full border-2 flex items-center justify-center text-[8px] shrink-0 mt-0.5 z-10 ${done?'bg-[#2563eb] border-[#2563eb] text-white':'bg-white border-[#e2e8f0]'}`}>{done?'✓':''}</div>
-                            <div>
-                              <div className="font-semibold text-[11px]">{s}</div>
-                              <div className="text-[10px] text-[#64748b] mt-0.5">{i<si?'Completed':i===si?'Current':'Pending'}</div>
+                    <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Eligibility</div>
+                    <div className="flex items-center gap-2">
+                      {panel.eligibility_status ? (
+                        <span className={`inline-flex px-2.5 py-1 rounded-[10px] text-[11px] font-semibold ${SB[panel.eligibility_status] || 'bg-[#f8fafc] text-[#64748b]'}`}>{panel.eligibility_status}</span>
+                      ) : (
+                        <span className="text-[11px] text-[#94a3b8]">Not yet evaluated</span>
+                      )}
+                      {panel.override_decision && (
+                        <span className="text-[10px] text-[#92400e] bg-[#fef3c7] px-1.5 py-0.5 rounded-full font-semibold">Overridden</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Priority + Assignment */}
+                  <div className="mb-4 grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-1.5 flex items-center gap-1"><Flag className="w-3 h-3" />Priority</div>
+                      <select
+                        value={panel.priority || 'medium'}
+                        onChange={e => updatePriority(panel.id, e.target.value as Priority)}
+                        className="w-full px-2.5 py-1.5 border border-[#e2e8f0] rounded-[7px] text-xs outline-none bg-white cursor-pointer"
+                      >
+                        {PRIORITY_OPTIONS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-1.5 flex items-center gap-1"><UserCheck className="w-3 h-3" />Assigned To</div>
+                      <select
+                        value={panel.assigned_to || ''}
+                        onChange={e => assignClaim(panel.id, e.target.value)}
+                        className="w-full px-2.5 py-1.5 border border-[#e2e8f0] rounded-[7px] text-xs outline-none bg-white cursor-pointer"
+                      >
+                        <option value="">Unassigned</option>
+                        {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Status history (real, from claim_status_history) */}
+                  <div className="mb-4">
+                    <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5 flex items-center gap-1"><History className="w-3 h-3" />Status History</div>
+                    {statusHistory.length === 0 ? (
+                      <div className="text-[11px] text-[#94a3b8]">No status changes recorded yet.</div>
+                    ) : (
+                      <ul className="list-none">
+                        {statusHistory.map((h, i) => (
+                          <li key={h.id} className="flex gap-2.5 pb-2.5 relative last:pb-0">
+                            {i < statusHistory.length - 1 && <div className="absolute left-[9px] top-5 bottom-0 w-px bg-[#e2e8f0]" />}
+                            <div className={`w-[19px] h-[19px] rounded-full border-2 flex items-center justify-center text-[8px] shrink-0 mt-0.5 z-10 ${h.field_name === 'status' ? 'bg-[#2563eb] border-[#2563eb] text-white' : 'bg-[#059669] border-[#059669] text-white'}`}>{h.field_name === 'status' ? 'S' : 'E'}</div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-[11px]">
+                                {h.from_status ? `${h.from_status} → ${h.to_status}` : `Initial: ${h.to_status}`}
+                              </div>
+                              <div className="text-[10px] text-[#64748b] mt-0.5">
+                                {h.source === 'staff' ? 'Staff' : h.source === 'insert' ? 'Created' : 'System'} · {new Date(h.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </div>
                             </div>
                           </li>
-                        );
-                      })}
-                    </ul>
+                        ))}
+                      </ul>
+                    )}
                   </div>
+
+                  {/* Update operational status */}
                   <div className="mb-4">
                     <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Update Status</div>
                     <div className="flex gap-1.5 flex-wrap">
-                      {STAGES.map(s => (
-                        <button key={s} onClick={() => updateStatus(panel.id, s)}
-                          className={`px-2.5 py-1 rounded-[7px] text-xs font-semibold border-none cursor-pointer transition-colors ${s===panel.status?'bg-[#2563eb] text-white':'bg-[#f8fafc] border border-[#e2e8f0] text-[#0f172a] hover:bg-[#e2e8f0]'}`}>
-                          {s}
-                        </button>
-                      ))}
+                      {STAGES.map(s => {
+                        const isValid = s === panel.status || VALID_TRANSITIONS[panel.status]?.includes(s);
+                        return (
+                          <button key={s} onClick={() => updateStatus(panel.id, s)}
+                            disabled={!isValid}
+                            className={`px-2.5 py-1 rounded-[7px] text-xs font-semibold border-none cursor-pointer transition-colors ${s===panel.status?'bg-[#2563eb] text-white':isValid?'bg-[#f8fafc] border border-[#e2e8f0] text-[#0f172a] hover:bg-[#e2e8f0]':'bg-[#f8fafc] text-[#cbd5e1] cursor-not-allowed'}`}>
+                            {s}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                   <div>
