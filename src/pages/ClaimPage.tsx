@@ -4,6 +4,10 @@ import { supabase, lookupFlight, FlightLookupResult, AI_URL, AI_HEADERS } from '
 import { Plane, ArrowRight, ArrowLeft, Check, Search, AlertTriangle, X, Upload, FileText, Image, Trash2, Ban } from 'lucide-react';
 import AirportInput from '../components/AirportInput';
 import { CheckerPrefill } from '../components/CompensationChecker';
+import IssueTypeSelector, { type IssueType } from '../components/IssueTypeSelector';
+import CancellationFields from '../components/CancellationFields';
+import DeniedBoardingFields from '../components/DeniedBoardingFields';
+import ConnectingFlightFields, { type SegmentData } from '../components/ConnectingFlightFields';
 
 interface Props { onNav: (p: Page) => void; prefill?: CheckerPrefill; }
 
@@ -87,6 +91,22 @@ export default function ClaimPage({ onNav, prefill }: Props) {
   // ── STEP 3 ────────────────────────────────────────────────────────────────────
   const [airlineReason, setAirlineReason] = useState<AirlineReason | ''>('');
   const [reasonBlocked, setReasonBlocked] = useState(false);
+
+  // Issue type + conditional fields
+  const [issueType, setIssueType] = useState<IssueType | ''>('');
+  const [cancellationNoticeDate, setCancellationNoticeDate] = useState('');
+  const [cancellationNoticeSource, setCancellationNoticeSource] = useState('');
+  const [replacementOffered, setReplacementOffered] = useState(false);
+  const [replacementAccepted, setReplacementAccepted] = useState(false);
+  const [replacementFlightNumber, setReplacementFlightNumber] = useState('');
+  const [boardingType, setBoardingType] = useState('');
+  const [confirmedReservation, setConfirmedReservation] = useState<boolean | null>(null);
+  const [checkedInOnTime, setCheckedInOnTime] = useState<boolean | null>(null);
+  const [denialReason, setDenialReason] = useState('');
+
+  // Connecting flight segments
+  const [isSingleBooking, setIsSingleBooking] = useState<boolean | null>(null);
+  const [segments, setSegments] = useState<SegmentData[]>([]);
 
   // Prior compensation check
   type PriorCompType = 'Food & Hotel Vouchers' | 'Cash' | 'Flight Voucher';
@@ -439,7 +459,7 @@ export default function ClaimPage({ onNav, prefill }: Props) {
             departure: dep,
             arrival: arr,
             airline: sf?.airline || '',
-            issue_type: 'Flight Disruption',
+            issue_type: issueType || 'Delay',
             airline_reason: airlineReason,
             agent: agentCode || '—',
             loa_signed: hasSig && loaChecked,
@@ -447,7 +467,23 @@ export default function ClaimPage({ onNav, prefill }: Props) {
             prior_comp_type: priorComp === 'Yes' ? priorCompType || null : null,
             prior_signed: priorComp === 'Yes' ? priorSigned || null : null,
             review_required: priorReviewFlag,
+            // Cancellation fields
+            cancellation_notice_date: issueType === 'Cancellation' ? cancellationNoticeDate || null : null,
+            cancellation_notice_source: issueType === 'Cancellation' ? cancellationNoticeSource : '',
+            replacement_offered: issueType === 'Cancellation' ? replacementOffered : false,
+            replacement_accepted: issueType === 'Cancellation' ? replacementAccepted : false,
+            replacement_flight_number: issueType === 'Cancellation' && replacementAccepted ? replacementFlightNumber : '',
+            // Denied boarding fields
+            boarding_type: issueType === 'Denied Boarding' ? boardingType : '',
+            confirmed_reservation: issueType === 'Denied Boarding' ? confirmedReservation : null,
+            checked_in_on_time: issueType === 'Denied Boarding' ? checkedInOnTime : null,
+            denial_reason: issueType === 'Denied Boarding' ? denialReason : '',
+            // Connecting flight fields
+            is_single_booking: issueType === 'Missed Connection' ? (isSingleBooking || false) : false,
           },
+          segments: issueType === 'Missed Connection' && segments.length > 0
+            ? segments.map((s, i) => ({ ...s, segment_order: i + 1 }))
+            : undefined,
           files: fileMetadata,
         }),
       });
@@ -978,6 +1014,57 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                     </div>
                   </div>
 
+                  {/* ── Issue type selection ─────────────────────────────── */}
+                  <div className="mb-5">
+                    <IssueTypeSelector value={issueType} onChange={setIssueType} />
+                  </div>
+
+                  {/* ── Cancellation conditional fields ──────────────────── */}
+                  {issueType === 'Cancellation' && (
+                    <div className="mb-5">
+                      <CancellationFields
+                        cancellationNoticeDate={cancellationNoticeDate}
+                        setCancellationNoticeDate={setCancellationNoticeDate}
+                        cancellationNoticeSource={cancellationNoticeSource}
+                        setCancellationNoticeSource={setCancellationNoticeSource}
+                        replacementOffered={replacementOffered}
+                        setReplacementOffered={setReplacementOffered}
+                        replacementAccepted={replacementAccepted}
+                        setReplacementAccepted={setReplacementAccepted}
+                        replacementFlightNumber={replacementFlightNumber}
+                        setReplacementFlightNumber={setReplacementFlightNumber}
+                      />
+                    </div>
+                  )}
+
+                  {/* ── Denied boarding conditional fields ─────────────── */}
+                  {issueType === 'Denied Boarding' && (
+                    <div className="mb-5">
+                      <DeniedBoardingFields
+                        boardingType={boardingType}
+                        setBoardingType={setBoardingType}
+                        confirmedReservation={confirmedReservation}
+                        setConfirmedReservation={setConfirmedReservation}
+                        checkedInOnTime={checkedInOnTime}
+                        setCheckedInOnTime={setCheckedInOnTime}
+                        denialReason={denialReason}
+                        setDenialReason={setDenialReason}
+                      />
+                    </div>
+                  )}
+
+                  {/* ── Missed Connection conditional fields ─────────────── */}
+                  {issueType === 'Missed Connection' && (
+                    <div className="mb-5">
+                      <ConnectingFlightFields
+                        isSingleBooking={isSingleBooking}
+                        setIsSingleBooking={setIsSingleBooking}
+                        segments={segments}
+                        setSegments={setSegments}
+                      />
+                    </div>
+                  )}
+
                   {/* ── Prior compensation check ─────────────────────────── */}
                   <div className="mb-5">
                     <div className="font-bold text-[15px] text-[#0f172a] mb-1">Have you received any compensation, vouchers, or signed a document with the airline? <span className="text-[#dc2626]">*</span></div>
@@ -1084,6 +1171,11 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                         reasonBlocked ||
                         priorComp === '' ||
                         (priorComp === 'Yes' && (!priorCompType || !priorSigned)) ||
+                        !issueType ||
+                        (issueType === 'Cancellation' && !cancellationNoticeDate) ||
+                        (issueType === 'Cancellation' && replacementOffered && replacementAccepted && !replacementFlightNumber) ||
+                        (issueType === 'Denied Boarding' && (!boardingType || confirmedReservation === null || checkedInOnTime === null)) ||
+                        (issueType === 'Missed Connection' && (isSingleBooking === null || segments.length === 0 || segments.some(s => !s.flight_number || !s.flight_date || !s.origin || !s.destination))) ||
                         !/^[A-Z]{3}$/.test(selectedFlight.depCode) ||
                         !/^[A-Z]{3}$/.test(selectedFlight.arrCode)
                       }
