@@ -30,8 +30,11 @@ CREATE POLICY "claim_flight_segments_admin_read"
     )
   );
 
--- ── audit_log: admin/staff can SELECT ───────────────────────────────────────
+-- ── audit_log: admin/super_admin ONLY (not worker) ──────────────────────────
+-- The OverridePanel (the only UI that reads audit_log) is hidden from workers
+-- via !isWorker in AdminPage. Workers do not need audit-log access.
 DROP POLICY IF EXISTS "audit_log_admin_read" ON audit_log;
+DROP POLICY IF EXISTS "Admins can read audit log" ON audit_log;
 CREATE POLICY "audit_log_admin_read"
   ON audit_log
   FOR SELECT
@@ -40,7 +43,7 @@ CREATE POLICY "audit_log_admin_read"
     EXISTS (
       SELECT 1 FROM profiles
       WHERE id = auth.uid()
-      AND role IN ('admin', 'super_admin', 'worker')
+      AND role IN ('admin', 'super_admin')
     )
   );
 

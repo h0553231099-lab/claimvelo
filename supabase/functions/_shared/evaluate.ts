@@ -806,7 +806,7 @@ export async function evaluateClaimInternal(
 
   const { data: claim, error } = await supabase
     .from("claims")
-    .select("id, claim_ref, flight_number, flight_date, departure, arrival, airline_reason, issue_type, agent, cancellation_notice_date, replacement_offered, replacement_accepted, replacement_flight_number, replacement_scheduled_dep_verified, replacement_scheduled_arr_verified, replacement_actual_arr_verified, boarding_type, confirmed_reservation, checked_in_on_time, denial_reason, is_single_booking, original_scheduled_final_arrival")
+    .select("id, claim_ref, flight_number, flight_date, departure, arrival, airline_reason, issue_type, agent, cancellation_notice_date, replacement_offered, replacement_accepted, replacement_flight_number, replacement_scheduled_dep_verified, replacement_scheduled_arr_verified, replacement_actual_arr_verified, boarding_type, confirmed_reservation, checked_in_on_time, denial_reason, is_single_booking, original_scheduled_final_arrival, final_destination_delay_minutes")
     .eq("id", claimId)
     .maybeSingle();
 
@@ -1099,9 +1099,20 @@ export async function evaluateClaimInternal(
         { ...evBase, flight: matched, crossCheckStatus: "incomplete", crossCheckDetails: { ...cc.details, segment_count: segments.length, unverified_segments: unverified.map((s: Record<string, unknown>) => s.segment_order) } },
       );
     }
-    // Use final-destination delay from the last segment
+    // Use final-destination delay — prefer the claim-level value computed by
+    // verifyAndStoreSegments (which uses original_scheduled_final_arrival as
+    // the canonical baseline). Fall back to computing it from the last
+    // segment's actual_arrival vs original_scheduled_final_arrival, and only
+    // as a last resort use the segment's own delay_minutes.
     const lastSegment = segments[segments.length - 1] as Record<string, unknown>;
-    if (lastSegment.delay_minutes != null) {
+    if (claim.final_destination_delay_minutes != null) {
+      delayMinutes = claim.final_destination_delay_minutes as number;
+    } else if (claim.original_scheduled_final_arrival && lastSegment.actual_arrival) {
+      delayMinutes = Math.max(0, Math.round(
+        (new Date(lastSegment.actual_arrival as string).getTime() -
+         new Date(claim.original_scheduled_final_arrival as string).getTime()) / 60000,
+      ));
+    } else if (lastSegment.delay_minutes != null) {
       delayMinutes = lastSegment.delay_minutes as number;
     }
   }

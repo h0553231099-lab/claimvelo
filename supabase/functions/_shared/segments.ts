@@ -51,6 +51,15 @@ export async function verifyAndStoreSegments(
   let allVerified = true;
   let finalDestinationDelay: number | null = null;
 
+  // Fetch the claim's original_scheduled_final_arrival — the canonical baseline
+  // that must NEVER be replaced by a rerouted/replacement itinerary.
+  const { data: claimRow } = await supabase
+    .from("claims")
+    .select("original_scheduled_final_arrival")
+    .eq("id", claimId)
+    .maybeSingle();
+  let originalScheduledFinalArrival: string | null = claimRow?.original_scheduled_final_arrival ?? null;
+
   for (const seg of segments) {
     const providers: ProviderResult[] = [];
     const aero = await fetchAeroDataBox(seg.flight_number, seg.flight_date, aeroKey);
@@ -99,19 +108,35 @@ export async function verifyAndStoreSegments(
       allVerified = false;
     }
 
-    // If this is the last segment, compute final-destination delay
-    if (seg.segment_order === segments.length && matched?.actualArrival && matched?.scheduledArrival) {
-      const actual = new Date(matched.actualArrival).getTime();
-      const scheduled = new Date(matched.scheduledArrival).getTime();
-      finalDestinationDelay = Math.max(0, Math.round((actual - scheduled) / 60000));
+    // If this is the last segment, compute final-destination delay using
+    // original_scheduled_final_arrival as the canonical baseline — NOT the
+    // last segment's own scheduled_arrival (which may belong to a
+    // rerouted/replacement flight and must never replace the original).
+    if (seg.segment_order === segments.length && matched?.actualArrival) {
+      // If original_scheduled_final_arrival is not yet set, capture it from
+      // the last segment's provider-verified scheduled arrival (first run).
+      if (!originalScheduledFinalArrival && matched.scheduledArrival) {
+        originalScheduledFinalArrival = matched.scheduledArrival;
+      }
+      if (originalScheduledFinalArrival) {
+        const actual = new Date(matched.actualArrival).getTime();
+        const baseline = new Date(originalScheduledFinalArrival).getTime();
+        finalDestinationDelay = Math.max(0, Math.round((actual - baseline) / 60000));
+      }
     }
   }
 
-  // Update claim with final-destination delay
+  // Update claim with final-destination delay AND persist the canonical
+  // original_scheduled_final_arrival so it is never overwritten on re-eval.
+  const updateFields: Record<string, unknown> = {};
   if (finalDestinationDelay !== null) {
-    await supabase.from("claims").update({
-      final_destination_delay_minutes: finalDestinationDelay,
-    }).eq("id", claimId);
+    updateFields.final_destination_delay_minutes = finalDestinationDelay;
+  }
+  if (originalScheduledFinalArrival) {
+    updateFields.original_scheduled_final_arrival = originalScheduledFinalArrival;
+  }
+  if (Object.keys(updateFields).length > 0) {
+    await supabase.from("claims").update(updateFields).eq("id", claimId);
   }
 
   return { allVerified, finalDestinationDelay };
