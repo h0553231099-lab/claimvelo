@@ -14,6 +14,8 @@ export const AI_HEADERS = {
 export const EMAIL_URL = `${supabaseUrl}/functions/v1/send-claim-email`;
 export const SEND_STAFF_EMAIL_URL = `${supabaseUrl}/functions/v1/send-staff-email`;
 export const FLIGHT_LOOKUP_URL = `${supabaseUrl}/functions/v1/flight-lookup`;
+export const GMAIL_SYNC_URL = `${supabaseUrl}/functions/v1/gmail-sync`;
+export const GMAIL_SEND_URL = `${supabaseUrl}/functions/v1/gmail-send`;
 
 export type FlightLookupResult = {
   flightNum: string;

@@ -77,7 +77,7 @@ export interface Claim {
 export interface ClaimStatusHistory {
   id: string;
   claim_id: string;
-  field_name: 'status' | 'eligibility_status' | 'priority' | 'assigned_to' | 'document_upload' | 'override' | 'review_decision' | 'info_request';
+  field_name: 'status' | 'eligibility_status' | 'priority' | 'assigned_to' | 'document_upload' | 'override' | 'review_decision' | 'info_request' | 'airline_email';
   from_status: string | null;
   to_status: string;
   changed_by: string | null;
@@ -181,7 +181,55 @@ export interface UserProfile {
 }
 
 export type Page = 'home' | 'claim' | 'claim-success' | 'dashboard' | 'admin' | 'loa' | 'about' | 'signin' | 'agent-signin' | 'sales-signin' | 'seo-signin' | 'how-it-works' | 'fees' | 'privacy' | 'agent-dashboard' | 'sales-dashboard' | 'seo-dashboard' | 'partners' | 'ireland' | 'united-kingdom' | 'api-docs';
-export type AdminView = 'dash' | 'claims' | 'crm' | 'inbox' | 'notifs' | 'analytics' | 'automation' | 'users' | 'settings' | 'finance' | 'qr' | 'partners' | 'bulk' | 'review';
+export type AdminView = 'dash' | 'claims' | 'crm' | 'inbox' | 'airline-emails' | 'notifs' | 'analytics' | 'automation' | 'users' | 'settings' | 'finance' | 'qr' | 'partners' | 'bulk' | 'review';
+
+// ── Phase 6 — Airline Email Integration ────────────────────────────────────────
+
+export type EmailDirection = 'inbound' | 'outbound';
+export type MatchConfidence = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE' | 'AMBIGUOUS';
+export type EmailStatus = 'NEW' | 'SEEN' | 'IN_PROGRESS' | 'WAITING' | 'RESOLVED' | 'ESCALATED';
+
+export interface AirlineEmail {
+  id: string;
+  gmail_message_id: string;
+  thread_id: string;
+  direction: EmailDirection;
+  from_address: string;
+  from_name: string;
+  to_address: string;
+  cc_address: string;
+  subject: string;
+  body_text: string;
+  body_html: string;
+  snippet: string;
+  received_at: string | null;
+  sent_at: string | null;
+  claim_id: string | null;
+  matching_confidence: MatchConfidence;
+  matched_fields: Record<string, string>;
+  matched_claim_refs: string[];
+  email_status: EmailStatus;
+  assigned_to: string | null;
+  next_action: string;
+  due_at: string | null;
+  has_attachments: boolean;
+  attachment_count: number;
+  sync_batch_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AirlineEmailAttachment {
+  id: string;
+  email_id: string;
+  claim_id: string | null;
+  gmail_attachment_id: string;
+  file_name: string;
+  content_type: string;
+  file_size: number;
+  storage_path: string;
+  created_at: string;
+}
 
 export interface ClaimFormData {
   firstName: string;
