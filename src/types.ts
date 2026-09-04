@@ -65,12 +65,15 @@ export interface Claim {
   // Phase 2 — priority + assignment
   priority?: Priority;
   assigned_to?: string | null;
+  // Compensation (numeric, from rules engine)
+  compensation_amount?: number | null;
+  review_completed_at?: string;
 }
 
 export interface ClaimStatusHistory {
   id: string;
   claim_id: string;
-  field_name: 'status' | 'eligibility_status';
+  field_name: 'status' | 'eligibility_status' | 'priority' | 'assigned_to' | 'review_status' | 'review_assigned_to';
   from_status: string | null;
   to_status: string;
   changed_by: string | null;
@@ -99,6 +102,33 @@ export interface ClaimFlightSegment {
   delay_minutes?: number;
   flight_status?: string;
   cross_check_status?: string;
+}
+
+// Claim file (document attached to a claim)
+export interface ClaimFile {
+  id: string;
+  claim_id: string;
+  uploaded_by: string | null;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  storage_path: string;
+  note: string;
+  created_at: string;
+}
+
+// Flight evidence summary — only non-sensitive fields exposed to the frontend.
+// Raw provider_evidence and cross_check_details are server-side only.
+export interface FlightEvidenceSummary {
+  claim_id: string;
+  data_source: string | null;
+  delay_minutes: number | null;
+  flight_status: string | null;
+  cross_check_status: string | null;
+  decision: string | null;
+  decision_reason: string | null;
+  scheduled_arrival: string | null;
+  actual_arrival: string | null;
 }
 
 export type UserRole = 'admin' | 'super_admin' | 'worker' | 'customer' | 'agent' | 'sales_manager' | 'seo_worker';

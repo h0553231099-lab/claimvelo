@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
-import { Claim, ClaimStatus, OperationalStatus, EligibilityStatus, Priority, ClaimStatusHistory, AdminView, UserProfile } from '../types';
+import { Claim, ClaimStatus, OperationalStatus, EligibilityStatus, Priority, ClaimFile, FlightEvidenceSummary, ClaimFlightSegment, AdminView, UserProfile } from '../types';
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
 import { recalculateAgentPayout, logAgentPayout } from '../lib/financialService';
 import { Page } from '../types';
@@ -8,6 +8,7 @@ import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus,
 import BulkImport from '../components/BulkImport';
 import ReviewQueue from '../components/ReviewQueue';
 import OverridePanel from '../components/OverridePanel';
+import ClaimTimeline from '../components/ClaimTimeline';
 
 interface FinanceTransaction {
   id: string;
@@ -37,18 +38,6 @@ interface WorkerProfile {
   total_paid_to_date?: number;
   api_key?: string | null;
   webhook_url?: string | null;
-}
-
-interface ClaimFile {
-  id: string;
-  claim_id: string;
-  uploaded_by: string | null;
-  file_name: string;
-  file_size: number;
-  file_type: string;
-  storage_path: string;
-  note: string;
-  created_at: string;
 }
 
 interface Props { onNav: (p: Page) => void; user?: UserProfile; onSignOut?: () => void; }
@@ -844,8 +833,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [showMyClaims, setShowMyClaims] = useState(false);
   const [panel, setPanel] = useState<Claim | null>(null);
-  const [panelTab, setPanelTab] = useState<'details' | 'loa' | 'files'>('details');
-  const [statusHistory, setStatusHistory] = useState<ClaimStatusHistory[]>([]);
+  const [panelTab, setPanelTab] = useState<'details' | 'timeline' | 'loa' | 'files'>('details');
+  const [flightEvidence, setFlightEvidence] = useState<FlightEvidenceSummary | null>(null);
+  const [flightSegments, setFlightSegments] = useState<ClaimFlightSegment[]>([]);
+  const [timelineRefresh, setTimelineRefresh] = useState(0);
   const [noteText, setNoteText] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteSaved, setNoteSaved] = useState<'idle' | 'ok' | 'err'>('idle');
@@ -1307,6 +1298,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
       const { data } = await supabase.from('claim_files').select('*').eq('claim_id', panel.id).order('created_at', { ascending: false });
       if (data) setClaimFiles(data as ClaimFile[]);
       setFileNote('');
+      setTimelineRefresh(r => r + 1);
     }
     setFileUploading(false);
   }
@@ -1315,6 +1307,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     if (storagePath) await supabase.storage.from('claim-files').remove([storagePath]);
     await supabase.from('claim_files').delete().eq('id', fileId);
     setClaimFiles(f => f.filter(x => x.id !== fileId));
+    setTimelineRefresh(r => r + 1);
   }
 
   async function openFile(f: ClaimFile) {
@@ -1379,9 +1372,22 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   }, [av]);
 
   useEffect(() => {
-    if (panel) loadStatusHistory(panel.id);
-    else setStatusHistory([]);
-  }, [panel?.id]);
+    if (!panel) { setFlightEvidence(null); setFlightSegments([]); return; }
+    // Fetch flight evidence summary (non-sensitive fields only)
+    supabase
+      .from('flight_evidence')
+      .select('claim_id, data_source, delay_minutes, flight_status, cross_check_status, decision, decision_reason, scheduled_arrival, actual_arrival')
+      .eq('claim_id', panel.id)
+      .maybeSingle()
+      .then(({ data }) => { setFlightEvidence(data as FlightEvidenceSummary | null); });
+    // Fetch connecting-flight segments (no provider_evidence)
+    supabase
+      .from('claim_flight_segments')
+      .select('id, claim_id, segment_order, flight_number, flight_date, origin, destination, scheduled_departure, scheduled_arrival, actual_departure, actual_arrival, marketing_carrier, operating_carrier, operating_carrier_name, codeshare_status, delay_minutes, flight_status, cross_check_status')
+      .eq('claim_id', panel.id)
+      .order('segment_order', { ascending: true })
+      .then(({ data }) => { setFlightSegments(data as ClaimFlightSegment[] || []); });
+  }, [panel]);
 
   const filtered = claims.filter(c => {
     const q = search.toLowerCase();
@@ -1417,7 +1423,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     }
     setClaims(cl => cl.map(c => c.id === id ? { ...c, status: ns } : c));
     setPanel(p => p?.id === id ? { ...p, status: ns } : p);
-    if (panel?.id === id) loadStatusHistory(id);
+    if (panel?.id === id) setTimelineRefresh(r => r + 1);
     if (oldClaim && oldClaim.status !== ns) {
       const passengerName = `${oldClaim.passenger_first_name} ${oldClaim.passenger_last_name}`.trim();
       insertNotification({
@@ -1446,21 +1452,14 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     await supabase.from('claims').update({ priority }).eq('id', id);
     setClaims(cl => cl.map(c => c.id === id ? { ...c, priority } : c));
     setPanel(p => p?.id === id ? { ...p, priority } : p);
+    setTimelineRefresh(r => r + 1);
   }
 
   async function assignClaim(id: string, staffId: string) {
     await supabase.from('claims').update({ assigned_to: staffId || null }).eq('id', id);
     setClaims(cl => cl.map(c => c.id === id ? { ...c, assigned_to: staffId || null } : c));
     setPanel(p => p?.id === id ? { ...p, assigned_to: staffId || null } : p);
-  }
-
-  async function loadStatusHistory(claimId: string) {
-    const { data } = await supabase
-      .from('claim_status_history')
-      .select('*')
-      .eq('claim_id', claimId)
-      .order('created_at', { ascending: false });
-    setStatusHistory(data as ClaimStatusHistory[] || []);
+    setTimelineRefresh(r => r + 1);
   }
 
   const sidebarMainItems: AdminView[] = isWorker ? ['dash','claims'] : ['dash','claims','crm','review','bulk'];
@@ -3086,10 +3085,11 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
             {/* Tabs */}
             <div className="flex border-b border-[#e2e8f0] shrink-0">
               {([
-                { id: 'details', label: 'Claim Details' },
-                { id: 'loa', label: 'LOA Document', icon: <FileText className="w-3.5 h-3.5" />, badge: panel.loa_signed ? 'Signed' : null },
+                { id: 'details', label: 'Details' },
+                { id: 'timeline', label: 'Timeline', icon: <History className="w-3.5 h-3.5" /> },
+                { id: 'loa', label: 'LOA', icon: <FileText className="w-3.5 h-3.5" />, badge: panel.loa_signed ? 'Signed' : null },
                 { id: 'files', label: 'Files', icon: <Paperclip className="w-3.5 h-3.5" />, badge: claimFiles.length > 0 ? String(claimFiles.length) : null },
-              ] as { id: 'details' | 'loa' | 'files'; label: string; icon?: React.ReactNode; badge?: string | null }[]).map(t => (
+              ] as { id: 'details' | 'timeline' | 'loa' | 'files'; label: string; icon?: React.ReactNode; badge?: string | null }[]).map(t => (
                 <button
                   key={t.id}
                   onClick={() => setPanelTab(t.id)}
@@ -3104,10 +3104,41 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
             <div className="flex-1 overflow-y-auto">
               {panelTab === 'details' && (
                 <div className="p-5">
+                  {/* Claimant Information */}
                   <div className="mb-4">
-                    <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Flight Details</div>
+                    <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Claimant</div>
                     <div className="grid grid-cols-2 gap-2.5">
-                      {[['Route',`${panel.departure}→${panel.arrival}`],['Airline',panel.airline],['Issue',panel.issue_type],['Amount',panel.amount],['Filed',panel.created_at?.split('T')[0]],['Agent', (() => { const w = workers.find(w => w.agent_code && w.agent_code === panel.agent); return w ? `${w.full_name} (${panel.agent})` : (panel.agent || '—'); })()]].map(([l,v]) => (
+                      {[['Name',`${panel.passenger_first_name} ${panel.passenger_last_name}`],['Email',panel.email],['Phone',panel.phone||'—'],['Country',panel.country||'—'],['DOB',panel.dob||'—'],['Address',panel.address||'—']].map(([l,v]) => (
+                        <div key={l}><div className="text-[10px] text-[#64748b] mb-0.5">{l}</div><div className="text-xs font-semibold truncate" title={v}>{v}</div></div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Flight Information */}
+                  <div className="mb-4">
+                    <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Flight</div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {[['Flight No.',panel.flight_number||'—'],['Date',panel.flight_date||'—'],['Route',`${panel.departure}→${panel.arrival}`],['Airline',panel.airline],['Issue Type',panel.issue_type],['Filed',panel.created_at?.split('T')[0]]].map(([l,v]) => (
+                        <div key={l}><div className="text-[10px] text-[#64748b] mb-0.5">{l}</div><div className="text-xs font-semibold">{v}</div></div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Carriers & Jurisdiction */}
+                  <div className="mb-4">
+                    <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Carriers & Jurisdiction</div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {[['Jurisdiction',panel.jurisdiction||'—'],['Operating Carrier',panel.operating_carrier_name||panel.operating_carrier||'—'],['Marketing Carrier',panel.marketing_carrier||'—'],['Codeshare',panel.is_codeshare?'Yes':'No'],['Agent', (() => { const w = workers.find(w => w.agent_code && w.agent_code === panel.agent); return w ? `${w.full_name} (${panel.agent})` : (panel.agent || '—'); })()]].map(([l,v]) => (
+                        <div key={l}><div className="text-[10px] text-[#64748b] mb-0.5">{l}</div><div className="text-xs font-semibold">{v}</div></div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Compensation */}
+                  <div className="mb-4">
+                    <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Compensation</div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {[['Claimed Amount',panel.amount||'—'],['Estimated (engine)',panel.compensation_amount?`€${panel.compensation_amount}`:'—']].map(([l,v]) => (
                         <div key={l}><div className="text-[10px] text-[#64748b] mb-0.5">{l}</div><div className="text-xs font-semibold">{v}</div></div>
                       ))}
                     </div>
@@ -3153,30 +3184,80 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                     </div>
                   </div>
 
-                  {/* Status history (real, from claim_status_history) */}
-                  <div className="mb-4">
-                    <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5 flex items-center gap-1"><History className="w-3 h-3" />Status History</div>
-                    {statusHistory.length === 0 ? (
-                      <div className="text-[11px] text-[#94a3b8]">No status changes recorded yet.</div>
-                    ) : (
-                      <ul className="list-none">
-                        {statusHistory.map((h, i) => (
-                          <li key={h.id} className="flex gap-2.5 pb-2.5 relative last:pb-0">
-                            {i < statusHistory.length - 1 && <div className="absolute left-[9px] top-5 bottom-0 w-px bg-[#e2e8f0]" />}
-                            <div className={`w-[19px] h-[19px] rounded-full border-2 flex items-center justify-center text-[8px] shrink-0 mt-0.5 z-10 ${h.field_name === 'status' ? 'bg-[#2563eb] border-[#2563eb] text-white' : 'bg-[#059669] border-[#059669] text-white'}`}>{h.field_name === 'status' ? 'S' : 'E'}</div>
-                            <div className="flex-1">
-                              <div className="font-semibold text-[11px]">
-                                {h.from_status ? `${h.from_status} → ${h.to_status}` : `Initial: ${h.to_status}`}
-                              </div>
-                              <div className="text-[10px] text-[#64748b] mt-0.5">
-                                {h.source === 'staff' ? 'Staff' : h.source === 'insert' ? 'Created' : 'System'} · {new Date(h.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                            </div>
-                          </li>
+                  {/* Review status */}
+                  {(panel.review_reason_code || panel.review_status) && (
+                    <div className="mb-4">
+                      <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Review</div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {[['Reason Code',panel.review_reason_code||'—'],['Review Status',panel.review_status||'—'],['Review Assigned', (() => { const w = workers.find(w => w.id === panel.review_assigned_to); return w ? w.full_name : '—'; })()]].map(([l,v]) => (
+                          <div key={l}><div className="text-[10px] text-[#64748b] mb-0.5">{l}</div><div className="text-xs font-semibold">{v}</div></div>
                         ))}
-                      </ul>
-                    )}
-                  </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Flight Evidence Summary */}
+                  {flightEvidence && (
+                    <div className="mb-4">
+                      <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Flight Evidence</div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {[['Data Source',flightEvidence.data_source||'—'],['Flight Status',flightEvidence.flight_status||'—'],['Delay (min)',flightEvidence.delay_minutes!=null?String(flightEvidence.delay_minutes):'—'],['Cross-Check',flightEvidence.cross_check_status||'—'],['Decision',flightEvidence.decision||'—'],['Scheduled Arr.',flightEvidence.scheduled_arrival?new Date(flightEvidence.scheduled_arrival).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—'],['Actual Arr.',flightEvidence.actual_arrival?new Date(flightEvidence.actual_arrival).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—']].map(([l,v]) => (
+                          <div key={l}><div className="text-[10px] text-[#64748b] mb-0.5">{l}</div><div className="text-xs font-semibold">{v}</div></div>
+                        ))}
+                      </div>
+                      {flightEvidence.decision_reason && (
+                        <div className="mt-2 text-[11px] text-[#475569] bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-2.5 py-1.5">{flightEvidence.decision_reason}</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Connecting Flight Segments */}
+                  {flightSegments.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Connecting Segments</div>
+                      <div className="space-y-2">
+                        {flightSegments.map(seg => (
+                          <div key={seg.id} className="border border-[#e2e8f0] rounded-lg p-2.5 bg-[#f8fafc]">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-bold text-[#2563eb] bg-[#eff6ff] px-1.5 py-0.5 rounded-full">#{seg.segment_order}</span>
+                              <span className="text-xs font-semibold">{seg.flight_number}</span>
+                              <span className="text-[10px] text-[#64748b]">{seg.flight_date}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                              <div><span className="text-[#64748b]">Route:</span> <span className="font-semibold">{seg.origin}→{seg.destination}</span></div>
+                              <div><span className="text-[#64748b]">Status:</span> <span className="font-semibold">{seg.flight_status||'—'}</span></div>
+                              {seg.delay_minutes!=null && <div><span className="text-[#64748b]">Delay:</span> <span className="font-semibold">{seg.delay_minutes} min</span></div>}
+                              {seg.operating_carrier_name && <div><span className="text-[#64748b]">Op. Carrier:</span> <span className="font-semibold">{seg.operating_carrier_name}</span></div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cancellation Info */}
+                  {(panel.cancellation_notice_date || panel.replacement_offered) && (
+                    <div className="mb-4">
+                      <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Cancellation</div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {[['Notice Date',panel.cancellation_notice_date||'—'],['Replacement Offered',panel.replacement_offered?'Yes':'No'],['Replacement Accepted',panel.replacement_accepted?'Yes':'No'],['Replacement Flight',panel.replacement_flight_number||'—']].map(([l,v]) => (
+                          <div key={l}><div className="text-[10px] text-[#64748b] mb-0.5">{l}</div><div className="text-xs font-semibold">{v}</div></div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Denied Boarding Info */}
+                  {(panel.boarding_type || panel.denial_reason) && (
+                    <div className="mb-4">
+                      <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Denied Boarding</div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {[['Boarding Type',panel.boarding_type||'—'],['Confirmed Reservation',panel.confirmed_reservation!=null?(panel.confirmed_reservation?'Yes':'No'):'—'],['Checked In On Time',panel.checked_in_on_time!=null?(panel.checked_in_on_time?'Yes':'No'):'—'],['Denial Reason',panel.denial_reason||'—']].map(([l,v]) => (
+                          <div key={l}><div className="text-[10px] text-[#64748b] mb-0.5">{l}</div><div className="text-xs font-semibold">{v}</div></div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Update operational status */}
                   <div className="mb-4">
@@ -3292,9 +3373,22 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                         setPanel(data as Claim);
                         setClaims(prev => prev.map(c => c.id === data.id ? data as Claim : c));
                       }
+                      setTimelineRefresh(r => r + 1);
                     }}
                   />
                 </div>
+              )}
+
+              {panelTab === 'timeline' && (
+                <ClaimTimeline
+                  claimId={panel.id}
+                  claimCreatedAt={panel.created_at}
+                  claimFiles={claimFiles}
+                  isAdmin={!isWorker}
+                  workers={workers}
+                  currentUser={user}
+                  refreshKey={timelineRefresh}
+                />
               )}
 
               {panelTab === 'loa' && (
