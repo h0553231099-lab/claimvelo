@@ -67,12 +67,17 @@ export interface Claim {
   assigned_to?: string | null;
   // Compensation
   compensation_amount?: number | null;
+  // Phase 4 — review decision workflow
+  review_decision?: 'approved' | 'rejected' | 'escalated' | null;
+  review_decision_reason?: string | null;
+  review_decided_by?: string | null;
+  review_decided_at?: string | null;
 }
 
 export interface ClaimStatusHistory {
   id: string;
   claim_id: string;
-  field_name: 'status' | 'eligibility_status' | 'priority' | 'assigned_to' | 'document_upload' | 'override';
+  field_name: 'status' | 'eligibility_status' | 'priority' | 'assigned_to' | 'document_upload' | 'override' | 'review_decision';
   from_status: string | null;
   to_status: string;
   changed_by: string | null;
@@ -94,6 +99,16 @@ export interface FlightEvidenceSummary {
   scheduled_arrival: string | null;
   actual_departure: string | null;
   actual_arrival: string | null;
+  confidence_score: number | null;
+}
+
+export interface ReviewNote {
+  id: string;
+  claim_id: string;
+  note: string;
+  created_by: string | null;
+  created_at: string;
+  author_name?: string | null;
 }
 
 export interface FlightSegmentSummary {

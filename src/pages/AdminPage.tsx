@@ -844,6 +844,16 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [showMyClaims, setShowMyClaims] = useState(false);
+  const [eligibilityFilter, setEligibilityFilter] = useState('');
+  const [airlineFilter, setAirlineFilter] = useState('');
+  const [reviewStatusFilter, setReviewStatusFilter] = useState('');
+  // Bulk actions
+  const [selectedClaimIds, setSelectedClaimIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState('');
+  const [bulkAssignee, setBulkAssignee] = useState('');
+  const [bulkPriority, setBulkPriority] = useState<Priority | ''>('');
+  const [bulkStatus, setBulkStatus] = useState<OperationalStatus | ''>('');
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [panel, setPanel] = useState<Claim | null>(null);
   const [panelTab, setPanelTab] = useState<'details' | 'timeline' | 'loa' | 'files'>('details');
   const [statusHistory, setStatusHistory] = useState<ClaimStatusHistory[]>([]);
@@ -1397,7 +1407,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     // Select only safe columns — never fetch provider_evidence or cross_check_details.
     const { data } = await supabase
       .from('flight_evidence')
-      .select('data_source, fetch_timestamp, delay_minutes, flight_status, cross_check_status, decision, decision_reason, scheduled_departure, scheduled_arrival, actual_departure, actual_arrival')
+      .select('data_source, fetch_timestamp, delay_minutes, flight_status, cross_check_status, decision, decision_reason, scheduled_departure, scheduled_arrival, actual_departure, actual_arrival, confidence_score')
       .eq('claim_id', claimId)
       .maybeSingle();
     setFlightEvidence(data as FlightEvidenceSummary | null);
@@ -1419,6 +1429,9 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
       && (!statusFilter || c.status === statusFilter)
       && (!priorityFilter || c.priority === priorityFilter)
       && (!assigneeFilter || (assigneeFilter === 'unassigned' ? !c.assigned_to : c.assigned_to === assigneeFilter))
+      && (!eligibilityFilter || c.eligibility_status === eligibilityFilter)
+      && (!airlineFilter || c.airline === airlineFilter)
+      && (!reviewStatusFilter || c.review_status === reviewStatusFilter)
       && (!showMyClaims || c.assigned_to === user?.id);
   });
 
@@ -1436,6 +1449,34 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     setPanel(p => p?.id === panel.id ? { ...p, notes: noteText } : p);
     setNoteSaved('ok');
     setTimeout(() => setNoteSaved('idle'), 2500);
+  }
+
+  async function executeBulkAction() {
+    if (selectedClaimIds.size === 0 || !bulkAction) return;
+    setBulkSaving(true);
+    const ids = Array.from(selectedClaimIds);
+    const update: Record<string, unknown> = {};
+    if (bulkAction === 'status') update.status = bulkStatus || 'Untouched';
+    if (bulkAction === 'assign') update.assigned_to = bulkAssignee || null;
+    if (bulkAction === 'priority') update.priority = bulkPriority || 'medium';
+    if (bulkAction === 'delete') {
+      await supabase.from('claims').delete().in('id', ids);
+      setClaims(prev => prev.filter(c => !selectedClaimIds.has(c.id)));
+      setSelectedClaimIds(new Set());
+      setBulkSaving(false);
+      setBulkAction('');
+      return;
+    }
+    if (Object.keys(update).length > 0) {
+      await supabase.from('claims').update(update).in('id', ids);
+      setClaims(prev => prev.map(c => selectedClaimIds.has(c.id) ? { ...c, ...update } as Claim : c));
+    }
+    setSelectedClaimIds(new Set());
+    setBulkAction('');
+    setBulkAssignee('');
+    setBulkPriority('');
+    setBulkStatus('');
+    setBulkSaving(false);
   }
 
   async function updateStatus(id: string, ns: OperationalStatus) {
@@ -1710,6 +1751,20 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   <option value="unassigned">Unassigned</option>
                   {workers.map(w=><option key={w.id} value={w.id}>{w.full_name}</option>)}
                 </select>
+                <select value={eligibilityFilter} onChange={e=>setEligibilityFilter(e.target.value)} className="px-2.5 py-1.5 border border-[#e2e8f0] rounded-[7px] text-xs outline-none bg-white cursor-pointer">
+                  <option value="">All eligibility</option>
+                  {ELIGIBILITY_STATUSES.map(s=><option key={s}>{s}</option>)}
+                </select>
+                <select value={airlineFilter} onChange={e=>setAirlineFilter(e.target.value)} className="px-2.5 py-1.5 border border-[#e2e8f0] rounded-[7px] text-xs outline-none bg-white cursor-pointer">
+                  <option value="">All airlines</option>
+                  {[...new Set(claims.map(c=>c.airline).filter(Boolean))].sort().map(a=><option key={a}>{a}</option>)}
+                </select>
+                <select value={reviewStatusFilter} onChange={e=>setReviewStatusFilter(e.target.value)} className="px-2.5 py-1.5 border border-[#e2e8f0] rounded-[7px] text-xs outline-none bg-white cursor-pointer">
+                  <option value="">All review</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_review">In Review</option>
+                  <option value="completed">Completed</option>
+                </select>
                 <button
                   onClick={() => setShowMyClaims(v => !v)}
                   className={`px-2.5 py-1.5 rounded-[7px] text-xs font-semibold border cursor-pointer transition-colors ${showMyClaims ? 'bg-[#2563eb] text-white border-[#2563eb]' : 'bg-[#f8fafc] text-[#64748b] border-[#e2e8f0] hover:bg-[#e2e8f0]'}`}
@@ -1718,8 +1773,55 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 </button>
                 <span className="ml-auto text-[11px] text-[#64748b]">{filtered.length} claims</span>
               </div>
+              {/* Bulk action bar */}
+              {selectedClaimIds.size > 0 && (
+                <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#eff6ff] border border-[#dbeafe] rounded-[7px]">
+                  <span className="text-[11px] font-bold text-[#2563eb]">{selectedClaimIds.size} selected</span>
+                  <select value={bulkAction} onChange={e=>setBulkAction(e.target.value)} className="px-2 py-1 border border-[#e2e8f0] rounded text-[11px] outline-none bg-white cursor-pointer">
+                    <option value="">Choose action...</option>
+                    <option value="status">Set Status</option>
+                    <option value="assign">Assign To</option>
+                    <option value="priority">Set Priority</option>
+                    <option value="delete">Delete</option>
+                  </select>
+                  {bulkAction === 'status' && (
+                    <select value={bulkStatus} onChange={e=>setBulkStatus(e.target.value as OperationalStatus)} className="px-2 py-1 border border-[#e2e8f0] rounded text-[11px] outline-none bg-white cursor-pointer">
+                      <option value="">Select status...</option>
+                      {STAGES.map(s=><option key={s}>{s}</option>)}
+                    </select>
+                  )}
+                  {bulkAction === 'assign' && (
+                    <select value={bulkAssignee} onChange={e=>setBulkAssignee(e.target.value)} className="px-2 py-1 border border-[#e2e8f0] rounded text-[11px] outline-none bg-white cursor-pointer">
+                      <option value="">Select staff...</option>
+                      {workers.map(w=><option key={w.id} value={w.id}>{w.full_name}</option>)}
+                    </select>
+                  )}
+                  {bulkAction === 'priority' && (
+                    <select value={bulkPriority} onChange={e=>setBulkPriority(e.target.value as Priority)} className="px-2 py-1 border border-[#e2e8f0] rounded text-[11px] outline-none bg-white cursor-pointer">
+                      <option value="">Select priority...</option>
+                      {PRIORITY_OPTIONS.map(p=><option key={p} value={p}>{p}</option>)}
+                    </select>
+                  )}
+                  {bulkAction && bulkAction !== 'delete' && (
+                    <button onClick={executeBulkAction} disabled={bulkSaving || (bulkAction==='status' && !bulkStatus) || (bulkAction==='assign' && !bulkAssignee) || (bulkAction==='priority' && !bulkPriority)} className="px-3 py-1 bg-[#2563eb] text-white rounded text-[11px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8] disabled:opacity-60">
+                      {bulkSaving ? '...' : 'Apply'}
+                    </button>
+                  )}
+                  {bulkAction === 'delete' && (
+                    <button onClick={executeBulkAction} disabled={bulkSaving} className="px-3 py-1 bg-[#dc2626] text-white rounded text-[11px] font-semibold border-none cursor-pointer hover:bg-[#b91c1c] disabled:opacity-60">
+                      {bulkSaving ? '...' : 'Confirm Delete'}
+                    </button>
+                  )}
+                  <button onClick={()=>{setSelectedClaimIds(new Set()); setBulkAction('');}} className="ml-auto px-2 py-1 text-[#64748b] text-[11px] font-semibold border-none bg-transparent cursor-pointer hover:text-[#0f172a]">
+                    Clear
+                  </button>
+                </div>
+              )}
               <table className="w-full border-collapse">
                 <thead><tr>
+                  <th className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc] w-8">
+                    <input type="checkbox" checked={filtered.length > 0 && filtered.every(c => selectedClaimIds.has(c.id))} onChange={e => { if (e.target.checked) setSelectedClaimIds(new Set(filtered.map(c => c.id))); else setSelectedClaimIds(new Set()); }} className="cursor-pointer" />
+                  </th>
                   {['ID','Passenger','Route','Airline','Issue','Amount','Priority','Status','Filed',''].map(h => (
                     <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-[#64748b] uppercase border-b border-[#e2e8f0] bg-[#f8fafc]">{h}</th>
                   ))}
@@ -1728,7 +1830,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   {filtered.map(c => {
                     const assignee = c.assigned_to ? workers.find(w => w.id === c.assigned_to) : null;
                     return (
-                    <tr key={c.id} className="hover:bg-[#f8fafc] group">
+                    <tr key={c.id} className={`hover:bg-[#f8fafc] group ${selectedClaimIds.has(c.id) ? 'bg-[#eff6ff]' : ''}`}>
+                      <td className="px-3 py-2.5 border-b border-[#e2e8f0]">
+                        <input type="checkbox" checked={selectedClaimIds.has(c.id)} onChange={e => { setSelectedClaimIds(prev => { const next = new Set(prev); if (e.target.checked) next.add(c.id); else next.delete(c.id); return next; }); }} className="cursor-pointer" onClick={e => e.stopPropagation()} />
+                      </td>
                       <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs font-semibold text-[#2563eb] cursor-pointer" onClick={() => setPanel(c)}>{c.claim_ref}</td>
                       <td className="px-3 py-2.5 border-b border-[#e2e8f0] text-xs cursor-pointer" onClick={() => setPanel(c)}>
                         {c.passenger_first_name} {c.passenger_last_name}
@@ -1827,7 +1932,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
 
           {/* BULK IMPORT */}
           {av === 'review' && !isWorker && (
-            <ReviewQueue />
+            <ReviewQueue onOpenClaim={(claimId) => {
+              const c = claims.find(cl => cl.id === claimId);
+              if (c) { setPanel(c); setAv('claims'); }
+            }} />
           )}
 
           {av === 'bulk' && !isWorker && (
@@ -3196,7 +3304,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   <div className="mb-4">
                     <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Review</div>
                     <div className="grid grid-cols-2 gap-2.5">
-                      {[['Review Status',panel.review_status || '—'],['Review Reason',panel.review_reason_code || '—']].map(([l,v]) => (
+                      {[['Review Status',panel.review_status || '—'],['Review Decision',panel.review_decision ? panel.review_decision.charAt(0).toUpperCase()+panel.review_decision.slice(1) : '—'],['Review Reason',panel.review_reason_code || '—']].map(([l,v]) => (
                         <div key={l}><div className="text-[10px] text-[#64748b] mb-0.5">{l}</div><div className="text-xs font-semibold">{v}</div></div>
                       ))}
                     </div>
@@ -3207,7 +3315,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                     <div className="mb-4">
                       <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">Flight Evidence</div>
                       <div className="grid grid-cols-2 gap-2.5">
-                        {[['Data Source',flightEvidence.data_source || '—'],['Flight Status',flightEvidence.flight_status || '—'],['Delay (min)',flightEvidence.delay_minutes != null ? String(flightEvidence.delay_minutes) : '—'],['Cross-Check',flightEvidence.cross_check_status || '—'],['Decision',flightEvidence.decision || '—'],['Decision Reason',flightEvidence.decision_reason || '—']].map(([l,v]) => (
+                        {[['Data Source',flightEvidence.data_source || '—'],['Flight Status',flightEvidence.flight_status || '—'],['Delay (min)',flightEvidence.delay_minutes != null ? String(flightEvidence.delay_minutes) : '—'],['Confidence',flightEvidence.confidence_score != null ? `${flightEvidence.confidence_score}/100` : '—'],['Cross-Check',flightEvidence.cross_check_status || '—'],['Decision',flightEvidence.decision || '—'],['Decision Reason',flightEvidence.decision_reason || '—']].map(([l,v]) => (
                           <div key={l} className={l === 'Decision Reason' ? 'col-span-2' : ''}><div className="text-[10px] text-[#64748b] mb-0.5">{l}</div><div className="text-xs font-semibold">{v}</div></div>
                         ))}
                       </div>
