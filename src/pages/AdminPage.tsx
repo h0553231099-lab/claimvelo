@@ -6,6 +6,8 @@ import { recalculateAgentPayout, logAgentPayout } from '../lib/financialService'
 import { Page } from '../types';
 import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2, Key, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import BulkImport from '../components/BulkImport';
+import ReviewQueue from '../components/ReviewQueue';
+import OverridePanel from '../components/OverridePanel';
 
 interface FinanceTransaction {
   id: string;
@@ -76,7 +78,7 @@ const AV_TITLES: Record<AdminView, string> = {
   inbox:'Inbox', notifs:'Notifications', analytics:'Analytics',
   automation:'Automation', users:'Users & Roles', settings:'Settings',
   finance:'Income & Expenses', qr:'Agent QR Codes', partners:'B2B Partners',
-  bulk:'Bulk Import',
+  bulk:'Bulk Import', review:'Review Queue',
 };
 
 interface DbNotification {
@@ -1393,7 +1395,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     }
   }
 
-  const sidebarMainItems: AdminView[] = isWorker ? ['dash','claims'] : ['dash','claims','crm','bulk'];
+  const sidebarMainItems: AdminView[] = isWorker ? ['dash','claims'] : ['dash','claims','crm','review','bulk'];
   const sidebarSystemItems: AdminView[] = isWorker
     ? ['inbox','notifs']
     : ['inbox','notifs','analytics','automation','users','qr','partners','settings'];
@@ -1411,7 +1413,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
           {sidebarMainItems.map(id => (
             <button key={id} onClick={() => setAv(id)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] cursor-pointer text-[12px] font-medium border-none w-full text-left mb-0.5 transition-colors ${av===id?'bg-[#eff6ff] text-[#2563eb]':'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'}`}>
-              <span>{id==='dash'?'📊':id==='claims'?'📋':id==='bulk'?'📥':'🗂'}</span>
+              <span>{id==='dash'?'📊':id==='claims'?'📋':id==='bulk'?'📥':id==='review'?'🔍':'🗂'}</span>
               {AV_TITLES[id]}
               {id==='claims' && <span className="ml-auto bg-[#2563eb] text-white text-[9px] font-bold px-1 py-0.5 rounded-[7px]">{claims.length}</span>}
             </button>
@@ -1689,6 +1691,10 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
           )}
 
           {/* BULK IMPORT */}
+          {av === 'review' && !isWorker && (
+            <ReviewQueue />
+          )}
+
           {av === 'bulk' && !isWorker && (
             <BulkImport workers={workers} onClaimsImported={() => {
               supabase.from('claims').select('*').order('created_at', { ascending: false }).then(({ data }) => {
@@ -3115,6 +3121,24 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                       )}
                     </div>
                   )}
+                </div>
+              )}
+
+              {panelTab === 'details' && !isWorker && panel && (
+                <div className="mt-4">
+                  <OverridePanel
+                    claimId={panel.id}
+                    claimRef={panel.claim_ref}
+                    currentStatus={panel.status}
+                    onOverridden={async () => {
+                      // Refresh the claim data
+                      const { data } = await supabase.from('claims').select('*').eq('id', panel.id).single();
+                      if (data) {
+                        setPanel(data as Claim);
+                        setClaims(prev => prev.map(c => c.id === data.id ? data as Claim : c));
+                      }
+                    }}
+                  />
                 </div>
               )}
 

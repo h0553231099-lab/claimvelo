@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { z } from "npm:zod@3.23.8";
 import { evaluateClaimInternal } from "../_shared/evaluate.ts";
+import { verifyAndStoreSegments, verifyReplacementFlight } from "../_shared/segments.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,6 +68,13 @@ const leadSchema = z.object({
     checked_in_on_time: z.boolean().optional(),
     denial_reason: z.string().optional(),
     is_single_booking: z.boolean().optional(),
+    segments: z.array(z.object({
+      flight_number: z.string().min(1),
+      flight_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      origin: z.string().length(3).regex(/^[A-Z]{3}$/),
+      destination: z.string().length(3).regex(/^[A-Z]{3}$/),
+      segment_order: z.number().int().min(1),
+    })).optional(),
   }),
 });
 
@@ -323,6 +331,24 @@ console.log(data);`,
       }
 
       const claimId = claimRow.id;
+
+      // 7b. Verify connecting-flight segments (if provided)
+      if (lead.flight_info.segments && lead.flight_info.segments.length > 0) {
+        try {
+          await verifyAndStoreSegments(supabaseUrl, serviceRoleKey, claimId, lead.flight_info.segments);
+        } catch (e) {
+          console.error("Segment verification failed:", e);
+        }
+      }
+
+      // 7c. Verify replacement flight (if provided)
+      if (lead.flight_info.replacement_flight_number && lead.flight_info.departure_date) {
+        try {
+          await verifyReplacementFlight(supabaseUrl, serviceRoleKey, claimId, lead.flight_info.replacement_flight_number, lead.flight_info.departure_date);
+        } catch (e) {
+          console.error("Replacement flight verification failed:", e);
+        }
+      }
 
       // 8. Trigger the shared rules engine evaluation (single decision path)
       let evaluationStatus = "Pending Check";

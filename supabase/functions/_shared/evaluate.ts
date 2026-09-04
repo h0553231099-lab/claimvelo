@@ -59,7 +59,7 @@ export interface EngineResult {
   detail: string;
 }
 
-interface ProviderFlight {
+export interface ProviderFlight {
   flightNumber: string;
   flightDate: string;
   origin: string;
@@ -76,7 +76,7 @@ interface ProviderFlight {
   codeshareStatus: string | null;
 }
 
-interface ProviderResult {
+export interface ProviderResult {
   source: "aerodatabox" | "aviationstack";
   flights: ProviderFlight[];
   raw: unknown;
@@ -482,7 +482,7 @@ function currencySymbol(currency: string): string {
 
 // ── Provider fetching ───────────────────────────────────────────────────────
 
-async function fetchAeroDataBox(fn: string, date: string, apiKey: string | undefined): Promise<ProviderResult | null> {
+export async function fetchAeroDataBox(fn: string, date: string, apiKey: string | undefined): Promise<ProviderResult | null> {
   if (!apiKey || !fn || !date) return null;
   try {
     const iata = normalizeFlightNumber(fn);
@@ -531,7 +531,7 @@ async function fetchAeroDataBox(fn: string, date: string, apiKey: string | undef
   } catch { return null; }
 }
 
-async function fetchAviationStack(fn: string, date: string, apiKey: string | undefined): Promise<ProviderResult | null> {
+export async function fetchAviationStack(fn: string, date: string, apiKey: string | undefined): Promise<ProviderResult | null> {
   if (!apiKey || !fn || !date) return null;
   try {
     const iata = normalizeFlightNumber(fn);
@@ -579,14 +579,14 @@ async function fetchAviationStack(fn: string, date: string, apiKey: string | und
 
 // ── Cross-check ──────────────────────────────────────────────────────────────
 
-interface CrossCheckResult {
+export interface CrossCheckResult {
   status: CrossCheckStatus;
   matched: ProviderFlight | null;
   details: Record<string, unknown>;
   operatingCarrierConflict: boolean;
 }
 
-function crossCheck(
+export function crossCheck(
   claim: { flightNumber: string; flightDate: string; origin: string; destination: string },
   providers: ProviderResult[],
 ): CrossCheckResult {
@@ -1070,12 +1070,40 @@ export async function evaluateClaimInternal(
     return pendingCheck(supabase, claimId, claimRef, "Provider data incomplete: actual/scheduled arrival times unavailable.", "INCOMPLETE_EVIDENCE", { ...evBase, flight: matched, crossCheckStatus: "incomplete", crossCheckDetails: cc.details });
   }
 
-  const delayMinutes = matched.delayMinutes;
+  let delayMinutes = matched.delayMinutes;
   const reasonCode = classifyReason(claim.airline_reason || "");
 
   // ── Stage 5: Extraordinary circumstances — NEVER auto-Eligible ──────────────
   if (EXTRAORDINARY_REASONS.has(reasonCode)) {
     return pendingCheck(supabase, claimId, claimRef, `Reported reason "${reasonCode.toLowerCase()}" may be extraordinary — requires manual verification.`, "EXTRAORDINARY_CIRCUMSTANCES", { ...evBase, flight: matched, crossCheckStatus: "matched", crossCheckDetails: cc.details });
+  }
+
+  // ── Stage 5b: Connecting flight segment verification ────────────────────────
+  // If the claim has segments (connecting flight), verify all are provider-
+  // matched and use the final-destination delay (last segment actual arrival −
+  // originally scheduled arrival at final destination). Never use first-segment
+  // departure time for this calculation.
+  const { data: segments } = await supabase
+    .from("claim_flight_segments")
+    .select("*")
+    .eq("claim_id", claimId)
+    .order("segment_order", { ascending: true });
+
+  if (segments && segments.length > 0) {
+    const unverified = segments.filter((s: Record<string, unknown>) => s.cross_check_status !== "matched");
+    if (unverified.length > 0) {
+      const unv = unverified[0] as Record<string, unknown>;
+      return pendingCheck(supabase, claimId, claimRef,
+        `Connecting flight segment ${unv.segment_order} could not be verified against provider data — manual review required.`,
+        "CONNECTING_MISSING_SEGMENT_DATA",
+        { ...evBase, flight: matched, crossCheckStatus: "incomplete", crossCheckDetails: { ...cc.details, segment_count: segments.length, unverified_segments: unverified.map((s: Record<string, unknown>) => s.segment_order) } },
+      );
+    }
+    // Use final-destination delay from the last segment
+    const lastSegment = segments[segments.length - 1] as Record<string, unknown>;
+    if (lastSegment.delay_minutes != null) {
+      delayMinutes = lastSegment.delay_minutes as number;
+    }
   }
 
   // ── Stage 6: Delay compensation eligibility — 3-hour threshold (Sturgeon) ───

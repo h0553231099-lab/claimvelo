@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { evaluateClaimInternal } from "../_shared/evaluate.ts";
+import { verifyAndStoreSegments, verifyReplacementFlight } from "../_shared/segments.ts";
 import { rateLimit, getClientIp } from "../_shared/rateLimit.ts";
 import { dbRateLimit } from "../_shared/dbRateLimit.ts";
 
@@ -193,6 +194,26 @@ Deno.serve(async (req: Request) => {
       claim_id: newClaim.id,
       message: `New claim from ${fullName} — ${airline} ${route}`.trim(),
     });
+
+    // ── 6b. Verify connecting-flight segments (if provided) ────────────────────
+    if (body.segments && Array.isArray(body.segments) && body.segments.length > 0) {
+      try {
+        await verifyAndStoreSegments(supabaseUrl, serviceRoleKey, newClaim.id, body.segments);
+      } catch (e) {
+        console.error("Segment verification failed:", e);
+        // Non-blocking — engine will return Pending Check for unverified segments
+      }
+    }
+
+    // ── 6c. Verify replacement flight (if provided) ───────────────────────────
+    if (claimData.replacement_flight_number && claimData.flight_date) {
+      try {
+        await verifyReplacementFlight(supabaseUrl, serviceRoleKey, newClaim.id, claimData.replacement_flight_number, claimData.flight_date);
+      } catch (e) {
+        console.error("Replacement flight verification failed:", e);
+        // Non-blocking — engine will return CANCELLED_REPLACEMENT_UNVERIFIED
+      }
+    }
 
     // ── 7. Run evaluation internally ──────────────────────────────────────────
     let evaluation = null;
