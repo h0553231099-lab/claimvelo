@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Page, UserProfile, Claim, ClaimStatus } from '../types';
+import { useState, useEffect, useRef } from 'react';
+import { Page, UserProfile, Claim, ClaimStatus, InfoRequest } from '../types';
 import { supabase } from '../lib/supabase';
 import { useLang } from '../lib/language';
-import { Plane, Plus, RefreshCw } from 'lucide-react';
+import { Plane, Plus, RefreshCw, Upload, FileText, AlertTriangle, CheckCircle, Clock, Paperclip } from 'lucide-react';
 
 interface Props { onNav: (p: Page) => void; user?: UserProfile | null; }
 
@@ -66,6 +66,10 @@ export default function DashboardPage({ onNav, user }: Props) {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Claim | null>(null);
+  const [infoRequests, setInfoRequests] = useState<InfoRequest[]>([]);
+  const [reqLoading, setReqLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user?.email) { setLoading(false); return; }
@@ -82,6 +86,38 @@ export default function DashboardPage({ onNav, user }: Props) {
         setLoading(false);
       });
   }, [user?.email]);
+
+  useEffect(() => {
+    if (!selected) { setInfoRequests([]); return; }
+    setReqLoading(true);
+    supabase.from('claim_info_requests').select('*').eq('claim_id', selected.id).order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setInfoRequests(data as InfoRequest[] || []);
+        setReqLoading(false);
+      });
+  }, [selected]);
+
+  async function uploadResponseFile(file: File, requestId: string) {
+    if (!selected) return;
+    setUploading(true);
+    const ext = file.name.split('.').pop() || 'bin';
+    const path = `${selected.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('claim-files').upload(path, file);
+    if (upErr) { setUploading(false); return; }
+    await supabase.from('claim_files').insert({
+      claim_id: selected.id,
+      file_name: file.name,
+      file_size: file.size,
+      file_type: file.type || ext,
+      storage_path: path,
+      note: 'Response to info request',
+      info_request_id: requestId,
+    });
+    // Refresh requests
+    const { data } = await supabase.from('claim_info_requests').select('*').eq('claim_id', selected.id).order('created_at', { ascending: false });
+    if (data) setInfoRequests(data as InfoRequest[]);
+    setUploading(false);
+  }
 
   const name = user?.full_name?.split(' ')[0] || 'there';
 
@@ -219,6 +255,77 @@ export default function DashboardPage({ onNav, user }: Props) {
 
               <div className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider mb-1">{t('dashboard.progress')}</div>
               <ClaimTimeline status={selected.status} />
+
+              {/* Info Requests */}
+              {infoRequests.length > 0 && (
+                <div className="mt-5">
+                  <div className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider mb-2">Information Requests</div>
+                  <div className="space-y-2.5">
+                    {infoRequests.map(req => {
+                      const isOverdue = req.status === 'requested' && req.due_at && new Date(req.due_at).getTime() < Date.now();
+                      const displayStatus = isOverdue ? 'overdue' : req.status;
+                      const statusMeta: Record<string, { icon: typeof Clock; bg: string; text: string; label: string }> = {
+                        requested: { icon: Clock, bg: 'bg-[#eff6ff]', text: 'text-[#2563eb]', label: 'Awaiting your response' },
+                        received:  { icon: CheckCircle, bg: 'bg-[#f0fdf4]', text: 'text-[#16a34a]', label: 'Received — thank you!' },
+                        overdue:   { icon: AlertTriangle, bg: 'bg-[#fef2f2]', text: 'text-[#dc2626]', label: 'Overdue — please respond' },
+                        cancelled: { icon: CheckCircle, bg: 'bg-[#f8fafc]', text: 'text-[#64748b]', label: 'Cancelled' },
+                      };
+                      const meta = statusMeta[displayStatus] || statusMeta.requested;
+                      const StatusIcon = meta.icon;
+
+                      return (
+                        <div key={req.id} className="p-3.5 bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px]">
+                          <div className="flex items-start gap-2.5">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${meta.bg}`}>
+                              <StatusIcon className={`w-3.5 h-3.5 ${meta.text}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13px] font-semibold text-[#0f172a]">{req.title}</div>
+                              <div className={`text-[11px] font-medium mt-0.5 ${meta.text}`}>{meta.label}</div>
+                              {req.description && (
+                                <div className="text-[12px] text-[#64748b] mt-1.5">{req.description}</div>
+                              )}
+                              {req.due_at && req.status === 'requested' && (
+                                <div className="text-[11px] text-[#94a3b8] mt-1">
+                                  Due: {new Date(req.due_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}
+                                </div>
+                              )}
+                              {req.status === 'requested' && (
+                                <div className="mt-2.5">
+                                  <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    className="hidden"
+                                    onChange={e => {
+                                      const f = e.target.files?.[0];
+                                      if (f) uploadResponseFile(f, req.id);
+                                      e.target.value = '';
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={uploading}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563eb] text-white rounded-lg text-[12px] font-semibold border-none cursor-pointer hover:bg-[#1d4ed8] disabled:opacity-60"
+                                  >
+                                    <Upload className="w-3.5 h-3.5" />
+                                    {uploading ? 'Uploading...' : req.request_type === 'document' ? 'Upload Document' : 'Provide Information'}
+                                  </button>
+                                </div>
+                              )}
+                              {req.fulfilled_at && (
+                                <div className="text-[11px] text-[#16a34a] mt-1.5 flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3" />
+                                  Received on {new Date(req.fulfilled_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
