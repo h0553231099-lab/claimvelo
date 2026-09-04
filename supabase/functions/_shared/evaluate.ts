@@ -222,13 +222,21 @@ async function fetchAeroDataBox(flightNumber: string, date: string, apiKey: stri
       const depAirport = dep?.airport as Record<string, unknown> | undefined;
       const arrAirport = arr?.airport as Record<string, unknown> | undefined;
       const depSched = dep?.scheduledTime as Record<string, unknown> | undefined;
-      const depActual = dep?.actualTime as Record<string, unknown> | undefined;
       const arrSched = arr?.scheduledTime as Record<string, unknown> | undefined;
-      const arrActual = arr?.actualTime as Record<string, unknown> | undefined;
       const schedDep = (depSched?.utc || depSched?.local) as string | null;
       const schedArr = (arrSched?.utc || arrSched?.local) as string | null;
-      const actualDep = (depActual?.utc || depActual?.local) as string | null;
-      const actualArr = (arrActual?.utc || arrActual?.local) as string | null;
+      // AeroDataBox stores the confirmed actual event in `runwayTime` (only set
+      // after the runway event occurred). We fall back to `revisedTime` ONLY
+      // when it differs from the scheduled time: for cancelled/scheduled flights
+      // `revisedTime` merely echoes `scheduledTime`, which would fabricate a
+      // zero delay. A missing actual time correctly forces "incomplete" →
+      // Pending Check rather than guessing.
+      const depRunway = (dep?.runwayTime?.utc || dep?.runwayTime?.local) as string | null;
+      const depRevised = (dep?.revisedTime?.utc || dep?.revisedTime?.local) as string | null;
+      const arrRunway = (arr?.runwayTime?.utc || arr?.runwayTime?.local) as string | null;
+      const arrRevised = (arr?.revisedTime?.utc || arr?.revisedTime?.local) as string | null;
+      const actualDep = depRunway ?? (depRevised && depRevised !== schedDep ? depRevised : null);
+      const actualArr = arrRunway ?? (arrRevised && arrRevised !== schedArr ? arrRevised : null);
       let delayMinutes: number | null = null;
       if (schedArr && actualArr) {
         delayMinutes = Math.max(0, Math.round((new Date(actualArr).getTime() - new Date(schedArr).getTime()) / 60000));
