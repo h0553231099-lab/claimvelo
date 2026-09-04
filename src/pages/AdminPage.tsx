@@ -10,6 +10,7 @@ import ReviewQueue from '../components/ReviewQueue';
 import OverridePanel from '../components/OverridePanel';
 import ClaimTimeline from '../components/ClaimTimeline';
 import InfoRequestPanel from '../components/InfoRequestPanel';
+import AirlineEmailInbox from '../components/AirlineEmailInbox';
 
 interface FinanceTransaction {
   id: string;
@@ -108,7 +109,7 @@ function Badge({ status }: { status: string }) {
 
 const AV_TITLES: Record<AdminView, string> = {
   dash:'Dashboard', claims:'All Claims', crm:'CRM Kanban',
-  inbox:'Inbox', notifs:'Notifications', analytics:'Analytics',
+  inbox:'Inbox', 'airline-emails':'Airline Emails', notifs:'Notifications', analytics:'Analytics',
   automation:'Automation', users:'Users & Roles', settings:'Settings',
   finance:'Income & Expenses', qr:'Agent QR Codes', partners:'B2B Partners',
   bulk:'Bulk Import', review:'Review Queue',
@@ -1558,7 +1559,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const sidebarMainItems: AdminView[] = isWorker ? ['dash','claims'] : ['dash','claims','crm','review','bulk'];
   const sidebarSystemItems: AdminView[] = isWorker
     ? ['inbox','notifs']
-    : ['inbox','notifs','analytics','automation','users','qr','partners','settings'];
+    : ['inbox','airline-emails','notifs','analytics','automation','users','qr','partners','settings'];
   const sidebarFinanceItems: AdminView[] = isWorker ? [] : ['finance'];
 
   return (
@@ -1584,7 +1585,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
           {sidebarSystemItems.map(id => (
             <button key={id} onClick={() => setAv(id)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] cursor-pointer text-[12px] font-medium border-none w-full text-left mb-0.5 transition-colors ${av===id?'bg-[#eff6ff] text-[#2563eb]':'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'}`}>
-              <span>{id==='inbox'?'📥':id==='notifs'?'🔔':id==='analytics'?'📈':id==='automation'?'⚙️':id==='users'?'👥':id==='qr'?'🔳':id==='partners'?'🤝':'🔧'}</span>
+              <span>{id==='inbox'?'📥':id==='airline-emails'?'✈️':id==='notifs'?'🔔':id==='analytics'?'📈':id==='automation'?'⚙️':id==='users'?'👥':id==='qr'?'🔳':id==='partners'?'🤝':'🔧'}</span>
               {AV_TITLES[id]}
               {id==='notifs' && notifications.filter(n => !n.read).length > 0 && <span className="ml-auto bg-[#2563eb] text-white text-[9px] font-bold px-1 py-0.5 rounded-[7px]">{notifications.filter(n => !n.read).length}</span>}
             </button>
@@ -2007,6 +2008,20 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
           {av === 'inbox' && (
             <div className="h-[calc(100vh-58px-48px-32px)]">
               <InternalInbox currentUser={user} />
+            </div>
+          )}
+
+          {/* AIRLINE EMAILS — Gmail-synced inbox with claim matching */}
+          {av === 'airline-emails' && (
+            <div className="h-[calc(100vh-58px-48px-32px)]">
+              <AirlineEmailInbox
+                currentUser={user}
+                claims={claims}
+                onOpenClaim={(claimId) => {
+                  const c = claims.find(cl => cl.id === claimId);
+                  if (c) { setPanel(c); setAv('claims'); }
+                }}
+              />
             </div>
           )}
 

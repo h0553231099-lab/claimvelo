@@ -18,6 +18,7 @@ const EVENT_META: Record<string, { icon: typeof PlusCircle; bg: string; ring: st
   document_upload:  { icon: Paperclip,       bg: 'bg-[#0891b2]', ring: 'border-[#0891b2]',  label: 'Document' },
   override:         { icon: Gavel,           bg: 'bg-[#92400e]', ring: 'border-[#92400e]',  label: 'Override' },
   info_request:     { icon: HelpCircle,      bg: 'bg-[#6366f1]', ring: 'border-[#6366f1]',  label: 'Info Request' },
+  airline_email:     { icon: Paperclip,       bg: 'bg-[#0d9488]', ring: 'border-[#0d9488]',  label: 'Airline Email' },
 };
 
 function formatTimestamp(iso: string): string {
@@ -70,6 +71,8 @@ export default function ClaimTimeline({ events, isAdmin }: Props) {
               : `Uploaded: ${h.to_status}`;
           } else if (h.field_name === 'info_request') {
             description = h.reason || `Requested: ${h.to_status}`;
+          } else if (h.field_name === 'airline_email') {
+            description = h.reason || h.to_status;
           } else if (h.field_name === 'assigned_to') {
             description = h.from_status
               ? `${h.from_status} → ${h.to_status}`
