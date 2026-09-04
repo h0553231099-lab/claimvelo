@@ -16,6 +16,7 @@ export const SEND_STAFF_EMAIL_URL = `${supabaseUrl}/functions/v1/send-staff-emai
 export const FLIGHT_LOOKUP_URL = `${supabaseUrl}/functions/v1/flight-lookup`;
 export const GMAIL_SYNC_URL = `${supabaseUrl}/functions/v1/gmail-sync`;
 export const GMAIL_SEND_URL = `${supabaseUrl}/functions/v1/gmail-send`;
+export const SEND_CUSTOMER_EMAIL_URL = `${supabaseUrl}/functions/v1/send-customer-email`;
 
 export type FlightLookupResult = {
   flightNum: string;

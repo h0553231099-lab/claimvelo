@@ -11,6 +11,7 @@ import OverridePanel from '../components/OverridePanel';
 import ClaimTimeline from '../components/ClaimTimeline';
 import InfoRequestPanel from '../components/InfoRequestPanel';
 import AirlineEmailInbox from '../components/AirlineEmailInbox';
+import ClaimCommunicationPanel from '../components/ClaimCommunicationPanel';
 
 interface FinanceTransaction {
   id: string;
@@ -858,7 +859,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [bulkStatus, setBulkStatus] = useState<OperationalStatus | ''>('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [panel, setPanel] = useState<Claim | null>(null);
-  const [panelTab, setPanelTab] = useState<'details' | 'timeline' | 'loa' | 'files' | 'requests'>('details');
+  const [panelTab, setPanelTab] = useState<'details' | 'timeline' | 'loa' | 'files' | 'requests' | 'communication'>('details');
   const [statusHistory, setStatusHistory] = useState<ClaimStatusHistory[]>([]);
   const [flightEvidence, setFlightEvidence] = useState<FlightEvidenceSummary | null>(null);
   const [flightSegments, setFlightSegments] = useState<FlightSegmentSummary[]>([]);
@@ -2034,6 +2035,9 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
               if (type === 'stale_in_progress') return { icon: '⏰', bg: '#eff6ff' };
               if (type === 'stale_waiting') return { icon: '⚠️', bg: '#fffbeb' };
               if (type === 'status_changed') return { icon: '🔄', bg: '#f8fafc' };
+              if (type === 'customer_reply') return { icon: '💬', bg: '#ede9fe' };
+              if (type === 'missing_document') return { icon: '📄', bg: '#fef3c7' };
+              if (type === 'claim_update') return { icon: '📧', bg: '#dbeafe' };
               return { icon: '🔔', bg: '#f8fafc' };
             };
             const notifTitle = (type: string) => {
@@ -2042,6 +2046,9 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
               if (type === 'stale_in_progress') return 'Stale — In Progress';
               if (type === 'stale_waiting') return 'Stale — Waiting';
               if (type === 'status_changed') return 'Status Changed';
+              if (type === 'customer_reply') return 'Customer Reply';
+              if (type === 'missing_document') return 'Missing Document';
+              if (type === 'claim_update') return 'Claim Update';
               return 'Notification';
             };
             return (
@@ -3265,7 +3272,8 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 { id: 'loa', label: 'LOA Document', icon: <FileText className="w-3.5 h-3.5" />, badge: panel.loa_signed ? 'Signed' : null },
                 { id: 'files', label: 'Files', icon: <Paperclip className="w-3.5 h-3.5" />, badge: claimFiles.length > 0 ? String(claimFiles.length) : null },
                 { id: 'requests', label: 'Requests', icon: <HelpCircle className="w-3.5 h-3.5" />, badge: infoRequests.filter(r => r.status === 'requested').length > 0 ? String(infoRequests.filter(r => r.status === 'requested').length) : null },
-              ] as { id: 'details' | 'timeline' | 'loa' | 'files' | 'requests'; label: string; icon?: React.ReactNode; badge?: string | null }[]).map(t => (
+                { id: 'communication', label: 'Comms', icon: <Mail className="w-3.5 h-3.5" /> },
+              ] as { id: 'details' | 'timeline' | 'loa' | 'files' | 'requests' | 'communication'; label: string; icon?: React.ReactNode; badge?: string | null }[]).map(t => (
                 <button
                   key={t.id}
                   onClick={() => setPanelTab(t.id)}
@@ -3562,6 +3570,18 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   requests={infoRequests}
                   loading={infoRequestsLoading}
                   onRefresh={refreshInfoRequests}
+                />
+              )}
+
+              {panelTab === 'communication' && (
+                <ClaimCommunicationPanel
+                  claimId={panel.id}
+                  claimRef={panel.claim_ref}
+                  claimEmail={panel.email}
+                  passengerName={`${panel.passenger_first_name} ${panel.passenger_last_name}`.trim()}
+                  preferredLanguage={panel.preferred_language || 'en'}
+                  user={user}
+                  onRefresh={() => loadStatusHistory(panel.id)}
                 />
               )}
 

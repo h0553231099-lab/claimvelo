@@ -3,6 +3,7 @@ import { Page, UserProfile, Claim, ClaimStatus, InfoRequest } from '../types';
 import { supabase } from '../lib/supabase';
 import { useLang } from '../lib/language';
 import { Plane, Plus, RefreshCw, Upload, FileText, AlertTriangle, CheckCircle, Clock, Paperclip } from 'lucide-react';
+import CustomerMessages from '../components/CustomerMessages';
 
 interface Props { onNav: (p: Page) => void; user?: UserProfile | null; }
 
@@ -76,7 +77,7 @@ export default function DashboardPage({ onNav, user }: Props) {
     supabase
       .from('claims')
       .select('*')
-      .eq('email', user.email)
+      .or(`email.eq.${user.email},customer_user_id.eq.${user.id}`)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         if (data) {
@@ -326,6 +327,9 @@ export default function DashboardPage({ onNav, user }: Props) {
                   </div>
                 </div>
               )}
+
+              {/* Customer Messages */}
+              <CustomerMessages claim={selected} user={user} />
             </div>
           )}
         </div>
