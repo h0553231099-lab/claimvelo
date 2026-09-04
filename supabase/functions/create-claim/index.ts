@@ -119,6 +119,7 @@ Deno.serve(async (req: Request) => {
       issue_type: claimData.issue_type || "Flight Disruption",
       airline_reason: claimData.airline_reason || "",
       status: "Untouched",
+      eligibility_status: "Pending Check",
       amount: "€600",
       agent: claimData.agent || "—",
       loa_signed: claimData.loa_signed || false,
