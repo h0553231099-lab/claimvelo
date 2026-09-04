@@ -65,18 +65,54 @@ export interface Claim {
   // Phase 2 — priority + assignment
   priority?: Priority;
   assigned_to?: string | null;
+  // Compensation
+  compensation_amount?: number | null;
 }
 
 export interface ClaimStatusHistory {
   id: string;
   claim_id: string;
-  field_name: 'status' | 'eligibility_status';
+  field_name: 'status' | 'eligibility_status' | 'priority' | 'assigned_to' | 'document_upload' | 'override';
   from_status: string | null;
   to_status: string;
   changed_by: string | null;
   reason: string | null;
   source: 'staff' | 'system' | 'insert';
+  actor_name: string | null;
   created_at: string;
+}
+
+export interface FlightEvidenceSummary {
+  data_source: string | null;
+  fetch_timestamp: string | null;
+  delay_minutes: number | null;
+  flight_status: string | null;
+  cross_check_status: string;
+  decision: string;
+  decision_reason: string;
+  scheduled_departure: string | null;
+  scheduled_arrival: string | null;
+  actual_departure: string | null;
+  actual_arrival: string | null;
+}
+
+export interface FlightSegmentSummary {
+  segment_order: number;
+  flight_number: string;
+  flight_date: string;
+  origin: string;
+  destination: string;
+  scheduled_departure: string | null;
+  scheduled_arrival: string | null;
+  actual_departure: string | null;
+  actual_arrival: string | null;
+  marketing_carrier: string;
+  operating_carrier: string;
+  operating_carrier_name: string;
+  codeshare_status: string;
+  delay_minutes: number | null;
+  flight_status: string;
+  cross_check_status: string;
 }
 
 export interface ClaimFlightSegment {
