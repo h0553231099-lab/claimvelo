@@ -124,7 +124,7 @@ Deno.serve(async (req: Request) => {
     const effectiveClaimId = claim_id || matchResult.claim_id;
 
     const { data: stored } = await admin.from("airline_emails").insert({
-      gmail_message_id: messageIdHeader,
+      gmail_message_id: gmailMessageId,
       thread_id: sentData.threadId || "",
       direction: "outbound",
       from_address: fromHeader,
