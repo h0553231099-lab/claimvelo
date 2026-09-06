@@ -75,7 +75,64 @@ export interface Claim {
   // Phase 7 — customer communication
   preferred_language?: string;
   last_customer_update_at?: string;
+  // Phase 9A — legal & finance fields
+  lawyer_id?: string | null;
+  legal_case_id?: string | null;
+  escalated_at?: string | null;
+  escalated_by?: string | null;
+  escalation_reason?: string;
+  approved_compensation_amount?: number | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  airline_payment_status?: 'none' | 'pending' | 'partial' | 'received';
+  airline_payment_amount?: number | null;
+  airline_payment_date?: string | null;
+  airline_payment_reference?: string;
+  claimvelo_fee_tier?: 'standard' | 'legal' | null;
+  claimvelo_fee_rate?: number | null;
+  claimvelo_fee_amount?: number | null;
+  customer_payout_status?: 'none' | 'pending' | 'paid';
+  customer_payout_amount?: number | null;
+  customer_payout_date?: string | null;
+  customer_payout_reference?: string;
 }
+
+// ── Phase 9A — Legal Cases ─────────────────────────────────────────────────────
+export type LegalStatus =
+  | 'intake'
+  | 'pre_litigation'
+  | 'letter_before_claim'
+  | 'court_filed'
+  | 'in_discovery'
+  | 'hearing_scheduled'
+  | 'judgment'
+  | 'settled'
+  | 'closed'
+  | 'withdrawn';
+
+export interface LegalCase {
+  id: string;
+  claim_id: string;
+  lawyer_id: string | null;
+  legal_status: LegalStatus;
+  escalation_reason: string;
+  escalated_at: string | null;
+  escalated_by: string | null;
+  next_deadline_date: string | null;
+  deadlines: unknown[];
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Phase 9A — Structured finance transaction types ───────────────────────────
+export type FinanceTransactionType =
+  | 'airline_payment'
+  | 'claimvelo_fee'
+  | 'customer_payout'
+  | 'agent_commission'
+  | 'legal_expense'
+  | 'general';
 
 // ── Phase 7 — Customer Communication ──────────────────────────────────────────
 

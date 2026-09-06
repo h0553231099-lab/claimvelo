@@ -47,3 +47,33 @@ Provide real values via the Base44 secrets dashboard.
 - Acceptance tests: `python3 supabase/tests/phase8b_acceptance.py` (needs
   secrets in `/run/base44/app.env`; deploys the edge function first via
   `npx supabase functions deploy manage-agent-finance --project-ref <ref>`).
+
+## Phase 9A — Legal & Finance Foundations (schema + RLS + audit only)
+- Migrations (applied to live DB): `20260906_p9a_01_fix_finance_rls.sql`,
+  `20260906_p9a_02_legal_cases_and_claim_fields.sql`,
+  `20260906_p9a_03_audit_coverage.sql`.
+- **finance_transactions RLS fixed:** all duplicate/conflicting policies dropped;
+  exactly 4 policies remain (SELECT/INSERT/UPDATE/DELETE), admin + super_admin
+  only. New `transaction_type` column (CHECK: airline_payment, claimvelo_fee,
+  customer_payout, agent_commission, legal_expense, general); existing rows
+  backfilled to `general`. `category` kept for display.
+- **legal_cases table:** one row per escalated claim (UNIQUE claim_id), with
+  lawyer_id, legal_status, escalation_reason, escalated_at/by, next_deadline_date,
+  deadlines (jsonb), notes. Links to existing claim infra — does NOT duplicate
+  documents/comms. RLS: lawyer reads own; admin/super_admin read+write.
+- **claims new columns:** lawyer_id, legal_case_id, escalated_at/by/reason,
+  approved_compensation_amount/approved_at/approved_by (separate from estimated
+  compensation_amount), airline_payment_status/amount/date/reference,
+  claimvelo_fee_tier/rate/amount, customer_payout_status/amount/date/reference.
+- **Lawyer RLS (least privilege):** lawyer sees only claims where
+  `lawyer_id = auth.uid()`, and the files, communications, airline_emails,
+  info_requests, review_notes, flight_segments, flight_evidence, and
+  status_history for those claims. No finance, no audit_log, no global claims.
+- **Audit coverage extended:** `audit_claim_change` now also fires on
+  lawyer assignment, escalation, compensation approval, airline payment,
+  customer payout, fee changes. New `audit_commission_change` (insert + status
+  change). New `audit_legal_case_change` (insert/update/delete).
+- **NOT done yet (Phase 9B+):** 30%/50% fee calculation, airline-payment /
+  customer-payout actions, lawyer dashboard, payment processor integration.
+- Acceptance/security tests: `python3 supabase/tests/phase9a_acceptance.py`
+  (needs secrets in `/run/base44/app.env`; creates + cleans up test users).
