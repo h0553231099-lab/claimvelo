@@ -158,7 +158,11 @@ function buildEmailHtml(
   fromAddress: string,
   language: string,
 ): string {
-  const greeting = language === "es" ? "Estimado cliente" : "Dear Customer";
+  // For launch, only English email templates are enabled.
+  // Non-English greetings are preserved for future use but gated off
+  // until the language is added to ENABLED_LANGUAGES.
+  const ENABLED_LANGUAGES = new Set(["en"]);
+  const greeting = ENABLED_LANGUAGES.has(language) && language === "es" ? "Estimado cliente" : "Dear Customer";
 
   return `<!DOCTYPE html>
 <html>

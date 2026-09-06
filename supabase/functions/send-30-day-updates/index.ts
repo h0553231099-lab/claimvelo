@@ -50,7 +50,13 @@ const UPDATE_TEMPLATES: Record<string, { subject: string; body: (ref: string, ai
   },
 };
 
+// Languages with complete, production-ready email templates.
+// For launch, only English is enabled. es/fr/de templates are preserved
+// for future use but fall back to English until their language is added here.
+const ENABLED_LANGUAGES = new Set(["en"]);
+
 function getTemplate(language: string) {
+  if (!ENABLED_LANGUAGES.has(language)) return UPDATE_TEMPLATES.en;
   return UPDATE_TEMPLATES[language] || UPDATE_TEMPLATES.en;
 }
 
