@@ -485,7 +485,7 @@ def test_validate_agent_code_rpc(ctx):
     # 7. Authenticated users also get only minimal response
     status, resp = api("POST", "/rpc/validate_agent_code",
         headers=user_headers(ctx["mgrA_jwt"]),
-        body={"p_code": ctx["agentA_code"]})
+        body={"p_code": rpc_code})
     # Note: the RPC grants EXECUTE to anon only. Authenticated users may or may not
     # have access. If they do, they should still get only {valid, agent_code}.
     if status == 200 and isinstance(resp, list) and len(resp) > 0:
