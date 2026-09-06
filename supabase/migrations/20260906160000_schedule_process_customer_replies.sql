@@ -5,24 +5,36 @@
 -- customer email replies from the Gmail monitoring inbox, match them to
 -- claims, and store unmatched/ambiguous replies in the review queue.
 --
--- Uses the same app_config.functions_url + app.service_role_key pattern
--- as the existing dispatch_30_day_updates() and sync_gmail() functions.
+-- Uses the same Vault-based service-role secret pattern as sync_gmail():
+--   • Non-secret function URL  → app_config.functions_url
+--   • Service role key          → vault.decrypted_secrets ('gmail_sync_service_role_key')
+--
+-- Does NOT depend on the app.service_role_key GUC (which may be unset).
 -- ═══════════════════════════════════════════════════════════════════════════
 
 CREATE OR REPLACE FUNCTION dispatch_process_customer_replies()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = extensions, public
+SET search_path = extensions, public, vault
 AS $$
 DECLARE
   v_url text;
   v_key text;
 BEGIN
-  SELECT value INTO v_url FROM public.app_config WHERE key = 'functions_url' LIMIT 1;
-  v_key := current_setting('app.service_role_key', true);
+  -- Non-secret config stays in app_config (just the function URL)
+  SELECT value INTO v_url
+    FROM public.app_config
+   WHERE key = 'functions_url'
+   LIMIT 1;
 
-  IF v_url IS NULL OR v_key IS NULL OR v_key = '' THEN
+  -- Secret is read from the encrypted Vault store (same key as sync_gmail)
+  SELECT decrypted_secret INTO v_key
+    FROM vault.decrypted_secrets
+   WHERE name = 'gmail_sync_service_role_key'
+   LIMIT 1;
+
+  IF v_url IS NULL OR v_key IS NULL THEN
     RETURN;
   END IF;
 

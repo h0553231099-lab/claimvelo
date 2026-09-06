@@ -230,7 +230,7 @@ Deno.serve(async (req: Request) => {
         email: payload.email,
         full_name: payload.fullName,
         role: payload.role,
-        agent_code: payload.agentCode ? payload.agentCode.toUpperCase() : null,
+        agent_code: payload.agentCode ? payload.agentCode.toUpperCase() : "",
         status: "active",
       });
 

@@ -68,7 +68,7 @@ export type TranslationKey =
   | 'home.time.badge' | 'home.time.title' | 'home.time.sub'
   | 'home.services.badge' | 'home.services.title' | 'home.services.btn'
   | 'home.reviews.badge' | 'home.reviews.title' | 'home.reviews.won'
-  | 'home.footer.tagline' | 'home.footer.about' | 'home.footer.privacy'
+  | 'home.footer.tagline' | 'home.footer.about' | 'home.footer.privacy' | 'home.footer.terms'
   | 'home.footer.how' | 'home.footer.fees' | 'home.footer.copy'
   | 'home.disruption.badge' | 'home.disruption.title' | 'home.disruption.sub'
   | 'home.disruption.hide' | 'home.disruption.more'
@@ -166,7 +166,7 @@ const base: Translations = {
   'home.reviews.badge': 'Verified Reviews', 'home.reviews.title': 'Thousands of Passengers Paid',
   'home.reviews.won': 'won',
   'home.footer.tagline': 'Flight compensation specialists. No win, no fee.',
-  'home.footer.about': 'About Us', 'home.footer.privacy': 'Privacy Policy',
+  'home.footer.about': 'About Us', 'home.footer.privacy': 'Privacy Policy', 'home.footer.terms': 'Terms of Service',
   'home.footer.how': 'How It Works', 'home.footer.fees': 'Our Fees',
   'home.footer.copy': '© 2024 ClaimVelo Ltd. All rights reserved.',
   'home.disruption.badge': 'Flight Disruptions', 'home.disruption.title': 'Current Disruptions',
