@@ -36,6 +36,7 @@ interface ParsedRow {
   destination: string;
   delayMinutes: number | null;
   delayReason: string;
+  bookingStatus: string;
   valid: boolean;
   errors: string[];
 }
@@ -51,6 +52,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   destination: ['destination', 'destination airport', 'arrival airport', 'arr airport', 'to', 'arrival'],
   delayMinutes: ['delay minutes', 'delay mins', 'delay (min)', 'arrival delay', 'delay', 'delay_min'],
   delayReason: ['delay reason', 'reason', 'delay cause', 'cause', 'disruption reason', 'airline reason'],
+  bookingStatus: ['booking status', 'booking_status', 'status'],
 };
 
 function normalizeHeader(h: string): string {
@@ -246,12 +248,13 @@ export default function ExcelImport({ workers, onImported }: Props) {
         const destination = String(raw[colMap.destination!] || '').trim().toUpperCase().slice(0, 3);
         const delayMinutes = colMap.delayMinutes ? parseDelayMinutes(raw[colMap.delayMinutes!]) : null;
         const delayReason = colMap.delayReason ? String(raw[colMap.delayReason!] || '').trim() : '';
+        const bookingStatus = colMap.bookingStatus ? String(raw[colMap.bookingStatus!] || '').trim() : '';
         const rowData: Partial<ParsedRow> = { pnr, passengerName, flightNumber, flightDate, origin, destination };
         const errors = validateRow(rowData);
         return {
           rowNumber: idx + 2, pnr, passengerName, firstName, lastName, email, phone,
           flightNumber, flightDate, origin, destination, delayMinutes, delayReason,
-          valid: errors.length === 0, errors,
+          bookingStatus, valid: errors.length === 0, errors,
         };
       });
       setParsedRows(rows);

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { isKnownIata, isValidFlightNumber } from "../_shared/airportCodes.ts";
 
 /**
  * process-excel-import
@@ -48,6 +49,7 @@ interface ParsedRow {
   destination: string;
   delayMinutes: number | null;
   delayReason: string;
+  bookingStatus?: string;
   valid: boolean;
   errors: string[];
 }
@@ -244,6 +246,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // FUTURE: any flight date in the future → whole lead is FUTURE
+    // (highest priority — future flights are never treated as compensation claims)
     const allDates = sortedRows.map((r) => r.flightDate).filter(Boolean).sort();
     const hasFuture = allDates.some((d) => d > todayStr);
     if (hasFuture) {
@@ -251,26 +254,71 @@ Deno.serve(async (req: Request) => {
       future++;
     }
 
-    // WARNING: missing email or phone (lead still created)
-    const hasMissingContact = !g.email.trim() || !g.phone.trim();
-    if (status === "READY" && hasMissingContact) {
-      status = "WARNING";
-      reviewReason = !g.email.trim() && !g.phone.trim()
-        ? "Missing email and phone"
-        : !g.email.trim() ? "Missing email" : "Missing phone";
-      warnings++;
+    // ── REVIEW checks (only if not FUTURE) ────────────────────────────────
+    // Priority order: cancelled booking > cancel keyword > unknown airport >
+    //                 malformed flight number. First match wins.
+
+    // 1. Booking_Status = CANCELLED → REVIEW
+    //    Source booking cancellation must NEVER be interpreted as proof that
+    //    the airline cancelled the flight. Actual flight cancellation still
+    //    requires real flight-provider evidence (Rules Engine).
+    if (status === "READY") {
+      const hasCancelledBooking = sortedRows.some((r) =>
+        (r.bookingStatus || "").trim().toUpperCase() === "CANCELLED"
+      );
+      if (hasCancelledBooking) {
+        status = "REVIEW";
+        reviewReason = "SOURCE_BOOKING_CANCELLED — source booking was cancelled; not interpreted as flight cancellation";
+        reviews++;
+      }
     }
 
-    // REVIEW: any row's delay reason mentions "cancel" — flag for manual review
-    // (a cancelled booking must NOT be auto-interpreted as a flight cancellation;
-    //  we never run the rules engine here, so we just surface it for a human).
-    const hasCancelKeyword = sortedRows.some((r) =>
-      /cancel/i.test(r.delayReason) || /cancel/i.test(r.passengerName)
-    );
-    if (hasCancelKeyword) {
-      status = "REVIEW";
-      reviewReason = "Row mentions cancellation — manual review required (not auto-interpreted as flight cancellation)";
-      reviews++;
+    // 2. Cancel keyword in delayReason / passengerName → REVIEW
+    if (status === "READY") {
+      const hasCancelKeyword = sortedRows.some((r) =>
+        /cancel/i.test(r.delayReason) || /cancel/i.test(r.passengerName)
+      );
+      if (hasCancelKeyword) {
+        status = "REVIEW";
+        reviewReason = "Row mentions cancellation — manual review required (not auto-interpreted as flight cancellation)";
+        reviews++;
+      }
+    }
+
+    // 3. Unknown airport code → REVIEW (validated against ClaimVelo reference)
+    if (status === "READY") {
+      const unknownCodes = new Set<string>();
+      for (const r of sortedRows) {
+        if (r.origin && !isKnownIata(r.origin)) unknownCodes.add(r.origin);
+        if (r.destination && !isKnownIata(r.destination)) unknownCodes.add(r.destination);
+      }
+      if (unknownCodes.size > 0) {
+        status = "REVIEW";
+        reviewReason = `Unknown airport code(s): ${[...unknownCodes].join(", ")} — not in ClaimVelo reference dataset`;
+        reviews++;
+      }
+    }
+
+    // 4. Malformed flight number → REVIEW
+    if (status === "READY") {
+      const malformed = sortedRows.filter((r) => r.flightNumber && !isValidFlightNumber(r.flightNumber));
+      if (malformed.length > 0) {
+        status = "REVIEW";
+        reviewReason = `Malformed flight number(s): ${malformed.map((r) => r.flightNumber).join(", ")}`;
+        reviews++;
+      }
+    }
+
+    // ── WARNING (only if not REVIEW or FUTURE) ─────────────────────────────
+    if (status === "READY") {
+      const hasMissingContact = !g.email.trim() || !g.phone.trim();
+      if (hasMissingContact) {
+        status = "WARNING";
+        reviewReason = !g.email.trim() && !g.phone.trim()
+          ? "Missing email and phone"
+          : !g.email.trim() ? "Missing email" : "Missing phone";
+        warnings++;
+      }
     }
 
     if (status === "READY") ready++;
