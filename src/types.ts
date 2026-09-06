@@ -198,6 +198,38 @@ export interface ClaimFlightSegment {
   cross_check_status?: string;
 }
 
+// ── Phase 8B — Commissions ─────────────────────────────────────────────────────
+export type CommissionStatus = 'pending' | 'approved' | 'paid';
+
+export interface Commission {
+  id: string;
+  agent_id: string;
+  claim_id: string;
+  commission_rate: number;
+  commission_amount: number;
+  commission_status: CommissionStatus;
+  paid_at: string | null;
+  created_at: string;
+  // Joined fields (optional)
+  claim_ref?: string;
+  agent_name?: string;
+  agent_code?: string;
+}
+
+export interface AgentContext {
+  id: string;
+  agent_code: string;
+  commission_rate: number;
+  total_payout_earned: number;
+  total_paid_to_date: number;
+  manager_id: string | null;
+  email: string;
+  full_name: string;
+  status: string;
+  managerName: string | null;
+  managerEmail: string | null;
+}
+
 export type UserRole = 'admin' | 'super_admin' | 'worker' | 'customer' | 'agent' | 'sales_manager' | 'seo_worker';
 
 export interface UserProfile {

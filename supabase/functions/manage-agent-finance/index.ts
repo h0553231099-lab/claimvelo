@@ -35,7 +35,7 @@ Deno.serve(async (req: Request) => {
   });
 
   try {
-    // ── Verify the caller is an admin or super_admin ──────────────────────────
+    // ── Verify the caller ─────────────────────────────────────────────────────
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader.startsWith("Bearer ")) {
       return jsonError(401, "Missing authorization header");
@@ -57,17 +57,136 @@ Deno.serve(async (req: Request) => {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!profile || !["admin", "super_admin"].includes(profile.role)) {
-      return jsonError(403, "Only admins can manage agent finances");
-    }
+    const role = profile?.role || "";
+    const isAdmin = role === "admin" || role === "super_admin";
+    const isSalesManager = role === "sales_manager";
+    const isAgent = role === "agent";
 
     const body = await req.json();
     const { action } = body;
 
-    // ── Action: recalculate-payout ────────────────────────────────────────────
+    // ── Action: get-agent-context (agent or admin) ─────────────────────────────
+    // Returns the calling agent's worker_profile + their manager's display name.
+    // Used by the Agent Portal profile section (manager name is not readable via
+    // profiles RLS by an agent).
+    if (action === "get-agent-context") {
+      if (!isAgent && !isAdmin) {
+        return jsonError(403, "Only agents can request agent context");
+      }
+      const { data: wp } = await admin
+        .from("worker_profiles")
+        .select("id, agent_code, commission_rate, total_payout_earned, total_paid_to_date, manager_id, email, full_name, status")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      let managerName: string | null = null;
+      let managerEmail: string | null = null;
+      if (wp?.manager_id) {
+        const { data: mgr } = await admin
+          .from("profiles")
+          .select("full_name, email")
+          .eq("id", wp.manager_id)
+          .maybeSingle();
+        managerName = mgr?.full_name || null;
+        managerEmail = mgr?.email || null;
+      }
+
+      return jsonOk({ agent: wp, managerName, managerEmail });
+    }
+
+    // ── Action: approve-commission (sales_manager own team, or admin) ──────────
+    // Moves a commission from 'pending' → 'approved'. The caller must own the
+    // commission's agent (manager_id = caller) unless they are an admin.
+    if (action === "approve-commission") {
+      const { commissionId } = body;
+      if (!commissionId) return jsonError(400, "commissionId is required");
+      if (!isSalesManager && !isAdmin) {
+        return jsonError(403, "Only sales managers or admins can approve commissions");
+      }
+
+      // Load the commission + its agent to verify ownership
+      const { data: commission } = await admin
+        .from("commissions")
+        .select("id, agent_id, commission_status")
+        .eq("id", commissionId)
+        .maybeSingle();
+
+      if (!commission) return jsonError(404, "Commission not found");
+
+      if (isSalesManager && !isAdmin) {
+        const { data: agent } = await admin
+          .from("worker_profiles")
+          .select("manager_id")
+          .eq("id", commission.agent_id)
+          .maybeSingle();
+        if (!agent || agent.manager_id !== user.id) {
+          return jsonError(403, "You can only approve commissions for your own team");
+        }
+      }
+
+      if (commission.commission_status !== "pending") {
+        return jsonError(409, `Commission is already ${commission.commission_status}`);
+      }
+
+      const { error: updateErr } = await admin
+        .from("commissions")
+        .update({ commission_status: "approved" })
+        .eq("id", commissionId);
+
+      if (updateErr) return jsonError(500, `Failed to approve: ${updateErr.message}`);
+      return jsonOk({ commissionId, status: "approved" });
+    }
+
+    // ── Action: pay-commission (sales_manager own team, or admin) ──────────────
+    // Moves a commission from 'approved' → 'paid' and stamps paid_at.
+    // NOTE: This only sets the status flag — actual payment processing is
+    // Phase 9 (log-payout records the money transfer to finance_transactions).
+    if (action === "pay-commission") {
+      const { commissionId } = body;
+      if (!commissionId) return jsonError(400, "commissionId is required");
+      if (!isSalesManager && !isAdmin) {
+        return jsonError(403, "Only sales managers or admins can pay commissions");
+      }
+
+      const { data: commission } = await admin
+        .from("commissions")
+        .select("id, agent_id, commission_status")
+        .eq("id", commissionId)
+        .maybeSingle();
+
+      if (!commission) return jsonError(404, "Commission not found");
+
+      if (isSalesManager && !isAdmin) {
+        const { data: agent } = await admin
+          .from("worker_profiles")
+          .select("manager_id")
+          .eq("id", commission.agent_id)
+          .maybeSingle();
+        if (!agent || agent.manager_id !== user.id) {
+          return jsonError(403, "You can only pay commissions for your own team");
+        }
+      }
+
+      if (commission.commission_status !== "approved") {
+        return jsonError(409, `Commission must be approved before paying (currently ${commission.commission_status})`);
+      }
+
+      const { error: updateErr } = await admin
+        .from("commissions")
+        .update({ commission_status: "paid", paid_at: new Date().toISOString() })
+        .eq("id", commissionId);
+
+      if (updateErr) return jsonError(500, `Failed to mark paid: ${updateErr.message}`);
+      return jsonOk({ commissionId, status: "paid" });
+    }
+
+    // ── Action: recalculate-payout (admin only) ────────────────────────────────
     // Updates an agent's commission_rate and recalculates total_payout_earned
     // from their eligible claims. Also updates/creates commission records.
     if (action === "recalculate-payout") {
+      if (!isAdmin) {
+        return jsonError(403, "Only admins can update commission rates");
+      }
       const { agentId, newRate } = body;
       if (!agentId) return jsonError(400, "agentId is required");
       if (typeof newRate !== "number" || newRate < 0 || newRate > 100) {
@@ -141,10 +260,13 @@ Deno.serve(async (req: Request) => {
       return jsonOk({ newTotal: total, claimCount });
     }
 
-    // ── Action: log-payout ────────────────────────────────────────────────────
+    // ── Action: log-payout (admin only) ────────────────────────────────────────
     // Logs a manual payout to an agent, updates total_paid_to_date,
     // and records it as a finance transaction.
     if (action === "log-payout") {
+      if (!isAdmin) {
+        return jsonError(403, "Only admins can log payouts");
+      }
       const { agentId, agentCode, agentName, amount, paymentDate, reference } = body;
       if (!agentId) return jsonError(400, "agentId is required");
       if (typeof amount !== "number" || amount <= 0) {
