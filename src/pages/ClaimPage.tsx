@@ -8,6 +8,7 @@ import IssueTypeSelector, { type IssueType } from '../components/IssueTypeSelect
 import CancellationFields from '../components/CancellationFields';
 import DeniedBoardingFields from '../components/DeniedBoardingFields';
 import ConnectingFlightFields, { type SegmentData } from '../components/ConnectingFlightFields';
+import { captureReferralFromURL, getReferralCode } from '../lib/referral';
 
 interface Props { onNav: (p: Page) => void; prefill?: CheckerPrefill; }
 
@@ -145,10 +146,11 @@ export default function ClaimPage({ onNav, prefill }: Props) {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrResult, setOcrResult] = useState<{ flightNum?: string; date?: string; dep?: string; arr?: string; airline?: string; passengerName?: string } | null>(null);
 
-  // Agent code
+  // Agent code — from URL param first, then from persisted referral (localStorage)
   const [agentCode] = useState(() => {
-    const p = new URLSearchParams(window.location.search).get('agent');
-    return p ? p.toUpperCase() : '';
+    const urlCode = captureReferralFromURL();
+    if (urlCode) return urlCode;
+    return getReferralCode() || '';
   });
 
   // Submission
