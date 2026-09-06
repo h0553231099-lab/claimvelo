@@ -11,6 +11,10 @@ import ClaimTimeline from '../components/ClaimTimeline';
 import InfoRequestPanel from '../components/InfoRequestPanel';
 import AirlineEmailInbox from '../components/AirlineEmailInbox';
 import ClaimCommunicationPanel from '../components/ClaimCommunicationPanel';
+import AdminLegalQueue from '../components/admin/AdminLegalQueue';
+import FinanceDashboard from '../components/admin/FinanceDashboard';
+import ClaimFinancePanel from '../components/legal/ClaimFinancePanel';
+import { escalateClaim as apiEscalateClaim } from '../lib/legalFinanceApi';
 
 interface FinanceTransaction {
   id: string;
@@ -111,7 +115,7 @@ const AV_TITLES: Record<AdminView, string> = {
   dash:'Dashboard', claims:'All Claims', crm:'CRM Kanban',
   inbox:'Inbox', 'airline-emails':'Airline Emails', notifs:'Notifications', analytics:'Analytics',
   automation:'Automation', users:'Users & Roles', settings:'Settings',
-  finance:'Income & Expenses', qr:'Agent QR Codes', partners:'B2B Partners',
+  finance:'Income & Expenses', 'finance-dashboard':'Finance Dashboard', 'legal-queue':'Legal Queue', qr:'Agent QR Codes', partners:'B2B Partners',
   bulk:'Bulk Import', review:'Review Queue',
 };
 
@@ -858,13 +862,17 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [bulkStatus, setBulkStatus] = useState<OperationalStatus | ''>('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [panel, setPanel] = useState<Claim | null>(null);
-  const [panelTab, setPanelTab] = useState<'details' | 'timeline' | 'loa' | 'files' | 'requests' | 'communication'>('details');
+  const [panelTab, setPanelTab] = useState<'details' | 'timeline' | 'loa' | 'files' | 'requests' | 'communication' | 'finance'>('details');
   const [statusHistory, setStatusHistory] = useState<ClaimStatusHistory[]>([]);
   const [flightEvidence, setFlightEvidence] = useState<FlightEvidenceSummary | null>(null);
   const [flightSegments, setFlightSegments] = useState<FlightSegmentSummary[]>([]);
   const [noteText, setNoteText] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteSaved, setNoteSaved] = useState<'idle' | 'ok' | 'err'>('idle');
+  // Legal escalation
+  const [escReason, setEscReason] = useState('');
+  const [escBusy, setEscBusy] = useState(false);
+  const [escMsg, setEscMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
   // Workers state
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
@@ -1588,7 +1596,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const sidebarSystemItems: AdminView[] = isWorker
     ? ['inbox','notifs']
     : ['inbox','airline-emails','notifs','analytics','automation','users','qr','partners','settings'];
-  const sidebarFinanceItems: AdminView[] = isWorker ? [] : ['finance'];
+  const sidebarFinanceItems: AdminView[] = isWorker ? [] : ['finance', 'finance-dashboard', 'legal-queue'];
 
   return (
     <div className="flex h-[calc(100vh-58px)] overflow-hidden">
@@ -1624,7 +1632,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
               {sidebarFinanceItems.map(id => (
                 <button key={id} onClick={() => setAv(id)}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] cursor-pointer text-[12px] font-medium border-none w-full text-left mb-0.5 transition-colors ${av===id?'bg-[#f0fdf4] text-[#16a34a]':'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'}`}>
-                  <span>💰</span>
+                  <span>{id==='finance'?'💰':id==='finance-dashboard'?'📊':'⚖️'}</span>
                   {AV_TITLES[id]}
                 </button>
               ))}
@@ -3251,6 +3259,16 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
             );
           })()}
 
+          {/* LEGAL QUEUE */}
+          {av === 'legal-queue' && !isWorker && (
+            <AdminLegalQueue />
+          )}
+
+          {/* FINANCE DASHBOARD */}
+          {av === 'finance-dashboard' && !isWorker && (
+            <FinanceDashboard />
+          )}
+
           {/* SETTINGS */}
           {av === 'settings' && !isWorker && (
             <div className="max-w-[620px]">
@@ -3300,7 +3318,8 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 { id: 'files', label: 'Files', icon: <Paperclip className="w-3.5 h-3.5" />, badge: claimFiles.length > 0 ? String(claimFiles.length) : null },
                 { id: 'requests', label: 'Requests', icon: <HelpCircle className="w-3.5 h-3.5" />, badge: infoRequests.filter(r => r.status === 'requested').length > 0 ? String(infoRequests.filter(r => r.status === 'requested').length) : null },
                 { id: 'communication', label: 'Comms', icon: <Mail className="w-3.5 h-3.5" /> },
-              ] as { id: 'details' | 'timeline' | 'loa' | 'files' | 'requests' | 'communication'; label: string; icon?: React.ReactNode; badge?: string | null }[]).map(t => (
+                { id: 'finance', label: 'Finance', icon: <DollarSign className="w-3.5 h-3.5" /> },
+              ] as { id: 'details' | 'timeline' | 'loa' | 'files' | 'requests' | 'communication' | 'finance'; label: string; icon?: React.ReactNode; badge?: string | null }[]).map(t => (
                 <button
                   key={t.id}
                   onClick={() => setPanelTab(t.id)}
@@ -3613,6 +3632,42 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                       loadStatusHistory(panel.id);
                     }}
                   />
+
+                  {/* Escalate to Legal — creates a legal_case via the secure edge function */}
+                  {!isWorker && (
+                    <div className="mt-4 pt-3 border-t border-[#e2e8f0]">
+                      <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2">Legal Escalation</div>
+                      {panel.legal_case_id ? (
+                        <div className="text-[11px] text-[#16a34a] font-semibold">Already escalated — manage in the Legal Queue.</div>
+                      ) : (
+                        <div>
+                          <input
+                            value={escReason}
+                            onChange={e => setEscReason(e.target.value)}
+                            placeholder="Escalation reason (e.g. airline rejected, court action required)"
+                            className="w-full px-3 py-2 border border-[#e2e8f0] rounded-[7px] text-[12px] outline-none focus:border-[#2563eb] mb-2"
+                          />
+                          {escMsg && <div className={`text-[11px] font-semibold rounded-[6px] px-2.5 py-1.5 mb-2 ${escMsg.kind === 'ok' ? 'text-[#16a34a] bg-[#f0fdf4]' : 'text-[#dc2626] bg-[#fef2f2]'}`}>{escMsg.text}</div>}
+                          <button
+                            disabled={escBusy}
+                            onClick={async () => {
+                              setEscBusy(true); setEscMsg(null);
+                              try {
+                                await apiEscalateClaim(panel.id, undefined, escReason);
+                                setEscMsg({ kind: 'ok', text: 'Claim escalated to legal.' });
+                                const { data } = await supabase.from('claims').select('*').eq('id', panel.id).single();
+                                if (data) { setPanel(data as Claim); setClaims(prev => prev.map(c => c.id === data.id ? data as Claim : c)); }
+                                loadStatusHistory(panel.id);
+                              } catch (e) {
+                                setEscMsg({ kind: 'err', text: e instanceof Error ? e.message : 'Escalation failed' });
+                              } finally { setEscBusy(false); }
+                            }}
+                            className="px-3 py-1.5 bg-[#dc2626] text-white rounded-[7px] text-[11px] font-semibold border-none cursor-pointer hover:bg-[#b91c1c] disabled:opacity-50 disabled:cursor-not-allowed"
+                          >{escBusy ? 'Escalating…' : 'Escalate to Legal'}</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -3653,6 +3708,15 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   </div>
                   <LOAPreview claim={panel} />
                 </div>
+              )}
+
+              {panelTab === 'finance' && !isWorker && (
+                <ClaimFinancePanel
+                  claimId={panel.id}
+                  claimRef={panel.claim_ref}
+                  estimatedAmount={panel.compensation_amount != null ? Number(panel.compensation_amount) : null}
+                  approvedAmount={panel.approved_compensation_amount != null ? Number(panel.approved_compensation_amount) : null}
+                />
               )}
 
               {panelTab === 'files' && (

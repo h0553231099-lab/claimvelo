@@ -24,6 +24,7 @@ const SignInPage = lazy(() => import('./pages/SignInPage'));
 const CompensationChecker = lazy(() => import('./components/CompensationChecker'));
 const AgentDashboardPage = lazy(() => import('./pages/AgentDashboardPage'));
 const SalesManagerPage = lazy(() => import('./pages/SalesManagerPage'));
+const LawyerDashboardPage = lazy(() => import('./pages/LawyerDashboardPage'));
 const AgentSignInPage = lazy(() => import('./pages/AgentSignInPage'));
 const SalesSignInPage = lazy(() => import('./pages/SalesSignInPage'));
 const SeoSignInPage = lazy(() => import('./pages/SeoSignInPage'));
@@ -139,6 +140,8 @@ export default function App() {
       nav('agent-dashboard');
     } else if (profile.role === 'sales_manager') {
       nav('sales-dashboard');
+    } else if (profile.role === 'lawyer') {
+      nav('lawyer-dashboard');
     } else if (profile.role === 'seo_worker') {
       nav('admin');
     } else {
@@ -165,6 +168,15 @@ export default function App() {
       <LanguageProvider>
         <Suspense fallback={<Loader />}>
           <SalesManagerPage onNav={nav} user={user} onSignOut={handleSignOut} />
+        </Suspense>
+      </LanguageProvider>
+    );
+  }
+  if (!loadingAuth && user?.role === 'lawyer' && page !== 'home' && page !== 'claim') {
+    return (
+      <LanguageProvider>
+        <Suspense fallback={<Loader />}>
+          <LawyerDashboardPage onNav={nav} user={user} onSignOut={handleSignOut} />
         </Suspense>
       </LanguageProvider>
     );
@@ -212,6 +224,7 @@ export default function App() {
           {page === 'united-kingdom' && <UKPage onNav={nav} />}
           {page === 'agent-dashboard' && <AgentDashboardPage onNav={nav} user={user} onSignOut={handleSignOut} />}
           {page === 'sales-dashboard' && <SalesManagerPage onNav={nav} user={user} onSignOut={handleSignOut} />}
+          {page === 'lawyer-dashboard' && user?.role === 'lawyer' && <LawyerDashboardPage onNav={nav} user={user} onSignOut={handleSignOut} />}
         </Suspense>
         <CookieBanner />
       </div>

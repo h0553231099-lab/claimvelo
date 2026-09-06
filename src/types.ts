@@ -134,6 +134,34 @@ export type FinanceTransactionType =
   | 'legal_expense'
   | 'general';
 
+export interface FinanceTransaction {
+  id: string;
+  type: 'income' | 'expense';
+  transaction_type: FinanceTransactionType | null;
+  category: string;
+  description: string;
+  amount: number;
+  currency: string;
+  date: string;
+  claim_id: string | null;
+  claim_ref: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+// Readable audit-log entry (admin only — RLS restricts audit_log to admins).
+export interface AuditLogEntry {
+  id: string;
+  created_at: string;
+  user_email: string | null;
+  role: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+}
+
 // ── Phase 7 — Customer Communication ──────────────────────────────────────────
 
 export type CommunicationDirection = 'outbound' | 'inbound';
@@ -287,7 +315,7 @@ export interface AgentContext {
   managerEmail: string | null;
 }
 
-export type UserRole = 'admin' | 'super_admin' | 'worker' | 'customer' | 'agent' | 'sales_manager' | 'seo_worker';
+export type UserRole = 'admin' | 'super_admin' | 'worker' | 'customer' | 'agent' | 'sales_manager' | 'seo_worker' | 'lawyer';
 
 export interface UserProfile {
   id: string;
@@ -298,8 +326,8 @@ export interface UserProfile {
   agent_code?: string;
 }
 
-export type Page = 'home' | 'claim' | 'claim-success' | 'dashboard' | 'admin' | 'loa' | 'about' | 'signin' | 'agent-signin' | 'sales-signin' | 'seo-signin' | 'how-it-works' | 'fees' | 'privacy' | 'agent-dashboard' | 'sales-dashboard' | 'seo-dashboard' | 'partners' | 'ireland' | 'united-kingdom' | 'api-docs' | 'start';
-export type AdminView = 'dash' | 'claims' | 'crm' | 'inbox' | 'airline-emails' | 'notifs' | 'analytics' | 'automation' | 'users' | 'settings' | 'finance' | 'qr' | 'partners' | 'bulk' | 'review';
+export type Page = 'home' | 'claim' | 'claim-success' | 'dashboard' | 'admin' | 'loa' | 'about' | 'signin' | 'agent-signin' | 'sales-signin' | 'seo-signin' | 'how-it-works' | 'fees' | 'privacy' | 'agent-dashboard' | 'sales-dashboard' | 'seo-dashboard' | 'lawyer-dashboard' | 'partners' | 'ireland' | 'united-kingdom' | 'api-docs' | 'start';
+export type AdminView = 'dash' | 'claims' | 'crm' | 'inbox' | 'airline-emails' | 'notifs' | 'analytics' | 'automation' | 'users' | 'settings' | 'finance' | 'finance-dashboard' | 'legal-queue' | 'qr' | 'partners' | 'bulk' | 'review';
 
 // ── Phase 6 — Airline Email Integration ────────────────────────────────────────
 
