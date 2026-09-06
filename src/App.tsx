@@ -134,7 +134,7 @@ export default function App() {
   function nav(p: Page) { setPage(p); window.scrollTo(0, 0); }
   function handleAuth(profile: UserProfile) {
     setUser(profile);
-    if (profile.role === 'admin' || profile.role === 'worker') {
+    if (profile.role === 'admin' || profile.role === 'super_admin' || profile.role === 'worker') {
       nav('admin');
     } else if (profile.role === 'agent') {
       nav('agent-dashboard');
@@ -208,7 +208,7 @@ export default function App() {
           {page === 'claim' && <ClaimPage onNav={nav} prefill={claimPrefill} />}
           {page === 'claim-success' && <ClaimSuccessPage onNav={nav} />}
           {page === 'dashboard' && <DashboardPage onNav={nav} user={user} />}
-          {page === 'admin' && user && (user.role === 'admin' || user.role === 'worker' || user.role === 'seo_worker') && <AdminPage onNav={nav} user={user} onSignOut={handleSignOut} />}
+          {page === 'admin' && user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'worker' || user.role === 'seo_worker') && <AdminPage onNav={nav} user={user} onSignOut={handleSignOut} />}
           {page === 'loa' && <LOAPage onNav={nav} form={form} sigData={sigData} />}
           {page === 'about' && <AboutPage onNav={nav} />}
           {page === 'how-it-works' && <HowItWorksPage onNav={nav} />}
