@@ -1,6 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { rateLimit, getClientIp } from "../_shared/rateLimit.ts";
 import { dbRateLimit } from "../_shared/dbRateLimit.ts";
+import { getCachedFlight, setCachedFlight } from "../_shared/flightCache.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { fetchAeroDataBox, fetchAviationStack } from "../_shared/evaluate.ts";
+import type { ProviderResult } from "../_shared/evaluate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +26,26 @@ interface FlightResult {
   delayMin: number;
   status: string;
   date: string;
+}
+
+/** Convert ProviderResult (from evaluate.ts) to FlightResult[] (for the website UI). */
+function providerResultToFlightResults(pr: ProviderResult | null): FlightResult[] {
+  if (!pr || !pr.flights || !pr.flights.length) return [];
+  return pr.flights.map((f) => ({
+    flightNum: f.flightNumber,
+    airline: f.operatingCarrierName || airlineFromCode(f.flightNumber),
+    depAirport: f.origin,
+    depCode: f.origin,
+    arrAirport: f.destination,
+    arrCode: f.destination,
+    depTime: f.scheduledDeparture ? f.scheduledDeparture.slice(11, 16) : "",
+    arrTime: f.scheduledArrival ? f.scheduledArrival.slice(11, 16) : "",
+    actualDepTime: f.actualDeparture ? f.actualDeparture.slice(11, 16) : null,
+    actualArrTime: f.actualArrival ? f.actualArrival.slice(11, 16) : null,
+    delayMin: f.delayMinutes || 0,
+    status: f.status,
+    date: f.flightDate,
+  }));
 }
 
 function airlineFromCode(code: string): string {
@@ -241,19 +265,54 @@ Deno.serve(async (req: Request) => {
     let flights: FlightResult[] | null = null;
     let apiNote = "";
 
+    // Service-role client for shared flight cache access
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
     if (flightNumber?.trim()) {
-      // Try AeroDataBox first — it supports historical and scheduled dates reliably
-      if (aeroKey) {
-        flights = await tryAeroDataBox(flightNumber.trim(), date, aeroKey);
-      }
-      // Fall back to AviationStack (works for live/current flights on free plan)
-      if (!flights?.length && aviationKey) {
-        const result = await tryAviationStackByFlight(flightNumber.trim(), date, aviationKey);
-        flights = result.flights;
-        if (result.rawError) apiNote = result.rawError;
+      const fn = flightNumber.trim();
+      const dc = (depCode || "").trim().toUpperCase();
+      const ac = (arrCode || "").trim().toUpperCase();
+
+      // Check shared flight cache first (only when origin+destination are known)
+      const cached = await getCachedFlight(supabase, {
+        flightNumber: fn, flightDate: date, origin: dc, destination: ac,
+      });
+
+      if (cached.hit) {
+        // Cache hit — 0 provider calls
+        flights = [];
+        if (cached.aerodatabox) {
+          flights.push(...providerResultToFlightResults(cached.aerodatabox as ProviderResult));
+        }
+        if (!flights.length && cached.aviationstack) {
+          flights.push(...providerResultToFlightResults(cached.aviationstack as ProviderResult));
+        }
+      } else {
+        // Cache miss — call providers (same fallback order as before)
+        let aeroResult: ProviderResult | null = null;
+        let aviaResult: ProviderResult | null = null;
+
+        if (aeroKey) {
+          aeroResult = await fetchAeroDataBox(fn, date, aeroKey);
+          if (aeroResult) flights = providerResultToFlightResults(aeroResult);
+        }
+        if (!flights?.length && aviationKey) {
+          aviaResult = await fetchAviationStack(fn, date, aviationKey);
+          if (aviaResult) flights = providerResultToFlightResults(aviaResult);
+        }
+
+        // Store in shared cache (always — even null results refresh expired entries)
+        await setCachedFlight(supabase,
+          { flightNumber: fn, flightDate: date, origin: dc, destination: ac },
+          aeroResult, aviaResult, "no_data",
+        );
       }
     } else if (depCode && arrCode) {
-      // Route search — AviationStack only
+      // Route search — AviationStack only (no cache, different key structure)
       if (aviationKey) {
         const result = await tryAviationStackByRoute(depCode, arrCode, date, aviationKey);
         flights = result.flights;

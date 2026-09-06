@@ -22,6 +22,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { getCachedFlight, setCachedFlight } from "./flightCache.ts";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -883,21 +884,49 @@ export async function evaluateClaimInternal(
     return { claimId, claimRef, decision: "Not Eligible", delayMinutes: null, reasonCode: null, source: null, detail };
   }
 
-  // ── Stage 2: Fetch provider flight data ─────────────────────────────────────
+  // ── Stage 2: Fetch provider flight data (with shared flight cache) ──────────
   const providers: ProviderResult[] = [];
-  const aero = await fetchAeroDataBox(flightNumber, flightDate, aerodataboxKey);
-  if (aero) providers.push(aero);
-  const avia = await fetchAviationStack(flightNumber, flightDate, aviationstackKey);
-  if (avia) providers.push(avia);
+  let providerEvidence: Record<string, unknown> = {};
+  let cacheHit = false;
 
-  const providerEvidence: Record<string, unknown> = {};
-  for (const p of providers) providerEvidence[p.source] = p.raw;
+  // Check shared flight_cache before calling any provider
+  const cached = await getCachedFlight(supabase, {
+    flightNumber, flightDate, origin: departure, destination: arrival,
+  });
+  if (cached.hit) {
+    cacheHit = true;
+    if (cached.aerodatabox) providers.push(cached.aerodatabox as ProviderResult);
+    if (cached.aviationstack) providers.push(cached.aviationstack as ProviderResult);
+    // Reconstruct providerEvidence from cached raw
+    if (cached.aerodatabox) providerEvidence["aerodatabox"] = (cached.aerodatabox as ProviderResult).raw;
+    if (cached.aviationstack) providerEvidence["aviationstack"] = (cached.aviationstack as ProviderResult).raw;
+  }
+
+  if (!cacheHit) {
+    // Cache miss — call providers as before
+    const aero = await fetchAeroDataBox(flightNumber, flightDate, aerodataboxKey);
+    if (aero) providers.push(aero);
+    const avia = await fetchAviationStack(flightNumber, flightDate, aviationstackKey);
+    if (avia) providers.push(avia);
+    for (const p of providers) providerEvidence[p.source] = p.raw;
+  }
 
   // ── Stage 3: Cross-check claim vs provider ──────────────────────────────────
   const cc = crossCheck({ flightNumber, flightDate, origin: departure, destination: arrival }, providers);
 
+  // Store fetched results in shared cache with cross-check verification status
+  if (!cacheHit) {
+    await setCachedFlight(supabase,
+      { flightNumber, flightDate, origin: departure, destination: arrival },
+      providers.find((p) => p.source === "aerodatabox") || null,
+      providers.find((p) => p.source === "aviationstack") || null,
+      cc.status,
+    );
+  }
+
+  const aeroProvider = providers.find((p) => p.source === "aerodatabox");
   const primarySource: DataSource = cc.matched
-    ? (aero && aero.flights.includes(cc.matched) ? "aerodatabox" : "aviationstack")
+    ? (aeroProvider && aeroProvider.flights.includes(cc.matched) ? "aerodatabox" : "aviationstack")
     : (providers.length > 0 ? providers[0].source : "none");
 
   const evBase = { dataSource: primarySource, fetchTimestamp, providerEvidence };
