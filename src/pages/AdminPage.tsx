@@ -3353,6 +3353,39 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                     </div>
                   </div>
 
+                  {/* 30-Day Update Status Indicator */}
+                  {(() => {
+                    const ACTIVE_STATUSES = ['Untouched', 'In Progress', 'Submitted', 'Waiting'];
+                    const isActive = ACTIVE_STATUSES.includes(panel.status as string);
+                    if (!isActive) return null;
+                    const lastUpdate = panel.last_customer_update_at ? new Date(panel.last_customer_update_at) : null;
+                    const daysSince = lastUpdate ? Math.floor((Date.now() - lastUpdate.getTime()) / 86400000) : null;
+                    const isOverdue = daysSince !== null && daysSince >= 30;
+                    const isWarning = daysSince !== null && daysSince >= 25 && daysSince < 30;
+                    const indicatorColor = isOverdue ? '#dc2626' : isWarning ? '#ea580c' : '#16a34a';
+                    const indicatorBg = isOverdue ? '#fef2f2' : isWarning ? '#fff7ed' : '#f0fdf4';
+                    const indicatorLabel = isOverdue ? 'Overdue — update needed' : isWarning ? 'Due soon' : 'Up to date';
+                    return (
+                      <div className="mb-4">
+                        <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">30-Day Update</div>
+                        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-[8px] border" style={{ backgroundColor: indicatorBg, borderColor: indicatorColor + '33' }}>
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: indicatorColor }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-bold" style={{ color: indicatorColor }}>{indicatorLabel}</div>
+                            <div className="text-[10px] text-[#64748b]">
+                              {daysSince !== null
+                                ? `Last customer update ${daysSince} day${daysSince === 1 ? '' : 's'} ago${lastUpdate ? ` · ${lastUpdate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}`
+                                : 'No customer update sent yet'}
+                            </div>
+                          </div>
+                          {panel.preferred_language && panel.preferred_language !== 'en' && (
+                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-[#eff6ff] text-[#2563eb] shrink-0">{panel.preferred_language}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Flight evidence summary (safe fields only — no raw provider JSON) */}
                   {flightEvidence && (
                     <div className="mb-4">
