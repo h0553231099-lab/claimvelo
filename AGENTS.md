@@ -73,7 +73,17 @@ Provide real values via the Base44 secrets dashboard.
   lawyer assignment, escalation, compensation approval, airline payment,
   customer payout, fee changes. New `audit_commission_change` (insert + status
   change). New `audit_legal_case_change` (insert/update/delete).
-- **NOT done yet (Phase 9B+):** 30%/50% fee calculation, airline-payment /
-  customer-payout actions, lawyer dashboard, payment processor integration.
+- **Phase 9B (done):** `manage-legal-finance` edge function implements the
+  full legal/finance workflow: `escalate-claim` (creates legal_case + stamps
+  claim), `approve-compensation`, `record-airline-payment`, `set-claimvelo-fee`
+  (30%/50% tier calc), `record-customer-payout`, `record-legal-expense`
+  (multiple per claim), `update-legal-case`, `get-legal-overview` (admin or
+  assigned lawyer). Typed finance transactions use a manual check-then-upsert
+  (the unique partial index `idx_finance_txn_unique_per_claim` has a WHERE
+  clause that PostgREST `onConflict` cannot target). Migration
+  `20260906_p9b_01_legal_finance_migration.sql` adds that index + a
+  `legal_cases` updated_at trigger (reuses `update_updated_at()`).
+- **NOT done yet (Phase 9C+):** lawyer dashboard UI, payment processor
+  integration.
 - Acceptance/security tests: `python3 supabase/tests/phase9a_acceptance.py`
   (needs secrets in `/run/base44/app.env`; creates + cleans up test users).
