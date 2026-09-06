@@ -123,5 +123,31 @@ Provide real values via the Base44 secrets dashboard.
     writes, non-admin roles (worker/customer/agent/sales_manager/lawyer) get
     403 on all admin-only actions, existing flows not regressed.
 - **NOT done yet (Phase 10+):** payment processor integration.
+
+## Excel Leads MVP — ingestion layer (no claim creation)
+- Migration (applied to live DB): `20260906190000_excel_leads.sql` — four NEW
+  additive tables (`import_batches`, `leads`, `import_raw_rows`,
+  `lead_flight_segments`), all with RLS (admin/super_admin SELECT only; service
+  role mutates via edge function). No existing table modified.
+- Edge function `process-excel-import` (admin/super_admin only — verifies JWT +
+  profile role): stores every raw row, deduplicates (within-batch identical rows
+  + cross-batch via `leads.lead_key` unique index), groups by PNR + passenger →
+  ONE lead per passenger, preserves ordered segments. **Never** creates claims,
+  runs the rules engine, verifies flights, contacts customers, sends emails, or
+  creates commissions. Resolves `agent_id` server-side from `agent_code`.
+- Lead statuses: READY / WARNING (missing email or phone) / REVIEW (row mentions
+  cancellation — NOT auto-interpreted as flight cancellation) / FUTURE (any
+  flight date in the future) / DUPLICATE.
+- Admin UI: "Excel Import" view (`ExcelImport.tsx`, reuses BulkImport parsing
+  helpers but POSTs to the edge function instead of creating claims) + "Lead
+  Queue" view (`LeadQueue.tsx`, expandable lead cards with segments). Both wired
+  into `AdminPage.tsx` sidebar. The old claim-creating `BulkImport` is no longer
+  rendered.
+- Deploy edge function: `npx supabase functions deploy process-excel-import
+  --project-ref <ref> --no-verify-jwt` (run inside the compose container).
+- E2E test: `python3 supabase/tests/excel_leads_e2e.py` (15 checks, all pass;
+  needs secrets in `/run/base44/app.env`; creates + cleans up a temp admin user).
+- **NOT done yet:** Lead → Claim conversion (reserved nullable `leads.claim_id`
+  FK + `lead_flight_segments` mirrors `claim_flight_segments` for this).
 - Acceptance/security tests: `python3 supabase/tests/phase9a_acceptance.py`
   (needs secrets in `/run/base44/app.env`; creates + cleans up test users).

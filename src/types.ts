@@ -327,7 +327,7 @@ export interface UserProfile {
 }
 
 export type Page = 'home' | 'claim' | 'claim-success' | 'dashboard' | 'admin' | 'loa' | 'about' | 'signin' | 'agent-signin' | 'sales-signin' | 'seo-signin' | 'how-it-works' | 'fees' | 'privacy' | 'terms' | 'agent-dashboard' | 'sales-dashboard' | 'seo-dashboard' | 'lawyer-dashboard' | 'partners' | 'ireland' | 'united-kingdom' | 'api-docs' | 'start';
-export type AdminView = 'dash' | 'claims' | 'crm' | 'inbox' | 'airline-emails' | 'notifs' | 'analytics' | 'automation' | 'users' | 'settings' | 'finance' | 'finance-dashboard' | 'legal-queue' | 'qr' | 'partners' | 'bulk' | 'review';
+export type AdminView = 'dash' | 'claims' | 'crm' | 'inbox' | 'airline-emails' | 'notifs' | 'analytics' | 'automation' | 'users' | 'settings' | 'finance' | 'finance-dashboard' | 'legal-queue' | 'qr' | 'partners' | 'bulk' | 'review' | 'leads';
 
 // ── Phase 6 — Airline Email Integration ────────────────────────────────────────
 
@@ -375,6 +375,58 @@ export interface AirlineEmailAttachment {
   file_size: number;
   storage_path: string;
   created_at: string;
+}
+
+// ── Excel Leads MVP ────────────────────────────────────────────────────────────
+export type LeadStatus = 'READY' | 'WARNING' | 'REVIEW' | 'FUTURE' | 'DUPLICATE';
+
+export interface ImportBatch {
+  id: string;
+  file_name: string;
+  agent_id: string | null;
+  agent_code: string;
+  total_rows: number;
+  status: string;
+  created_by: string | null;
+  created_by_email: string;
+  summary: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface LeadFlightSegment {
+  id: string;
+  lead_id: string;
+  segment_order: number;
+  flight_number: string;
+  flight_date: string;
+  origin: string;
+  destination: string;
+  delay_minutes: number | null;
+  delay_reason: string;
+}
+
+export interface Lead {
+  id: string;
+  batch_id: string;
+  booking_reference: string;
+  passenger_first_name: string;
+  passenger_last_name: string;
+  email: string;
+  phone: string;
+  agent_id: string | null;
+  agent_code: string;
+  status: LeadStatus;
+  review_reason: string;
+  segment_count: number;
+  first_flight_date: string | null;
+  last_flight_date: string | null;
+  route: string;
+  claim_id: string | null;
+  lead_key: string;
+  created_at: string;
+  // joined (optional)
+  segments?: LeadFlightSegment[];
+  batch_file_name?: string;
 }
 
 export interface ClaimFormData {

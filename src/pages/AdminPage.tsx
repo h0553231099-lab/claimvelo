@@ -4,7 +4,8 @@ import { Claim, ClaimStatus, OperationalStatus, EligibilityStatus, Priority, Cla
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
 import { Page } from '../types';
 import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2, Key, Eye, EyeOff, CheckCircle, Flag, UserCheck, History, HelpCircle } from 'lucide-react';
-import BulkImport from '../components/BulkImport';
+import ExcelImport from '../components/ExcelImport';
+import LeadQueue from '../components/LeadQueue';
 import ReviewQueue from '../components/ReviewQueue';
 import OverridePanel from '../components/OverridePanel';
 import ClaimTimeline from '../components/ClaimTimeline';
@@ -116,7 +117,7 @@ const AV_TITLES: Record<AdminView, string> = {
   inbox:'Inbox', 'airline-emails':'Airline Emails', notifs:'Notifications', analytics:'Analytics',
   automation:'Automation', users:'Users & Roles', settings:'Settings',
   finance:'Income & Expenses', 'finance-dashboard':'Finance Dashboard', 'legal-queue':'Legal Queue', qr:'Agent QR Codes', partners:'B2B Partners',
-  bulk:'Bulk Import', review:'Review Queue',
+  bulk:'Excel Import', review:'Review Queue', leads:'Lead Queue',
 };
 
 interface DbNotification {
@@ -1598,7 +1599,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     setStatusHistory(data as ClaimStatusHistory[] || []);
   }
 
-  const sidebarMainItems: AdminView[] = isWorker ? ['dash','claims'] : ['dash','claims','crm','review','bulk'];
+  const sidebarMainItems: AdminView[] = isWorker ? ['dash','claims'] : ['dash','claims','crm','review','bulk','leads'];
   const sidebarSystemItems: AdminView[] = isWorker
     ? ['inbox','notifs']
     : ['inbox','airline-emails','notifs','analytics','automation','users','qr','partners','settings'];
@@ -1616,7 +1617,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
           {sidebarMainItems.map(id => (
             <button key={id} onClick={() => setAv(id)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] cursor-pointer text-[12px] font-medium border-none w-full text-left mb-0.5 transition-colors ${av===id?'bg-[#eff6ff] text-[#2563eb]':'bg-transparent text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]'}`}>
-              <span>{id==='dash'?'📊':id==='claims'?'📋':id==='bulk'?'📥':id==='review'?'🔍':'🗂'}</span>
+              <span>{id==='dash'?'📊':id==='claims'?'📋':id==='bulk'?'📥':id==='review'?'🔍':id==='leads'?'👥':'🗂'}</span>
               {AV_TITLES[id]}
               {id==='claims' && <span className="ml-auto bg-[#2563eb] text-white text-[9px] font-bold px-1 py-0.5 rounded-[7px]">{claims.length}</span>}
             </button>
@@ -2001,11 +2002,16 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
           )}
 
           {av === 'bulk' && !isWorker && (
-            <BulkImport workers={workers} onClaimsImported={() => {
+            <ExcelImport workers={workers} onImported={() => {
               supabase.from('claims').select('*').order('created_at', { ascending: false }).then(({ data }) => {
                 if (data) setClaims(data as Claim[]);
               });
             }} />
+          )}
+
+          {/* LEAD QUEUE */}
+          {av === 'leads' && !isWorker && (
+            <LeadQueue workers={workers} />
           )}
 
           {/* B2B PARTNERS */}
