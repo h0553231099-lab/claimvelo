@@ -1,7 +1,7 @@
 import { ClaimStatusHistory } from '../types';
 import {
   PlusCircle, ArrowRightLeft, CheckCircle, Flag, UserCheck,
-  Paperclip, Gavel, HelpCircle,
+  Paperclip, Gavel, HelpCircle, Mail,
 } from 'lucide-react';
 
 interface Props {
@@ -19,6 +19,7 @@ const EVENT_META: Record<string, { icon: typeof PlusCircle; bg: string; ring: st
   override:         { icon: Gavel,           bg: 'bg-[#92400e]', ring: 'border-[#92400e]',  label: 'Override' },
   info_request:     { icon: HelpCircle,      bg: 'bg-[#6366f1]', ring: 'border-[#6366f1]',  label: 'Info Request' },
   airline_email:     { icon: Paperclip,       bg: 'bg-[#0d9488]', ring: 'border-[#0d9488]',  label: 'Airline Email' },
+  customer_email:    { icon: Mail,            bg: 'bg-[#4f46e5]', ring: 'border-[#4f46e5]',  label: 'Customer Email' },
 };
 
 function formatTimestamp(iso: string): string {

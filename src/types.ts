@@ -72,12 +72,41 @@ export interface Claim {
   review_decision_reason?: string | null;
   review_decided_by?: string | null;
   review_decided_at?: string | null;
+  // Phase 7 — customer communication
+  preferred_language?: string;
+  last_customer_update_at?: string;
+}
+
+// ── Phase 7 — Customer Communication ──────────────────────────────────────────
+
+export type CommunicationDirection = 'outbound' | 'inbound';
+export type CommunicationChannel = 'email' | 'portal';
+export type CommunicationMatchStatus = 'matched' | 'ambiguous' | 'unmatched' | 'manual';
+
+export interface ClaimCommunication {
+  id: string;
+  claim_id: string;
+  direction: CommunicationDirection;
+  channel: CommunicationChannel;
+  subject: string;
+  body: string;
+  from_address: string;
+  to_address: string;
+  from_name: string;
+  from_user_id: string | null;
+  match_status: CommunicationMatchStatus;
+  matched_claim_refs: string[];
+  message_id: string | null;
+  read_by_staff: boolean;
+  read_by_customer: boolean;
+  language: string;
+  created_at: string;
 }
 
 export interface ClaimStatusHistory {
   id: string;
   claim_id: string;
-  field_name: 'status' | 'eligibility_status' | 'priority' | 'assigned_to' | 'document_upload' | 'override' | 'review_decision' | 'info_request' | 'airline_email';
+  field_name: 'status' | 'eligibility_status' | 'priority' | 'assigned_to' | 'document_upload' | 'override' | 'review_decision' | 'info_request' | 'airline_email' | 'customer_email';
   from_status: string | null;
   to_status: string;
   changed_by: string | null;

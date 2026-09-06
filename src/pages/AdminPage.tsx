@@ -11,6 +11,7 @@ import OverridePanel from '../components/OverridePanel';
 import ClaimTimeline from '../components/ClaimTimeline';
 import InfoRequestPanel from '../components/InfoRequestPanel';
 import AirlineEmailInbox from '../components/AirlineEmailInbox';
+import ClaimCommunicationPanel from '../components/ClaimCommunicationPanel';
 
 interface FinanceTransaction {
   id: string;
@@ -858,7 +859,7 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
   const [bulkStatus, setBulkStatus] = useState<OperationalStatus | ''>('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [panel, setPanel] = useState<Claim | null>(null);
-  const [panelTab, setPanelTab] = useState<'details' | 'timeline' | 'loa' | 'files' | 'requests'>('details');
+  const [panelTab, setPanelTab] = useState<'details' | 'timeline' | 'loa' | 'files' | 'requests' | 'communication'>('details');
   const [statusHistory, setStatusHistory] = useState<ClaimStatusHistory[]>([]);
   const [flightEvidence, setFlightEvidence] = useState<FlightEvidenceSummary | null>(null);
   const [flightSegments, setFlightSegments] = useState<FlightSegmentSummary[]>([]);
@@ -2034,6 +2035,9 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
               if (type === 'stale_in_progress') return { icon: '⏰', bg: '#eff6ff' };
               if (type === 'stale_waiting') return { icon: '⚠️', bg: '#fffbeb' };
               if (type === 'status_changed') return { icon: '🔄', bg: '#f8fafc' };
+              if (type === 'customer_reply') return { icon: '💬', bg: '#ede9fe' };
+              if (type === 'missing_document') return { icon: '📄', bg: '#fef3c7' };
+              if (type === 'claim_update') return { icon: '📧', bg: '#dbeafe' };
               return { icon: '🔔', bg: '#f8fafc' };
             };
             const notifTitle = (type: string) => {
@@ -2042,6 +2046,9 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
               if (type === 'stale_in_progress') return 'Stale — In Progress';
               if (type === 'stale_waiting') return 'Stale — Waiting';
               if (type === 'status_changed') return 'Status Changed';
+              if (type === 'customer_reply') return 'Customer Reply';
+              if (type === 'missing_document') return 'Missing Document';
+              if (type === 'claim_update') return 'Claim Update';
               return 'Notification';
             };
             return (
@@ -3265,7 +3272,8 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                 { id: 'loa', label: 'LOA Document', icon: <FileText className="w-3.5 h-3.5" />, badge: panel.loa_signed ? 'Signed' : null },
                 { id: 'files', label: 'Files', icon: <Paperclip className="w-3.5 h-3.5" />, badge: claimFiles.length > 0 ? String(claimFiles.length) : null },
                 { id: 'requests', label: 'Requests', icon: <HelpCircle className="w-3.5 h-3.5" />, badge: infoRequests.filter(r => r.status === 'requested').length > 0 ? String(infoRequests.filter(r => r.status === 'requested').length) : null },
-              ] as { id: 'details' | 'timeline' | 'loa' | 'files' | 'requests'; label: string; icon?: React.ReactNode; badge?: string | null }[]).map(t => (
+                { id: 'communication', label: 'Comms', icon: <Mail className="w-3.5 h-3.5" /> },
+              ] as { id: 'details' | 'timeline' | 'loa' | 'files' | 'requests' | 'communication'; label: string; icon?: React.ReactNode; badge?: string | null }[]).map(t => (
                 <button
                   key={t.id}
                   onClick={() => setPanelTab(t.id)}
@@ -3344,6 +3352,39 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                       ))}
                     </div>
                   </div>
+
+                  {/* 30-Day Update Status Indicator */}
+                  {(() => {
+                    const ACTIVE_STATUSES = ['Untouched', 'In Progress', 'Submitted', 'Waiting'];
+                    const isActive = ACTIVE_STATUSES.includes(panel.status as string);
+                    if (!isActive) return null;
+                    const lastUpdate = panel.last_customer_update_at ? new Date(panel.last_customer_update_at) : null;
+                    const daysSince = lastUpdate ? Math.floor((Date.now() - lastUpdate.getTime()) / 86400000) : null;
+                    const isOverdue = daysSince !== null && daysSince >= 30;
+                    const isWarning = daysSince !== null && daysSince >= 25 && daysSince < 30;
+                    const indicatorColor = isOverdue ? '#dc2626' : isWarning ? '#ea580c' : '#16a34a';
+                    const indicatorBg = isOverdue ? '#fef2f2' : isWarning ? '#fff7ed' : '#f0fdf4';
+                    const indicatorLabel = isOverdue ? 'Overdue — update needed' : isWarning ? 'Due soon' : 'Up to date';
+                    return (
+                      <div className="mb-4">
+                        <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2.5">30-Day Update</div>
+                        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-[8px] border" style={{ backgroundColor: indicatorBg, borderColor: indicatorColor + '33' }}>
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: indicatorColor }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-bold" style={{ color: indicatorColor }}>{indicatorLabel}</div>
+                            <div className="text-[10px] text-[#64748b]">
+                              {daysSince !== null
+                                ? `Last customer update ${daysSince} day${daysSince === 1 ? '' : 's'} ago${lastUpdate ? ` · ${lastUpdate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}`
+                                : 'No customer update sent yet'}
+                            </div>
+                          </div>
+                          {panel.preferred_language && panel.preferred_language !== 'en' && (
+                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-[#eff6ff] text-[#2563eb] shrink-0">{panel.preferred_language}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Flight evidence summary (safe fields only — no raw provider JSON) */}
                   {flightEvidence && (
@@ -3562,6 +3603,18 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
                   requests={infoRequests}
                   loading={infoRequestsLoading}
                   onRefresh={refreshInfoRequests}
+                />
+              )}
+
+              {panelTab === 'communication' && (
+                <ClaimCommunicationPanel
+                  claimId={panel.id}
+                  claimRef={panel.claim_ref}
+                  claimEmail={panel.email}
+                  passengerName={`${panel.passenger_first_name} ${panel.passenger_last_name}`.trim()}
+                  preferredLanguage={panel.preferred_language || 'en'}
+                  user={user}
+                  onRefresh={() => loadStatusHistory(panel.id)}
                 />
               )}
 
