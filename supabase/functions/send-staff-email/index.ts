@@ -93,6 +93,10 @@ Deno.serve(async (req: Request) => {
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
 
+    if (!resendKey) {
+      return jsonError(500, "Email service not configured (RESEND_API_KEY missing)");
+    }
+
     const html = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -112,38 +116,31 @@ Deno.serve(async (req: Request) => {
 </body>
 </html>`;
 
-    if (resendKey) {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${resendKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: `${fromName} <${fromAddress}>`,
-          to: [to],
-          reply_to: fromAddress,
-          subject,
-          html,
-          text: body,
-        }),
-      });
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: `${fromName} <${fromAddress}>`,
+        to: [to],
+        reply_to: fromAddress,
+        subject,
+        html,
+        text: body,
+      }),
+    });
 
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`Resend error: ${err}`);
-      }
-
-      const data = await res.json();
-      return new Response(JSON.stringify({ ok: true, id: data.id }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    } else {
-      console.log(`[SEND-STAFF-EMAIL] To: ${to} | Subject: ${subject}`);
-      return new Response(JSON.stringify({ ok: true, id: "dev-mode" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!res.ok) {
+      const err = await res.text();
+      return jsonError(500, `Email delivery failed: ${err}`);
     }
+
+    const data = await res.json();
+    return new Response(JSON.stringify({ ok: true, id: data.id }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
     console.error("send-staff-email error:", err);
     return new Response(JSON.stringify({ error: String(err) }), {

@@ -248,7 +248,10 @@ Deno.serve(async (req: Request) => {
     let emailSent = true;
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
-    if (resendKey) {
+    if (!resendKey) {
+      console.error("RESEND_API_KEY not configured — welcome email not sent");
+      emailSent = false;
+    } else {
       try {
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -272,8 +275,6 @@ Deno.serve(async (req: Request) => {
         console.error("Email send failed:", e);
         emailSent = false;
       }
-    } else {
-      console.log(`[WELCOME EMAIL] To: ${payload.email} | Invite link generated (no Resend key)`);
     }
 
     // ── 7. Record in audit_log (best-effort) ───────────────────────────────────

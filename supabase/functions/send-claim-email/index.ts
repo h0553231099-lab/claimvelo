@@ -243,27 +243,26 @@ Deno.serve(async (req: Request) => {
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
 
-    if (resendKey) {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${resendKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: "ClaimVelo <support@claimvelo.com>",
-          to: [payload.to],
-          subject,
-          html,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`Resend error: ${err}`);
-      }
-    } else {
-      console.log(`[EMAIL] To: ${payload.to} | Subject: ${subject}`);
-      console.log(`[EMAIL] Body preview: ${html.slice(0, 200)}`);
+    if (!resendKey) {
+      return jsonError(500, "Email service not configured (RESEND_API_KEY missing)");
+    }
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "ClaimVelo <support@claimvelo.com>",
+        to: [payload.to],
+        subject,
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      return jsonError(500, `Email delivery failed: ${err}`);
     }
 
     return new Response(JSON.stringify({ ok: true }), {

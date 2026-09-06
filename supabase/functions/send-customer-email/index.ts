@@ -94,34 +94,34 @@ Deno.serve(async (req: Request) => {
 
     // ── Send via Resend ───────────────────────────────────────────────────────
     const resendKey = Deno.env.get("RESEND_API_KEY");
-    let emailId = "dev-mode";
 
-    if (resendKey) {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${resendKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: `${fromName} <${fromAddress}>`,
-          to: [claim.email],
-          reply_to: fromAddress,
-          subject,
-          html,
-          text: body,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`Resend error: ${err}`);
-      }
-      const data = await res.json();
-      emailId = data.id || emailId;
-    } else {
-      console.log(`[SEND-CUSTOMER-EMAIL] To: ${claim.email} | Subject: ${subject}`);
+    if (!resendKey) {
+      return jsonError(500, "Email service not configured (RESEND_API_KEY missing)");
     }
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: `${fromName} <${fromAddress}>`,
+        to: [claim.email],
+        reply_to: fromAddress,
+        subject,
+        html,
+        text: body,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      return jsonError(500, `Email delivery failed: ${err}`);
+    }
+
+    const data = await res.json();
+    const emailId = data.id || null;
 
     // ── Log the communication ─────────────────────────────────────────────────
     await admin.from("claim_communications").insert({
@@ -136,7 +136,7 @@ Deno.serve(async (req: Request) => {
       from_user_id: user.id,
       match_status: "manual",
       language,
-      message_id: emailId !== "dev-mode" ? emailId : null,
+      message_id: emailId,
     });
 
     // The trigger on claim_communications updates last_customer_update_at and
