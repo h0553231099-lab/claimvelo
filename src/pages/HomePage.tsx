@@ -941,6 +941,7 @@ export default function HomePage({ onNav, onCheckCompensation }: Props) {
         <div className="flex gap-5 justify-center flex-wrap mb-5">
           <button onClick={() => onNav('about')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">{t('home.footer.about')}</button>
           <button onClick={() => onNav('privacy')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">{t('home.footer.privacy')}</button>
+          <button onClick={() => onNav('terms')} className="text-[#94a3b8] text-xs bg-transparent border-none cursor-pointer hover:text-white transition-colors">{t('home.footer.terms')}</button>
           <a href="mailto:support@claimvelo.com" className="text-[#94a3b8] no-underline text-xs hover:text-white transition-colors">support@claimvelo.com</a>
           <a href="tel:+13477688926" className="text-[#94a3b8] no-underline text-xs hover:text-white transition-colors">347 768 8926</a>
           <span className="text-[#94a3b8] text-xs">1265 55th St, Brooklyn, NY 11219</span>

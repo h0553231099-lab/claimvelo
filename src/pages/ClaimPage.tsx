@@ -1296,7 +1296,10 @@ export default function ClaimPage({ onNav, prefill }: Props) {
                     <label className="flex items-start gap-3 cursor-pointer text-[13px] text-[#374151] leading-relaxed mb-4">
                       <input type="checkbox" checked={loaChecked} onChange={e => setLoaChecked(e.target.checked)} className="w-4 h-4 mt-0.5 accent-[#0f2744] shrink-0" />
                       <span className="flex-1 min-w-0">
-                        I authorise <strong>ClaimVelo Ltd.</strong> to act as my authorised representative and pursue compensation on my behalf under EC Regulation 261/2004 / UK261. I agree to a <strong>30% success fee</strong> (50% if legal action is required) — no charge if unsuccessful. No-Win, No-Fee.
+                        I authorise <strong>ClaimVelo Ltd.</strong> to act as my authorised representative and pursue compensation on my behalf under EC Regulation 261/2004 / UK261. I agree to a <strong>30% success fee</strong> (50% if legal action is required) — no charge if unsuccessful. No-Win, No-Fee. See our{' '}
+                        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onNav('terms'); }} className="text-[#2563eb] hover:underline bg-transparent border-none cursor-pointer p-0 font-inherit text-[13px] inline">Terms of Service</button>{' '}
+                        and{' '}
+                        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onNav('privacy'); }} className="text-[#2563eb] hover:underline bg-transparent border-none cursor-pointer p-0 font-inherit text-[13px] inline">Privacy Policy</button>.
                       </span>
                     </label>
                     {loaChecked && (

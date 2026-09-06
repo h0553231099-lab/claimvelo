@@ -20,6 +20,7 @@ const AboutPage = lazy(() => import('./pages/AboutPage'));
 const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage'));
 const FeesPage = lazy(() => import('./pages/FeesPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
 const SignInPage = lazy(() => import('./pages/SignInPage'));
 const CompensationChecker = lazy(() => import('./components/CompensationChecker'));
 const AgentDashboardPage = lazy(() => import('./pages/AgentDashboardPage'));
@@ -218,6 +219,7 @@ export default function App() {
           {page === 'sales-signin' && <SalesSignInPage onAuth={handleAuth} onNav={nav} />}
           {page === 'seo-signin' && <SeoSignInPage onAuth={handleAuth} onNav={nav} />}
           {page === 'privacy' && <PrivacyPolicyPage onNav={nav} />}
+          {page === 'terms' && <TermsPage onNav={nav} />}
           {page === 'partners' && <PartnerPage onNav={nav} />}
           {page === 'api-docs' && <ApiDocsPage onNav={nav} />}
           {page === 'ireland' && <IrelandPage onNav={nav} />}

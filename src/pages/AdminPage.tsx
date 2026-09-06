@@ -1259,21 +1259,27 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     }
     setWorkerSaving(true);
     setWorkerError('');
-    const { error } = await supabase.from('worker_profiles').insert({
-      email: workerForm.email.trim(),
-      full_name: workerForm.full_name.trim(),
-      role: workerForm.role,
-      agent_code: workerForm.agent_code.trim().toUpperCase(),
-      status: 'active',
-      created_by: user?.id,
-    });
-    if (error) {
-      setWorkerError(error.message);
-    } else {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({
+          email: workerForm.email.trim(),
+          fullName: workerForm.full_name.trim(),
+          role: workerForm.role,
+          agentCode: workerForm.agent_code.trim().toUpperCase() || undefined,
+        }),
+      });
+      const result = await res.json();
+      if (!result.ok) throw new Error(result.error || 'Failed to create account');
       const { data } = await supabase.from('worker_profiles').select('*').order('created_at', { ascending: false });
       if (data) setWorkers(data as WorkerProfile[]);
       setShowAddWorker(false);
-      setWorkerForm({ email: '', full_name: '', role: 'worker' });
+      setWorkerForm({ email: '', full_name: '', role: 'worker', agent_code: '' });
+    } catch (e: unknown) {
+      setWorkerError(e instanceof Error ? e.message : 'Something went wrong');
     }
     setWorkerSaving(false);
   }

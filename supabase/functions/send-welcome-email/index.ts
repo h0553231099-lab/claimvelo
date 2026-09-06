@@ -10,8 +10,13 @@ const corsHeaders = {
 
 // ── Authorization constants ──────────────────────────────────────────────────
 const ADMIN_ROLES = ["admin", "super_admin"];
-const ALLOWED_CREATE_ROLES = ["agent", "sales_manager"];
-const APPROVED_REDIRECT_URL = "https://claimvelo.com/agent-signin";
+const ALLOWED_CREATE_ROLES = ["agent", "sales_manager", "worker", "admin"];
+const REDIRECT_URLS: Record<string, string> = {
+  agent: "https://claimvelo.com/agent-signin",
+  sales_manager: "https://claimvelo.com/agent-signin",
+  worker: "https://claimvelo.com/signin",
+  admin: "https://claimvelo.com/signin",
+};
 
 interface WelcomePayload {
   email: string;
@@ -40,7 +45,7 @@ function buildWelcomeHtml(p: {
   agentCode?: string;
   qrImageUrl?: string;
 }): string {
-  const roleLabel = p.role === "sales_manager" ? "Sales Manager" : "Agent";
+  const roleLabel = p.role === "sales_manager" ? "Sales Manager" : p.role === "admin" ? "Admin" : p.role === "worker" ? "Team Member" : "Agent";
   const accentColor = p.role === "sales_manager" ? "#0369a1" : "#2563eb";
 
   return `
@@ -168,11 +173,21 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Validate role against explicit allowlist ─────────────────────────────
-    // Only 'agent' and 'sales_manager' may be created through this endpoint.
-    // This prevents privilege escalation — admin can NEVER create or promote
-    // a super_admin, admin, worker, customer, lawyer, or seo_worker here.
+    // Only 'agent', 'sales_manager', 'worker', and 'admin' may be created
+    // through this endpoint. This prevents privilege escalation — admin can
+    // NEVER create or promote a super_admin, customer, lawyer, or seo_worker.
     if (!ALLOWED_CREATE_ROLES.includes(payload.role)) {
-      return jsonError(400, `Role '${payload.role}' is not allowed. Only 'agent' and 'sales_manager' can be created through this endpoint.`);
+      return jsonError(400, `Role '${payload.role}' is not allowed.`);
+    }
+
+    // ── Duplicate check: prevent re-creating an existing account ─────────────
+    const { data: existingProfile } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("email", payload.email)
+      .maybeSingle();
+    if (existingProfile) {
+      return jsonError(409, "An account with this email already exists.");
     }
 
     // ── 1. Create the auth user + generate invite link (single step) ──────────
@@ -183,7 +198,7 @@ Deno.serve(async (req: Request) => {
       type: "invite",
       email: payload.email,
       options: {
-        redirectTo: APPROVED_REDIRECT_URL,
+        redirectTo: REDIRECT_URLS[payload.role] || "https://claimvelo.com/signin",
       },
     });
 
@@ -208,14 +223,14 @@ Deno.serve(async (req: Request) => {
       return jsonError(500, `Failed to create profile: ${profileError.message}. Account was not created.`);
     }
 
-    // ── 4. Insert worker_profiles row (agents only) ────────────────────────────
-    if (payload.role === "agent" && payload.agentCode) {
+    // ── 4. Insert worker_profiles row (all staff roles) ────────────────────────
+    if (payload.role === "agent" || payload.role === "worker" || payload.role === "admin") {
       const { error: workerError } = await admin.from("worker_profiles").insert({
         user_id: userId,
         email: payload.email,
         full_name: payload.fullName,
-        role: "agent",
-        agent_code: payload.agentCode.toUpperCase(),
+        role: payload.role,
+        agent_code: payload.agentCode ? payload.agentCode.toUpperCase() : null,
         status: "active",
       });
 
@@ -223,7 +238,7 @@ Deno.serve(async (req: Request) => {
         // Cleanup: delete profile + auth user
         await admin.from("profiles").delete().eq("id", userId);
         await admin.auth.admin.deleteUser(userId);
-        return jsonError(500, `Failed to create agent profile: ${workerError.message}. Account was not created.`);
+        return jsonError(500, `Failed to create staff profile: ${workerError.message}. Account was not created.`);
       }
     }
 
@@ -244,7 +259,8 @@ Deno.serve(async (req: Request) => {
       qrImageUrl,
     });
 
-    const subject = `Welcome to ClaimVelo — Set Your Password to Activate Your ${payload.role === "sales_manager" ? "Sales Manager" : "Agent"} Account`;
+    const roleLabelForSubject = payload.role === "sales_manager" ? "Sales Manager" : payload.role === "admin" ? "Admin" : payload.role === "worker" ? "Team Member" : "Agent";
+    const subject = `Welcome to ClaimVelo — Set Your Password to Activate Your ${roleLabelForSubject} Account`;
     let emailSent = true;
 
     const resendKey = Deno.env.get("RESEND_API_KEY");

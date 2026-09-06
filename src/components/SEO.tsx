@@ -12,6 +12,7 @@ const PUBLIC_PAGE_PATHS: Partial<Record<Page, string>> = {
   fees: '/fees',
   about: '/about',
   privacy: '/privacy',
+  terms: '/terms',
   ireland: '/ireland',
   partners: '/partners',
   'united-kingdom': '/united-kingdom',
@@ -310,6 +311,7 @@ function buildBreadcrumbSchema(page: Page, canonicalUrl: string) {
     'united-kingdom': 'United Kingdom',
     partners: 'Partner Programme',
     privacy: 'Privacy Policy',
+    terms: 'Terms of Service',
   };
 
   const label = pageLabels[page];
