@@ -87,7 +87,41 @@ Provide real values via the Base44 secrets dashboard.
   `audit_claim_change()` ELSIF chain so escalation fields are checked
   BEFORE status (escalating a claim also sets status='Escalated', which
   was masking the `claim.escalated` audit action).
-- **NOT done yet (Phase 9C+):** lawyer dashboard UI, payment processor
-  integration.
+- **Phase 9C (done):** Legal & Finance UI layer.
+  - `LawyerDashboardPage` (`/lawyer-dashboard`): lists only the lawyer's
+    assigned legal_cases (RLS: `legal_cases.lawyer_id = auth.uid()`). Case
+    list with search + status filter, deadline urgency badges, summary cards.
+    Clicking a case opens `LegalCaseDetail` in read-only mode (`isAdmin=false`).
+  - `AdminLegalQueue` (Admin sidebar → ⚖️ Legal Queue): all escalated/unassigned
+    legal cases. Admin can assign/reassign lawyers via dropdown (escalate-claim
+    → update-legal-case). Case detail opens `LegalCaseDetail` in admin mode.
+  - `FinanceDashboard` (Admin sidebar → 📊 Finance Dashboard): typed
+    `finance_transactions` summary (airline payments, ClaimVelo fees, customer
+    payouts, agent commissions, legal expenses). Filters: date range, airline,
+    country, claim status, payment status, reconciliation status, search.
+    Reconciliation computed from server-persisted rows only (no client math).
+  - `ClaimFinancePanel` (Admin Claim Detail → Finance tab): full financial
+    lifecycle per claim. Reads via `get-reconciliation`; all mutations
+    (approve compensation, record airline payment, set fee, record payout,
+    record legal expense) go through `manage-legal-finance`. Shows
+    reconciliation status banner + mismatch flags.
+  - `LegalCaseDetail` (shared): legal status, deadlines (jsonb), notes,
+    lawyer assignment. Admin sees edit controls + audit_log escalation
+    history; lawyer sees read-only + derived timeline. All writes via
+    `update-legal-case` (admin-only, 403 for lawyers).
+  - `legalFinanceApi.ts`: client wrapper for `manage-legal-finance` edge
+    function. All mutations go through this; the frontend never writes
+    protected legal/finance fields directly to Supabase.
+  - Lint: 0 errors (1 pre-existing `react-hooks/exhaustive-deps` warning in
+    App.tsx). TypeScript: clean. Production build: succeeds.
+  - Acceptance/security tests: `python3 supabase/tests/phase9c_acceptance.py`
+    (51 checks, all pass; needs secrets in `/run/base44/app.env`; creates +
+    cleans up test users). Covers: lawyer RLS isolation (A sees own, B blocked),
+    lawyer blocked from finance_transactions, admin assign/reassign, legal
+    status/deadline/notes persistence, reconciliation values match DB,
+    mismatch detection, finance filter correctness, RLS blocks direct client
+    writes, non-admin roles (worker/customer/agent/sales_manager/lawyer) get
+    403 on all admin-only actions, existing flows not regressed.
+- **NOT done yet (Phase 10+):** payment processor integration.
 - Acceptance/security tests: `python3 supabase/tests/phase9a_acceptance.py`
   (needs secrets in `/run/base44/app.env`; creates + cleans up test users).

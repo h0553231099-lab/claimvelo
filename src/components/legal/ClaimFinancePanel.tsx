@@ -24,7 +24,7 @@ import {
   recordLegalExpense,
   type ReconciliationDetail,
 } from '../../lib/legalFinanceApi';
-import { AlertTriangle, CheckCircle, RefreshCw, Plus, Euro } from 'lucide-react';
+import { AlertTriangle, CheckCircle, RefreshCw, Plus } from 'lucide-react';
 
 interface Props {
   claimId: string;

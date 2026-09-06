@@ -16,7 +16,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { FinanceTransaction, Claim } from '../../types';
-import { Search, RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Search, RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign, AlertTriangle } from 'lucide-react';
 
 const euro = (n: number) => `€${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 

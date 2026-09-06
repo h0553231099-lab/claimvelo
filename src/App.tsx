@@ -9,7 +9,7 @@ import { LanguageProvider } from './lib/language';
 import { parseUrl, buildUrl } from './lib/router';
 import { type Locale } from './lib/i18n';
 import type { CheckerPrefill } from './components/CompensationChecker';
-import { captureReferralFromURL, getReferralCode } from './lib/referral';
+import { captureReferralFromURL } from './lib/referral';
 // Lazy-load heavy pages for better initial bundle size / LCP
 const HomePage = lazy(() => import('./pages/HomePage'));
 const ClaimPage = lazy(() => import('./pages/ClaimPage'));

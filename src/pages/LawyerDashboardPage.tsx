@@ -85,7 +85,6 @@ export default function LawyerDashboardPage({ onNav, user, onSignOut }: Props) {
 
   // ── Case detail view ──────────────────────────────────────────────────────
   if (selectedClaimId) {
-    const sel = cases.find(c => c.claim.id === selectedClaimId);
     return (
       <div className="min-h-screen bg-[#f8fafc]">
         <header className="bg-white border-b border-[#e2e8f0] h-14 flex items-center px-4 gap-3 sticky top-0 z-10">
