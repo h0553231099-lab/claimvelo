@@ -92,7 +92,9 @@ Deno.serve(async (req: Request) => {
         // ── 2. Send the email ──────────────────────────────────────────────────
         let emailSent = false;
 
-        if (resendKey) {
+        if (!resendKey) {
+          console.error(`30-day update email failed for ${claim.claim_ref}: RESEND_API_KEY not configured`);
+        } else {
           const res = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: {
@@ -114,10 +116,6 @@ Deno.serve(async (req: Request) => {
             const err = await res.text();
             console.error(`30-day update email failed for ${claim.claim_ref}: ${err}`);
           }
-        } else {
-          // Dev mode — no Resend key, simulate success
-          console.log(`[30-DAY-UPDATE] To: ${claim.email} | Claim: ${claim.claim_ref} | Subject: ${subject}`);
-          emailSent = true;
         }
 
         // ── 3. Log the communication and update the timer ─────────────────────
