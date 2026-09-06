@@ -101,19 +101,26 @@ export default function DashboardPage({ onNav, user }: Props) {
   async function uploadResponseFile(file: File, requestId: string) {
     if (!selected) return;
     setUploading(true);
-    const ext = file.name.split('.').pop() || 'bin';
-    const path = `${selected.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('claim-files').upload(path, file);
-    if (upErr) { setUploading(false); return; }
-    await supabase.from('claim_files').insert({
-      claim_id: selected.id,
-      file_name: file.name,
-      file_size: file.size,
-      file_type: file.type || ext,
-      storage_path: path,
-      note: 'Response to info request',
-      info_request_id: requestId,
-    });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setUploading(false); return; }
+      const formData = new FormData();
+      formData.append('claim_id', selected.id);
+      formData.append('info_request_id', requestId);
+      formData.append('note', 'Response to info request');
+      formData.append('file', file);
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-claim-file`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      });
+      const result = await res.json();
+      if (!result.success) {
+        console.error('Upload failed:', result.error);
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+    }
     // Refresh requests
     const { data } = await supabase.from('claim_info_requests').select('*').eq('claim_id', selected.id).order('created_at', { ascending: false });
     if (data) setInfoRequests(data as InfoRequest[]);
