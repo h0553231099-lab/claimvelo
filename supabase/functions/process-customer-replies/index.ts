@@ -5,6 +5,8 @@ import {
   gmailApi,
   getHeader,
   extractBodyParts,
+  extractAttachments,
+  downloadAttachment,
 } from "../_shared/gmail.ts";
 
 const corsHeaders = {
@@ -121,27 +123,64 @@ Deno.serve(async (req: Request) => {
       // ── 6. Match to claims ──────────────────────────────────────────────────
       const matchResult = await matchCustomerReply(admin, fromAddress, subject, bodyText);
 
-      if (matchResult.status === "unmatched") {
-        // Store as unmatched for manual review — do NOT guess
-        await admin.from("claim_communications").insert({
-          claim_id: null, // No claim linked — but claim_id is NOT NULL...
-          // Actually, claim_id is NOT NULL. We need to handle unmatched differently.
-          // For now, skip unmatched emails (they're not customer replies to any claim).
-        }).then(() => {}).catch(() => {});
-        // Since claim_id is NOT NULL, we can't store unmatched emails in claim_communications.
-        // Log them for manual review instead.
-        console.log(`[PROCESS-CUSTOMER-REPLY] Unmatched email from ${fromAddress}: ${subject}`);
-        results.push({ id: msgId, status: "unmatched" });
-        continue;
-      }
+      if (matchResult.status === "unmatched" || matchResult.status === "ambiguous") {
+        // Store in the unmatched review queue — never discard or guess
+        const attachments = extractAttachments(msgData.payload);
 
-      if (matchResult.status === "ambiguous") {
-        // Ambiguous — don't guess. Log for manual review.
+        // Download attachments to Storage
+        const attachmentPaths: string[] = [];
+        for (const att of attachments) {
+          try {
+            const buf = await downloadAttachment(msgId, att.attachmentId);
+            const safeName = att.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+            const storagePath = `unmatched/${msgId}/${safeName}`;
+            const { error: uploadError } = await admin.storage
+              .from("airline-email-attachments")
+              .upload(storagePath, buf, { contentType: att.mimeType });
+            if (!uploadError) attachmentPaths.push(storagePath);
+          } catch (e) {
+            console.error(`Attachment download failed for ${att.filename}:`, e);
+          }
+        }
+
+        // Check for duplicate (same gmail_message_id already stored)
+        const { data: existingUnmatched } = await admin
+          .from("unmatched_customer_emails")
+          .select("id")
+          .eq("gmail_message_id", msgId)
+          .maybeSingle();
+
+        if (!existingUnmatched) {
+          const receivedAt = msgData.internalDate
+            ? new Date(parseInt(msgData.internalDate)).toISOString()
+            : new Date().toISOString();
+
+          await admin.from("unmatched_customer_emails").insert({
+            gmail_message_id: msgId,
+            from_address: fromAddress,
+            from_name: fromName,
+            to_address: extractEmailAddress(toHeader) || mailbox,
+            subject,
+            body: bodyText,
+            received_at: receivedAt,
+            match_status: matchResult.status,
+            candidate_claim_refs: matchResult.candidate_refs,
+            candidate_claim_ids: [],
+            attachment_count: attachments.length,
+            attachment_filenames: attachments.map((a) => ({
+              filename: a.filename,
+              content_type: a.mimeType,
+              size: a.size,
+            })),
+            attachment_storage_paths: attachmentPaths,
+          });
+        }
+
         console.log(
-          `[PROCESS-CUSTOMER-REPLY] Ambiguous email from ${fromAddress}: ${subject}. ` +
-          `Candidate claims: ${matchResult.candidate_refs.join(", ")}`,
+          `[PROCESS-CUSTOMER-REPLY] ${matchResult.status} email from ${fromAddress}: ${subject}. ` +
+          `Stored in review queue.`,
         );
-        results.push({ id: msgId, status: "ambiguous" });
+        results.push({ id: msgId, status: matchResult.status });
         continue;
       }
 
