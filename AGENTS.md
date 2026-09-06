@@ -83,6 +83,10 @@ Provide real values via the Base44 secrets dashboard.
   clause that PostgREST `onConflict` cannot target). Migration
   `20260906_p9b_01_legal_finance_migration.sql` adds that index + a
   `legal_cases` updated_at trigger (reuses `update_updated_at()`).
+  `20260906_p9b_02_fix_audit_trigger_order.sql` reorders the
+  `audit_claim_change()` ELSIF chain so escalation fields are checked
+  BEFORE status (escalating a claim also sets status='Escalated', which
+  was masking the `claim.escalated` audit action).
 - **NOT done yet (Phase 9C+):** lawyer dashboard UI, payment processor
   integration.
 - Acceptance/security tests: `python3 supabase/tests/phase9a_acceptance.py`

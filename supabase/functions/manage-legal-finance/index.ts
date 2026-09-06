@@ -15,6 +15,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
  *   record-legal-expense   — log a legal expense (multiple per claim allowed)
  *   update-legal-case      — update legal_case status / lawyer / deadlines
  *   get-legal-overview     — return a legal_case + claim finance summary
+ *   get-reconciliation     — return full reconciliation state for a claim
  *
  * All mutations use the service-role client (bypasses RLS). The caller is
  * verified via JWT and must be admin or super_admin for every action except
@@ -242,15 +243,18 @@ Deno.serve(async (req: Request) => {
 
       const paymentStatus = status || "received";
 
-      // Load claim_ref for the finance transaction description
+      // Load claim_ref + approved_compensation_amount for reconciliation
       const { data: claim } = await admin
         .from("claims")
-        .select("claim_ref")
+        .select("claim_ref, approved_compensation_amount")
         .eq("id", claimId)
         .maybeSingle();
       const claimRef = claim?.claim_ref || "";
 
-      // Update claim airline payment fields
+      // Update claim airline payment fields. The airline payment does NOT
+      // change approved_compensation_amount or the fee — it is recorded as-is.
+      // If it doesn't match the approved amount, that is a reconciliation
+      // mismatch surfaced to the admin, not a silent corruption.
       const { error: claimErr } = await admin
         .from("claims")
         .update({
@@ -278,14 +282,30 @@ Deno.serve(async (req: Request) => {
       });
 
       if (txnErr) return jsonError(500, `Failed to record finance transaction: ${txnErr}`);
-      return jsonOk({ claimId, amount: round2(amount), status: paymentStatus });
+
+      // Reconciliation check: compare received vs approved
+      const approvedAmount = Number(claim?.approved_compensation_amount) || 0;
+      let reconciliation: Record<string, unknown> | null = null;
+      if (approvedAmount > 0) {
+        const mismatch = round2(approvedAmount - round2(amount));
+        reconciliation = {
+          approvedAmount,
+          receivedAmount: round2(amount),
+          mismatch,
+          status: mismatch === 0 ? "matched" : mismatch > 0 ? "underpaid" : "overpaid",
+        };
+      }
+
+      return jsonOk({ claimId, amount: round2(amount), status: paymentStatus, reconciliation });
     }
 
     // ── Action: set-claimvelo-fee (admin only) ─────────────────────────────────
     // Calculates and persists the ClaimVelo success fee based on the tier
-    // (standard=30%, legal=50%) and the actual received amount. Uses
-    // airline_payment_amount if set, otherwise approved_compensation_amount.
-    // Upserts a typed finance transaction (income — fee retained).
+    // (standard=30%, legal=50%) from the LOCKED approved_compensation_amount.
+    // The airline payment is a separate financial event and must NOT redefine
+    // the fee basis — the fee is always a percentage of what was approved,
+    // regardless of what the airline actually paid.
+    // Requires approve-compensation to have been called first.
     if (action === "set-claimvelo-fee") {
       if (!isAdmin) return jsonError(403, "Only admins can set ClaimVelo fees");
       const { claimId, tier } = body;
@@ -294,17 +314,17 @@ Deno.serve(async (req: Request) => {
         return jsonError(400, "tier must be 'standard' or 'legal'");
       }
 
-      // Load the claim to get the base amount for the fee calculation
+      // Load the claim — fee basis is approved_compensation_amount ONLY
       const { data: claim } = await admin
         .from("claims")
-        .select("claim_ref, airline_payment_amount, approved_compensation_amount, compensation_amount")
+        .select("claim_ref, approved_compensation_amount")
         .eq("id", claimId)
         .maybeSingle();
       if (!claim) return jsonError(404, "Claim not found");
 
-      const baseAmount = Number(claim.airline_payment_amount) || Number(claim.approved_compensation_amount) || Number(claim.compensation_amount) || 0;
+      const baseAmount = Number(claim.approved_compensation_amount) || 0;
       if (baseAmount <= 0) {
-        return jsonError(409, "No compensation amount available to calculate fee from (set approved compensation or airline payment first)");
+        return jsonError(409, "Compensation must be approved before setting the fee (call approve-compensation first)");
       }
 
       const rate = FEE_RATES[tier];
@@ -342,8 +362,10 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Action: record-customer-payout (admin only) ───────────────────────────
-    // Records the net payout sent to the customer. Sets customer payout fields
-    // on the claim and upserts a typed finance transaction (expense).
+    // Records the net payout sent to the customer. The customer payout must
+    // not exceed what was actually received from the airline minus the
+    // ClaimVelo fee — this prevents silently overpaying when the airline
+    // payment is partial. Requires airline payment and fee to be set first.
     if (action === "record-customer-payout") {
       if (!isAdmin) return jsonError(403, "Only admins can record customer payouts");
       const { claimId, amount, paymentDate, reference } = body;
@@ -354,13 +376,32 @@ Deno.serve(async (req: Request) => {
       if (!paymentDate) return jsonError(400, "paymentDate is required");
       if (!reference || !reference.trim()) return jsonError(400, "reference is required");
 
-      // Load claim_ref
+      // Load claim finance fields to validate against overpay
       const { data: claim } = await admin
         .from("claims")
-        .select("claim_ref")
+        .select("claim_ref, airline_payment_amount, claimvelo_fee_amount, approved_compensation_amount")
         .eq("id", claimId)
         .maybeSingle();
+      if (!claim) return jsonError(404, "Claim not found");
       const claimRef = claim?.claim_ref || "";
+
+      const airlinePaid = Number(claim?.airline_payment_amount) || 0;
+      const feeAmount = Number(claim?.claimvelo_fee_amount) || 0;
+
+      if (airlinePaid <= 0) {
+        return jsonError(409, "Airline payment must be recorded before customer payout");
+      }
+      if (feeAmount <= 0) {
+        return jsonError(409, "ClaimVelo fee must be set before customer payout");
+      }
+
+      // Max payout = what the airline actually paid minus the ClaimVelo fee.
+      // This ensures a partial airline payment does not silently overpay the
+      // customer — they receive their share of what was actually received.
+      const maxPayout = round2(airlinePaid - feeAmount);
+      if (round2(amount) > maxPayout) {
+        return jsonError(409, `Payout €${round2(amount)} exceeds maximum €${maxPayout} (airline payment €${airlinePaid} − fee €${feeAmount}). Record the correct amount or reconcile the airline payment first.`);
+      }
 
       // Update claim customer payout fields
       const { error: claimErr } = await admin
@@ -390,7 +431,25 @@ Deno.serve(async (req: Request) => {
       });
 
       if (txnErr) return jsonError(500, `Failed to record finance transaction: ${txnErr}`);
-      return jsonOk({ claimId, amount: round2(amount), status: "paid" });
+
+      // Reconciliation: is the payout complete?
+      const expectedPayout = maxPayout;
+      const payoutComplete = round2(amount) === expectedPayout;
+
+      return jsonOk({
+        claimId,
+        amount: round2(amount),
+        status: "paid",
+        maxPayout,
+        payoutComplete,
+        reconciliation: {
+          airlinePaid,
+          feeAmount,
+          expectedPayout,
+          actualPayout: round2(amount),
+          status: payoutComplete ? "complete" : "partial_payout",
+        },
+      });
     }
 
     // ── Action: record-legal-expense (admin only) ──────────────────────────────
@@ -477,6 +536,75 @@ Deno.serve(async (req: Request) => {
       return jsonOk({ legalCase: updated });
     }
 
+    // ── Action: get-reconciliation (admin only) ────────────────────────────────
+    // Returns the full reconciliation state for a claim: approved vs received
+    // vs fee vs payout, with mismatch flags. Used to verify the financial
+    // state is consistent before closing a claim.
+    if (action === "get-reconciliation") {
+      if (!isAdmin) return jsonError(403, "Only admins can view reconciliation");
+      const { claimId } = body;
+      if (!claimId) return jsonError(400, "claimId is required");
+
+      const { data: claim } = await admin
+        .from("claims")
+        .select(`
+          id, claim_ref,
+          approved_compensation_amount, approved_at,
+          airline_payment_status, airline_payment_amount, airline_payment_date,
+          claimvelo_fee_tier, claimvelo_fee_rate, claimvelo_fee_amount,
+          customer_payout_status, customer_payout_amount, customer_payout_date
+        `)
+        .eq("id", claimId)
+        .maybeSingle();
+      if (!claim) return jsonError(404, "Claim not found");
+
+      const approved = Number(claim.approved_compensation_amount) || 0;
+      const received = Number(claim.airline_payment_amount) || 0;
+      const fee = Number(claim.claimvelo_fee_amount) || 0;
+      const payout = Number(claim.customer_payout_amount) || 0;
+
+      const airlineMismatch = approved > 0 ? round2(approved - received) : null;
+      const expectedPayout = received > 0 && fee > 0 ? round2(received - fee) : null;
+      const payoutMismatch = expectedPayout != null ? round2(expectedPayout - payout) : null;
+
+      // Overall reconciliation status
+      let overallStatus = "pending";
+      if (approved > 0 && received > 0 && fee > 0 && payout > 0) {
+        if (airlineMismatch === 0 && payoutMismatch === 0) {
+          overallStatus = "complete";
+        } else {
+          overallStatus = "mismatch";
+        }
+      } else if (approved > 0 || received > 0 || fee > 0 || payout > 0) {
+        overallStatus = "in_progress";
+      }
+
+      return jsonOk({
+        claimId,
+        claimRef: claim.claim_ref,
+        approvedCompensation: approved,
+        airlinePayment: {
+          status: claim.airline_payment_status,
+          amount: received,
+          date: claim.airline_payment_date,
+        },
+        claimveloFee: {
+          tier: claim.claimvelo_fee_tier,
+          rate: claim.claimvelo_fee_rate,
+          amount: fee,
+        },
+        customerPayout: {
+          status: claim.customer_payout_status,
+          amount: payout,
+          date: claim.customer_payout_date,
+        },
+        airlineMismatch,
+        expectedPayout,
+        payoutMismatch,
+        overallStatus,
+      });
+    }
+
     // ── Action: get-legal-overview (admin or assigned lawyer) ──────────────────
     // Returns the legal_case + a finance summary for the claim. A lawyer may
     // only access cases assigned to them.
@@ -524,10 +652,36 @@ Deno.serve(async (req: Request) => {
         .not("transaction_type", "is", null)
         .order("date", { ascending: false });
 
+      // Reconciliation summary
+      const c = claim as Record<string, unknown> | null;
+      const approved = Number(c?.approved_compensation_amount) || 0;
+      const received = Number(c?.airline_payment_amount) || 0;
+      const fee = Number(c?.claimvelo_fee_amount) || 0;
+      const payout = Number(c?.customer_payout_amount) || 0;
+      const airlineMismatch = approved > 0 ? round2(approved - received) : null;
+      const expectedPayout = received > 0 && fee > 0 ? round2(received - fee) : null;
+      const payoutMismatch = expectedPayout != null ? round2(expectedPayout - payout) : null;
+      let overallStatus = "pending";
+      if (approved > 0 && received > 0 && fee > 0 && payout > 0) {
+        overallStatus = (airlineMismatch === 0 && payoutMismatch === 0) ? "complete" : "mismatch";
+      } else if (approved > 0 || received > 0 || fee > 0 || payout > 0) {
+        overallStatus = "in_progress";
+      }
+
       return jsonOk({
         legalCase,
         claim: claim || null,
         transactions: transactions || [],
+        reconciliation: {
+          approvedCompensation: approved,
+          airlinePayment: received,
+          claimveloFee: fee,
+          customerPayout: payout,
+          airlineMismatch,
+          expectedPayout,
+          payoutMismatch,
+          overallStatus,
+        },
       });
     }
 
