@@ -28,6 +28,49 @@ async function call(action: string, payload: Record<string, unknown> = {}) {
   return data;
 }
 
+// ── Agent & API-key management (all server-side, JWT-authorized) ──────────────
+
+export interface AgentListItem {
+  id: string;
+  user_id: string | null;
+  email: string;
+  full_name: string;
+  agent_code: string;
+  status: string;
+  commission_rate?: number | null;
+  total_payout_earned?: number | null;
+  total_paid_to_date?: number | null;
+  created_at: string;
+  has_key: boolean;
+}
+
+/** List the caller's team agents (server-side; raw API keys are never returned). */
+export async function listAgents(): Promise<AgentListItem[]> {
+  const data = await call("list-agents");
+  return (data.agents || []) as AgentListItem[];
+}
+
+/** Create a new agent. Role & manager_id are assigned server-side. */
+export async function createAgent(payload: {
+  email: string;
+  full_name: string;
+  agent_code: string;
+  password: string;
+}): Promise<void> {
+  await call("create-agent", payload);
+}
+
+/** Generate a cryptographically secure API key. Returns the raw key ONCE. */
+export async function generateApiKey(agentId: string): Promise<string> {
+  const data = await call("generate-api-key", { agentId });
+  return data.apiKey as string;
+}
+
+/** Revoke an agent's API key. */
+export async function revokeApiKey(agentId: string): Promise<void> {
+  await call("revoke-api-key", { agentId });
+}
+
 /** Fetch the calling agent's profile + manager display name (server-side). */
 export async function getAgentContext(): Promise<AgentContext | null> {
   const data = await call('get-agent-context');

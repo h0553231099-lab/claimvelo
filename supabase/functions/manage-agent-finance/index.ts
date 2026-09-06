@@ -20,6 +20,15 @@ function jsonOk(data: Record<string, unknown>) {
   });
 }
 
+// Cryptographically secure API key generator (server-side only).
+// Uses the Web Crypto API — never Math.random(), never the browser.
+function generateSecureApiKey(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `cv_live_${hex}`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -308,6 +317,153 @@ Deno.serve(async (req: Request) => {
         });
 
       return jsonOk({ newTotalPaid, balanceDue });
+    }
+
+    // ── Action: list-agents (sales_manager own team, or admin) ─────────────────
+    // Returns the caller's team agents. The raw api_key is NEVER returned —
+    // only a `has_key` boolean — so keys are not readable via client queries.
+    if (action === "list-agents") {
+      if (!isSalesManager && !isAdmin) {
+        return jsonError(403, "Only sales managers or admins can list agents");
+      }
+      let query = admin
+        .from("worker_profiles")
+        .select("id, user_id, email, full_name, agent_code, status, commission_rate, total_payout_earned, total_paid_to_date, created_at, manager_id, api_key");
+      if (!isAdmin) {
+        query = query.eq("manager_id", user.id);
+      }
+      const { data: rows, error: listErr } = await query.order("created_at", { ascending: false });
+      if (listErr) return jsonError(500, `Failed to load agents: ${listErr.message}`);
+      const agents = (rows || []).map((r: Record<string, unknown>) => ({
+        id: r.id,
+        user_id: r.user_id,
+        email: r.email,
+        full_name: r.full_name,
+        agent_code: r.agent_code,
+        status: r.status,
+        commission_rate: r.commission_rate,
+        total_payout_earned: r.total_payout_earned,
+        total_paid_to_date: r.total_paid_to_date,
+        created_at: r.created_at,
+        has_key: !!r.api_key,
+      }));
+      return jsonOk({ agents });
+    }
+
+    // ── Action: create-agent (sales_manager own team, or admin) ────────────────
+    // Creates a new agent. Role is hardcoded to 'agent' server-side (the caller
+    // cannot create admin/worker/super_admin users). manager_id is hardcoded to
+    // the caller (the agent cannot be assigned to another manager). The auth
+    // user is created via the Admin API with the service-role key.
+    if (action === "create-agent") {
+      if (!isSalesManager && !isAdmin) {
+        return jsonError(403, "Only sales managers or admins can create agents");
+      }
+      const email = (body.email || "").trim();
+      const full_name = (body.full_name || "").trim();
+      const agent_code = (body.agent_code || "").trim().toUpperCase();
+      const password = body.password || "";
+      if (!email || !full_name || !agent_code) {
+        return jsonError(400, "Name, email, and agent code are required");
+      }
+      if (!password || password.length < 8) {
+        return jsonError(400, "Password must be at least 8 characters");
+      }
+
+      // 1. Create the auth user (service role). role is NOT read from the client.
+      const { data: newUser, error: createErr } = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name, role: "agent" },
+      });
+      if (createErr || !newUser?.user?.id) {
+        return jsonError(400, `Failed to create agent account: ${createErr?.message || "unknown"}`);
+      }
+      const newUserId = newUser.user.id;
+
+      // 2. Insert profile with role 'agent' (server-side; cannot be admin/super_admin)
+      await admin.from("profiles").upsert({
+        id: newUserId,
+        email,
+        full_name,
+        role: "agent",
+      });
+
+      // 3. Insert worker_profile; manager_id is the caller (cannot assign to another manager)
+      const { error: wpErr } = await admin.from("worker_profiles").insert({
+        user_id: newUserId,
+        email,
+        full_name,
+        role: "agent",
+        status: "active",
+        agent_code,
+        manager_id: user.id,
+      });
+      if (wpErr) {
+        // Best-effort cleanup of the auth user if the worker profile insert fails
+        await admin.auth.admin.deleteUser(newUserId);
+        return jsonError(400, `Failed to create agent profile: ${wpErr.message}`);
+      }
+
+      return jsonOk({ userId: newUserId, agentCode: agent_code });
+    }
+
+    // ── Action: generate-api-key (sales_manager own team, or admin) ─────────────
+    // Generates a cryptographically secure key server-side and stores it. The
+    // raw key is returned ONCE so the manager can copy it; it is never readable
+    // again through any client query. Ownership (manager_id = caller) is enforced.
+    if (action === "generate-api-key") {
+      if (!isSalesManager && !isAdmin) {
+        return jsonError(403, "Only sales managers or admins can manage API keys");
+      }
+      const { agentId } = body;
+      if (!agentId) return jsonError(400, "agentId is required");
+
+      const { data: agent } = await admin
+        .from("worker_profiles")
+        .select("id, manager_id")
+        .eq("id", agentId)
+        .maybeSingle();
+      if (!agent) return jsonError(404, "Agent not found");
+      if (isSalesManager && !isAdmin && agent.manager_id !== user.id) {
+        return jsonError(403, "You can only manage API keys for agents on your own team");
+      }
+
+      const newKey = generateSecureApiKey();
+      const { error: keyErr } = await admin
+        .from("worker_profiles")
+        .update({ api_key: newKey })
+        .eq("id", agentId);
+      if (keyErr) return jsonError(500, `Failed to generate key: ${keyErr.message}`);
+      return jsonOk({ apiKey: newKey });
+    }
+
+    // ── Action: revoke-api-key (sales_manager own team, or admin) ───────────────
+    // Clears the agent's api_key. Ownership (manager_id = caller) is enforced.
+    if (action === "revoke-api-key") {
+      if (!isSalesManager && !isAdmin) {
+        return jsonError(403, "Only sales managers or admins can manage API keys");
+      }
+      const { agentId } = body;
+      if (!agentId) return jsonError(400, "agentId is required");
+
+      const { data: agent } = await admin
+        .from("worker_profiles")
+        .select("id, manager_id")
+        .eq("id", agentId)
+        .maybeSingle();
+      if (!agent) return jsonError(404, "Agent not found");
+      if (isSalesManager && !isAdmin && agent.manager_id !== user.id) {
+        return jsonError(403, "You can only manage API keys for agents on your own team");
+      }
+
+      const { error: revokeErr } = await admin
+        .from("worker_profiles")
+        .update({ api_key: null })
+        .eq("id", agentId);
+      if (revokeErr) return jsonError(500, `Failed to revoke key: ${revokeErr.message}`);
+      return jsonOk({ agentId });
     }
 
     return jsonError(400, `Unknown action: ${action}`);

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Plane, LogOut, UserPlus, TrendingUp, Users, CheckCircle, X, Eye, EyeOff, AlertCircle, Key, Copy, RefreshCw, Trash2, DollarSign, BarChart3, Award, Target } from 'lucide-react';
 import SalesCommissions from '../components/sales/SalesCommissions';
 import SalesClaims from '../components/sales/SalesClaims';
+import { listAgents, createAgent as apiCreateAgent, generateApiKey as apiGenerateApiKey, revokeApiKey as apiRevokeApiKey } from '../lib/agentApi';
 
 interface AgentRow {
   id: string;
@@ -12,10 +13,10 @@ interface AgentRow {
   full_name: string;
   agent_code: string;
   status: string;
-  api_key: string | null;
-  commission_rate?: number;
-  total_payout_earned?: number;
-  total_paid_to_date?: number;
+  has_key: boolean;
+  commission_rate?: number | null;
+  total_payout_earned?: number | null;
+  total_paid_to_date?: number | null;
   created_at: string;
 }
 
@@ -48,7 +49,9 @@ export default function SalesManagerPage({ onNav, user, onSignOut }: Props) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [keyBusy, setKeyBusy] = useState<string | null>(null);
   const [keyError, setKeyError] = useState('');
-  const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
+  // Raw keys are only ever held in memory right after generation (shown once).
+  // They are never persisted client-side or re-read from the database.
+  const [newKeys, setNewKeys] = useState<Record<string, string>>({});
 
   useEffect(() => { loadData(); }, [user]);
 
@@ -56,14 +59,9 @@ export default function SalesManagerPage({ onNav, user, onSignOut }: Props) {
     if (!user) return;
     setLoading(true);
 
-    // Load agents belonging to this manager (RLS: manager_id = auth.uid())
-    const { data: agentData } = await supabase
-      .from('worker_profiles')
-      .select('*')
-      .eq('manager_id', user.id)
-      .order('created_at', { ascending: false });
-
-    const myAgents = (agentData || []) as AgentRow[];
+    // Load agents belonging to this manager via the authorized server-side flow.
+    // The edge function enforces team scoping and never returns raw API keys.
+    const myAgents = await listAgents();
     setAgents(myAgents);
 
     // Load all claims for the team (RLS filters to team claims for sales_manager)
@@ -112,95 +110,57 @@ export default function SalesManagerPage({ onNav, user, onSignOut }: Props) {
     }
     setSaving(true);
 
-    const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-      email: form.email.trim(),
-      password: form.password,
-      options: { data: { full_name: form.full_name.trim(), role: 'agent' } },
-    });
-
-    if (signUpErr) {
-      setError(signUpErr.message);
-      setSaving(false);
-      return;
-    }
-
-    const newUserId = signUpData?.user?.id;
-
-    if (newUserId) {
-      await supabase.from('profiles').upsert({
-        id: newUserId,
+    try {
+      // All creation happens server-side: role is hardcoded to 'agent' and
+      // manager_id is assigned to the caller — neither is controllable client-side.
+      await apiCreateAgent({
         email: form.email.trim(),
         full_name: form.full_name.trim(),
-        role: 'agent',
+        agent_code: form.agent_code.trim().toUpperCase(),
+        password: form.password,
       });
-    }
-
-    const { error: wpErr } = await supabase.from('worker_profiles').insert({
-      user_id: newUserId || null,
-      email: form.email.trim(),
-      full_name: form.full_name.trim(),
-      role: 'agent',
-      status: 'active',
-      agent_code: form.agent_code.trim().toUpperCase(),
-      manager_id: user?.id,
-    });
-
-    if (wpErr) {
-      setError(wpErr.message);
+      setSuccess(`Agent ${form.full_name} created with code ${form.agent_code.toUpperCase()}.`);
+      setForm({ email: '', full_name: '', agent_code: '', password: '', confirm: '' });
+      await loadData();
+      setTimeout(() => setAgentSubView('list'), 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create agent');
+    } finally {
       setSaving(false);
-      return;
     }
-
-    setSuccess(`Agent ${form.full_name} created with code ${form.agent_code.toUpperCase()}.`);
-    setForm({ email: '', full_name: '', agent_code: '', password: '', confirm: '' });
-    setSaving(false);
-    await loadData();
-    setTimeout(() => setAgentSubView('list'), 1500);
-  }
-
-  function generateApiKey(agent: AgentRow): string {
-    const slug = agent.full_name.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20);
-    const rand = Math.random().toString(36).slice(2, 8);
-    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
-    return `cv_live_${slug}_${rand}${suffix}`;
   }
 
   async function createApiKey(agent: AgentRow) {
     setKeyError('');
     setKeyBusy(agent.id);
-    const newKey = generateApiKey(agent);
-    const { error } = await supabase.from('worker_profiles').update({ api_key: newKey }).eq('id', agent.id);
-    if (error) {
-      setKeyError(error.message);
+    try {
+      // Key is generated server-side (crypto-secure) and returned ONCE.
+      const rawKey = await apiGenerateApiKey(agent.id);
+      setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, has_key: true } : a));
+      setNewKeys(prev => ({ ...prev, [agent.id]: rawKey }));
+    } catch (err) {
+      setKeyError(err instanceof Error ? err.message : 'Failed to generate key');
+    } finally {
       setKeyBusy(null);
-      return;
     }
-    setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, api_key: newKey } : a));
-    setRevealedKeys(prev => new Set(prev).add(agent.id));
-    setKeyBusy(null);
   }
 
   async function revokeApiKey(agent: AgentRow) {
     if (!confirm(`Revoke API key for ${agent.full_name}?`)) return;
     setKeyBusy(agent.id);
-    const { error } = await supabase.from('worker_profiles').update({ api_key: null }).eq('id', agent.id);
-    if (error) { setKeyError(error.message); setKeyBusy(null); return; }
-    setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, api_key: null } : a));
-    setRevealedKeys(prev => { const n = new Set(prev); n.delete(agent.id); return n; });
-    setKeyBusy(null);
+    try {
+      await apiRevokeApiKey(agent.id);
+      setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, has_key: false } : a));
+      setNewKeys(prev => { const n = { ...prev }; delete n[agent.id]; return n; });
+    } catch (err) {
+      setKeyError(err instanceof Error ? err.message : 'Failed to revoke key');
+    } finally {
+      setKeyBusy(null);
+    }
   }
 
   async function copyKey(key: string, agentId: string) {
     try { await navigator.clipboard.writeText(key); setCopiedKey(agentId); setTimeout(() => setCopiedKey(null), 2000); } catch { /* */ }
-  }
-
-  function maskKey(key: string): string {
-    if (key.length <= 12) return key.slice(0, 4) + '••••';
-    return key.slice(0, 8) + '••••••••••••' + key.slice(-4);
-  }
-
-  function toggleReveal(agentId: string) {
-    setRevealedKeys(prev => { const n = new Set(prev); n.has(agentId) ? n.delete(agentId) : n.add(agentId); return n; });
   }
 
   // Agent code → name map (for claims display)
@@ -463,8 +423,8 @@ export default function SalesManagerPage({ onNav, user, onSignOut }: Props) {
                 ) : (
                   <div className="grid gap-3">
                     {agents.map(a => {
-                      const hasKey = !!a.api_key;
-                      const revealed = revealedKeys.has(a.id);
+                      const hasKey = a.has_key;
+                      const rawKey = newKeys[a.id]; // only present right after generation
                       return (
                         <div key={a.id} className="bg-white border border-[#e2e8f0] rounded-[12px] p-5">
                           <div className="flex items-center gap-4 mb-3">
@@ -476,9 +436,14 @@ export default function SalesManagerPage({ onNav, user, onSignOut }: Props) {
                           {hasKey && (
                             <div className="flex items-center gap-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-[9px] px-3 py-2.5">
                               <Key className="w-3.5 h-3.5 text-[#94a3b8] shrink-0" />
-                              <code className="flex-1 text-[11px] font-mono text-[#0f172a] truncate">{revealed ? a.api_key : maskKey(a.api_key!)}</code>
-                              <button onClick={() => toggleReveal(a.id)} className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#94a3b8] hover:text-[#64748b] hover:bg-white border-none bg-transparent cursor-pointer transition-colors shrink-0" title={revealed ? 'Hide' : 'Reveal'}>{revealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}</button>
-                              <button onClick={() => copyKey(a.api_key!, a.id)} className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#94a3b8] hover:text-[#2563eb] hover:bg-white border-none bg-transparent cursor-pointer transition-colors shrink-0" title="Copy">{copiedKey === a.id ? <CheckCircle className="w-3.5 h-3.5 text-[#16a34a]" /> : <Copy className="w-3.5 h-3.5" />}</button>
+                              {rawKey ? (
+                                <>
+                                  <code className="flex-1 text-[11px] font-mono text-[#0f172a] truncate">{rawKey}</code>
+                                  <button onClick={() => copyKey(rawKey, a.id)} className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#94a3b8] hover:text-[#2563eb] hover:bg-white border-none bg-transparent cursor-pointer transition-colors shrink-0" title="Copy">{copiedKey === a.id ? <CheckCircle className="w-3.5 h-3.5 text-[#16a34a]" /> : <Copy className="w-3.5 h-3.5" />}</button>
+                                </>
+                              ) : (
+                                <code className="flex-1 text-[11px] font-mono text-[#94a3b8] truncate">cv_live_•••••••••••••••• — key set (regenerate to view)</code>
+                              )}
                             </div>
                           )}
                           <div className="flex items-center gap-2 mt-3">
