@@ -1,11 +1,14 @@
-import { supabase, insertNotification } from './supabase';
-
 /**
- * Financial Service — Sub-Step A
+ * Financial Service — Compensation Calculator (read-only)
  *
- * Calculates estimated compensation values for eligible claims and splits
- * commission to the travel agent's profile. Called automatically by the
- * rules engine when a claim is marked "Eligible".
+ * Calculates estimated compensation values for eligible claims based on
+ * flight distance. This module contains ONLY pure calculation logic —
+ * no database writes.
+ *
+ * Commission calculation, rate updates, and payout logging are handled
+ * server-side by the evaluate.ts edge function and the manage-agent-finance
+ * edge function. Client-side commission writes have been removed for
+ * security (Phase 8A).
  *
  * Compensation bands (EU261 / similar):
  *   - Short haul  (< 1,500 km):  €250
@@ -36,14 +39,6 @@ export interface CompensationResult {
   currency: Currency;
   distanceKm: number;
   band: 'short' | 'medium' | 'long';
-}
-
-export interface CommissionResult {
-  agentCode: string;
-  commissionRate: number;
-  commissionAmount: number;
-  newTotalPayout: number;
-  currency: Currency;
 }
 
 // Approximate lat/lon for major airports used in distance estimation.
@@ -103,7 +98,6 @@ function estimateDistance(departure: string, arrival: string): number {
   const coordA = AIRPORT_COORDS[dep];
   const coordB = AIRPORT_COORDS[arr];
   if (coordA && coordB) return haversineKm(coordA, coordB);
-  // Unknown airports — assume medium haul as a safe middle ground
   return 2000;
 }
 
@@ -114,6 +108,7 @@ function isIsraeliRoute(dep: string, arr: string): boolean {
 /**
  * Calculates the estimated compensation for a claim based on flight distance.
  * Returns the amount in EUR for EU routes, ILS for Israeli routes.
+ * Pure function — no database access.
  */
 export function calculateCompensation(departure: string, arrival: string): CompensationResult {
   const distanceKm = estimateDistance(departure, arrival);
@@ -135,221 +130,4 @@ export function calculateCompensation(departure: string, arrival: string): Compe
   }
 
   return { amount, currency, distanceKm, band };
-}
-
-/**
- * Fetches the agent's commission_rate from their worker_profiles row.
- * Returns null if the agent is not found or not active.
- */
-async function getAgentProfile(agentCode: string): Promise<{ id: string; commissionRate: number; totalPayout: number } | null> {
-  if (!agentCode || agentCode === '—') return null;
-  const { data, error } = await supabase
-    .from('worker_profiles')
-    .select('id, commission_rate, total_payout_earned')
-    .eq('agent_code', agentCode)
-    .eq('role', 'agent')
-    .eq('status', 'active')
-    .maybeSingle();
-  if (error || !data) return null;
-  return {
-    id: data.id,
-    commissionRate: Number(data.commission_rate) || 10,
-    totalPayout: Number(data.total_payout_earned) || 0,
-  };
-}
-
-/**
- * Sub-Step A entry point — called by the rules engine when a claim is
- * marked "Eligible". Performs:
- *   1. Calculates the estimated compensation based on flight distance
- *   2. Saves it to claims.compensation_amount
- *   3. Looks up the agent's commission_rate and computes their cut
- *   4. Atomically increments the agent's total_payout_earned
- *
- * Returns the full result so callers (e.g. notifications) can use the detail.
- */
-export async function applyFinancials(
-  claimId: string,
-  claimRef: string,
-  departure: string,
-  arrival: string,
-  agentCode: string | null,
-): Promise<{ compensation: CompensationResult; commission: CommissionResult | null }> {
-  const compensation = calculateCompensation(departure, arrival);
-  const currencySymbol = compensation.currency === 'ILS' ? '₪' : '€';
-
-  // 1. Save compensation amount to the claim
-  await supabase
-    .from('claims')
-    .update({
-      compensation_amount: compensation.amount,
-      amount: `${currencySymbol}${compensation.amount}`,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', claimId);
-
-  // 2. Calculate and apply agent commission
-  let commission: CommissionResult | null = null;
-
-  if (agentCode) {
-    const agent = await getAgentProfile(agentCode);
-    if (agent) {
-      const commissionAmount = Math.round((compensation.amount * agent.commissionRate) / 100 * 100) / 100;
-      const newTotal = Math.round((agent.totalPayout + commissionAmount) * 100) / 100;
-
-      await supabase
-        .from('worker_profiles')
-        .update({ total_payout_earned: newTotal })
-        .eq('id', agent.id);
-
-      commission = {
-        agentCode,
-        commissionRate: agent.commissionRate,
-        commissionAmount,
-        newTotalPayout: newTotal,
-        currency: compensation.currency,
-      };
-
-      await insertNotification({
-        type: 'commission_earned',
-        claim_ref: claimRef,
-        claim_id: claimId,
-        message: `Agent ${agentCode} earned ${currencySymbol}${commissionAmount} commission (${agent.commissionRate}% of ${currencySymbol}${compensation.amount}). Total payout: ${currencySymbol}${newTotal}.`,
-      });
-    }
-  }
-
-  return { compensation, commission };
-}
-
-/**
- * Sub-Step B — recalculates an agent's total_payout_earned from scratch
- * using their current commission_rate. Called by the admin dashboard when
- * an admin changes an agent's commission percentage.
- *
- * Iterates all eligible claims attributed to this agent, recomputes the
- * commission for each based on the new rate, and updates the agent's
- * total_payout_earned in one atomic write.
- *
- * Returns the new total and a breakdown of the recalculation.
- */
-export async function recalculateAgentPayout(
-  agentId: string,
-  newRate: number,
-): Promise<{ newTotal: number; claimCount: number; breakdown: { claimRef: string; amount: number; commission: number }[] }> {
-  // Save the new rate first
-  await supabase
-    .from('worker_profiles')
-    .update({ commission_rate: newRate })
-    .eq('id', agentId);
-
-  // Fetch the agent's code so we can find their claims
-  const { data: agent } = await supabase
-    .from('worker_profiles')
-    .select('agent_code')
-    .eq('id', agentId)
-    .maybeSingle();
-
-  if (!agent?.agent_code) {
-    return { newTotal: 0, claimCount: 0, breakdown: [] };
-  }
-
-  // Get all eligible claims for this agent that have a compensation_amount
-  const { data: claims } = await supabase
-    .from('claims')
-    .select('id, claim_ref, compensation_amount, departure, arrival')
-    .eq('agent', agent.agent_code)
-    .eq('eligibility_status', 'Eligible')
-    .not('compensation_amount', 'is', null);
-
-  if (!claims || claims.length === 0) {
-    await supabase
-      .from('worker_profiles')
-      .update({ total_payout_earned: 0 })
-      .eq('id', agentId);
-    return { newTotal: 0, claimCount: 0, breakdown: [] };
-  }
-
-  let total = 0;
-  const breakdown: { claimRef: string; amount: number; commission: number }[] = [];
-
-  for (const claim of claims) {
-    const compAmount = Number(claim.compensation_amount);
-    if (isNaN(compAmount) || compAmount <= 0) continue;
-
-    // If compensation wasn't calculated yet (e.g. pre-financial-module claim),
-    // recalculate it from the route
-    let amount = compAmount;
-    if (!amount) {
-      const result = calculateCompensation(claim.departure, claim.arrival);
-      amount = result.amount;
-      await supabase
-        .from('claims')
-        .update({ compensation_amount: amount })
-        .eq('id', claim.id);
-    }
-
-    const commission = Math.round((amount * newRate) / 100 * 100) / 100;
-    total = Math.round((total + commission) * 100) / 100;
-    breakdown.push({ claimRef: claim.claim_ref, amount, commission });
-  }
-
-  await supabase
-    .from('worker_profiles')
-    .update({ total_payout_earned: total })
-    .eq('id', agentId);
-
-  return { newTotal: total, claimCount: claims.length, breakdown };
-}
-
-/**
- * Sub-Step C — logs a manual payout to an agent and updates their
- * total_paid_to_date. Called by the admin dashboard when the admin
- * clicks "Mark as Paid" and submits the payout form.
- *
- * Also records the payout as a finance transaction for audit trail.
- *
- * Returns the new total_paid_to_date and the resulting balance_due.
- */
-export async function logAgentPayout(
-  agentId: string,
-  agentCode: string,
-  agentName: string,
-  amount: number,
-  paymentDate: string,
-  referenceId: string,
-): Promise<{ newTotalPaid: number; balanceDue: number }> {
-  // Fetch current totals
-  const { data: agent } = await supabase
-    .from('worker_profiles')
-    .select('total_payout_earned, total_paid_to_date')
-    .eq('id', agentId)
-    .maybeSingle();
-
-  const currentEarned = Number(agent?.total_payout_earned) || 0;
-  const currentPaid = Number(agent?.total_paid_to_date) || 0;
-  const newTotalPaid = Math.round((currentPaid + amount) * 100) / 100;
-  const balanceDue = Math.round((currentEarned - newTotalPaid) * 100) / 100;
-
-  // Update the agent's total_paid_to_date
-  await supabase
-    .from('worker_profiles')
-    .update({ total_paid_to_date: newTotalPaid })
-    .eq('id', agentId);
-
-  // Log as a finance transaction for audit trail
-  await supabase
-    .from('finance_transactions')
-    .insert({
-      type: 'expense',
-      category: 'Payroll',
-      description: `Agent payout — ${agentName} (${agentCode}) — Ref: ${referenceId}`,
-      amount,
-      currency: 'EUR',
-      date: paymentDate,
-      claim_ref: null,
-      created_by: null,
-    });
-
-  return { newTotalPaid, balanceDue };
 }

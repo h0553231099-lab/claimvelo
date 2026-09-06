@@ -102,6 +102,27 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // ── 3b. Server-side agent/referral code validation ─────────────────────────
+    // Never trust agent_id or agent code from the frontend. Validate against
+    // worker_profiles and resolve the permanent agent_id here.
+    let validatedAgentCode = "—";
+    let validatedAgentId: string | null = null;
+    const rawAgentCode = (claimData.agent || "").toString().trim().toUpperCase();
+    if (rawAgentCode && rawAgentCode !== "—") {
+      const { data: agentProfile } = await admin
+        .from("worker_profiles")
+        .select("id, agent_code, role, status")
+        .eq("agent_code", rawAgentCode)
+        .eq("role", "agent")
+        .eq("status", "active")
+        .maybeSingle();
+      if (agentProfile) {
+        validatedAgentCode = agentProfile.agent_code;
+        validatedAgentId = agentProfile.id;
+      }
+      // Invalid codes are silently dropped — no fake attribution
+    }
+
     // ── 4. Insert the claim ───────────────────────────────────────────────────
     const insertRow: Record<string, unknown> = {
       claim_ref: claimRef,
@@ -121,7 +142,8 @@ Deno.serve(async (req: Request) => {
       status: "Untouched",
       eligibility_status: "Pending Check",
       amount: "€600",
-      agent: claimData.agent || "—",
+      agent: validatedAgentCode,
+      agent_id: validatedAgentId,
       loa_signed: claimData.loa_signed || false,
       signature_data: claimData.signature_data || "",
       prior_comp_type: claimData.prior_comp_type || null,

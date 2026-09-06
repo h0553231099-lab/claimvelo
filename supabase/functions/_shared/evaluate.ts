@@ -781,6 +781,16 @@ async function applyFinancials(
       const commission = Math.round((comp.amount * rate) / 100 * 100) / 100;
       const newTotal = Math.round((Number(agent.total_payout_earned || 0) + commission) * 100) / 100;
       await supabase.from("worker_profiles").update({ total_payout_earned: newTotal }).eq("id", agent.id);
+
+      // Create per-claim commission record (idempotent via unique constraint)
+      await supabase.from("commissions").upsert({
+        agent_id: agent.id,
+        claim_id: claimId,
+        commission_rate: rate,
+        commission_amount: commission,
+        commission_status: "pending",
+      }, { onConflict: "claim_id,agent_id" });
+
       await supabase.from("notifications").insert({
         type: "commission_earned", claim_ref: claimRef, claim_id: claimId,
         message: `Agent ${agentCode} earned ${sym}${commission} commission (${rate}% of ${sym}${comp.amount}).`,

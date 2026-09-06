@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import { Claim, ClaimStatus, OperationalStatus, EligibilityStatus, Priority, ClaimStatusHistory, FlightEvidenceSummary, FlightSegmentSummary, AdminView, UserProfile, InfoRequest } from '../types';
 import { supabase, sendClaimEmail, insertNotification, SEND_STAFF_EMAIL_URL } from '../lib/supabase';
-import { recalculateAgentPayout, logAgentPayout } from '../lib/financialService';
 import { Page } from '../types';
 import { Inbox, Reply, Trash2, Search, FileText, X, Upload, Paperclip, UserPlus, Trash, TrendingUp, TrendingDown, PlusCircle, DollarSign, ArrowUpRight, ArrowDownRight, Mail, Send, Pencil, Download, QrCode, Copy, Link2, Key, Eye, EyeOff, CheckCircle, Flag, UserCheck, History, HelpCircle } from 'lucide-react';
 import BulkImport from '../components/BulkImport';
@@ -942,21 +941,32 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     setPayoutError('');
     setPayoutSuccess('');
     try {
-      const { newTotalPaid, balanceDue } = await logAgentPayout(
-        payoutAgent.id,
-        payoutAgent.agent_code || '',
-        payoutAgent.full_name || payoutAgent.email,
-        amt,
-        payoutForm.paymentDate,
-        payoutForm.reference.trim(),
-      );
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-agent-finance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({
+          action: 'log-payout',
+          agentId: payoutAgent.id,
+          agentCode: payoutAgent.agent_code || '',
+          agentName: payoutAgent.full_name || payoutAgent.email,
+          amount: amt,
+          paymentDate: payoutForm.paymentDate,
+          reference: payoutForm.reference.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to log payout');
+      const { newTotalPaid, balanceDue } = data;
       setWorkers(prev => prev.map(w => w.id === payoutAgent.id
         ? { ...w, total_paid_to_date: newTotalPaid }
         : w,
       ));
       setPayoutSuccess(`Payout of €${amt.toFixed(2)} logged. New balance due: €${balanceDue.toFixed(2)}`);
       setPayoutForm({ amount: '', paymentDate: new Date().toISOString().split('T')[0], reference: '' });
-      // Auto-close after showing success briefly
       setTimeout(() => { setPayoutAgent(null); setPayoutSuccess(''); }, 1800);
     } catch (e: unknown) {
       setPayoutError(e instanceof Error ? e.message : 'Failed to log payout');
@@ -968,12 +978,29 @@ export default function AdminPage({ onNav, user, onSignOut }: Props) {
     const rate = parseFloat(commissionInput);
     if (isNaN(rate) || rate < 0 || rate > 100) return;
     setCommissionSaving(true);
-    const result = await recalculateAgentPayout(agentId, rate);
-    // Update local state
-    setWorkers(prev => prev.map(w => w.id === agentId
-      ? { ...w, commission_rate: rate, total_payout_earned: result.newTotal }
-      : w,
-    ));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-agent-finance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({
+          action: 'recalculate-payout',
+          agentId,
+          newRate: rate,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update commission rate');
+      setWorkers(prev => prev.map(w => w.id === agentId
+        ? { ...w, commission_rate: rate, total_payout_earned: data.newTotal }
+        : w,
+      ));
+    } catch (e: unknown) {
+      console.error('Commission rate update failed:', e);
+    }
     setEditingCommission(null);
     setCommissionSaving(false);
   }
