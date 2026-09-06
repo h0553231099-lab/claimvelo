@@ -737,16 +737,16 @@ def test_internal_note_no_reset(ctx):
 
 
 def test_customer_comm_resets_timer(ctx):
-    """Test 16: Customer-facing communication does reset/update the correct timestamp."""
+    """Test 16: Successful customer-facing communication resets timer."""
     print("\n── Test 16: Customer-facing communication resets timer ──")
     claim_id = ctx["claim2_id"]
 
-    # Get current last_customer_update_at (set to 10 days ago)
+    # Get current last_customer_update_at (set to 10 days ago at creation)
     status, resp = api("GET", f"/claims?id=eq.{claim_id}&select=last_customer_update_at",
         headers=admin_headers())
     before = resp[0]["last_customer_update_at"] if isinstance(resp, list) and len(resp) > 0 else None
 
-    # Insert an outbound email communication
+    # Insert an outbound email communication (successful customer email)
     status, resp = api("POST", "/claim_communications",
         headers=admin_headers({"Prefer": "return=representation"}),
         body={
@@ -762,57 +762,201 @@ def test_customer_comm_resets_timer(ctx):
             "language": "es",
         })
     if status != 201:
-        record("Customer comm resets timer: insert outbound", False, f"status={status} resp={resp}")
+        record("Customer email: insert outbound email", False, f"status={status} resp={resp}")
         return
-    record("Customer comm resets timer: insert outbound email", True)
+    record("Customer email: insert outbound email", True)
 
     # Check last_customer_update_at was updated
     status, resp = api("GET", f"/claims?id=eq.{claim_id}&select=last_customer_update_at",
         headers=admin_headers())
     after = resp[0]["last_customer_update_at"] if isinstance(resp, list) and len(resp) > 0 else None
 
-    # The timestamp should have changed (before was 10 days ago, after should be recent)
     try:
         before_time = datetime.fromisoformat(before.replace("Z", "+00:00"))
         after_time = datetime.fromisoformat(after.replace("Z", "+00:00"))
         timer_reset = after_time > before_time
     except Exception:
         timer_reset = before != after
-    record("Customer comm resets timer: last_customer_update_at updated", timer_reset,
+    record("Customer email: last_customer_update_at updated", timer_reset,
            f"before={before} after={after}")
 
-    # Also test that a status change (field_name='status', source='staff') resets the timer
-    # First set the timer back to old value
+
+def test_portal_comm_resets_timer(ctx):
+    """Test 16b: Successful portal customer-facing message resets timer."""
+    print("\n── Test 16b: Portal customer-facing message resets timer ──")
+    claim_id = ctx["claim2_id"]
+
+    # Set timer back to 20 days ago
     old_time = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
     api("PATCH", f"/claims?id=eq.{claim_id}",
         headers=admin_headers(),
         body={"last_customer_update_at": old_time})
 
-    # Insert a status change in claim_status_history
+    # Insert an outbound portal communication (staff reply via portal)
+    status, resp = api("POST", "/claim_communications",
+        headers=admin_headers({"Prefer": "return=representation"}),
+        body={
+            "claim_id": claim_id,
+            "direction": "outbound",
+            "channel": "portal",
+            "subject": "Portal reply",
+            "body": "We are working on your claim.",
+            "from_address": "support@claimvelo.com",
+            "to_address": ctx["cust2_email"],
+            "from_name": "ClaimVelo Team",
+            "match_status": "manual",
+            "language": "es",
+        })
+    record("Portal message: insert outbound portal message",
+           status == 201, f"status={status}")
+
+    # Check timer was reset
+    status, resp = api("GET", f"/claims?id=eq.{claim_id}&select=last_customer_update_at",
+        headers=admin_headers())
+    after = resp[0]["last_customer_update_at"] if isinstance(resp, list) and len(resp) > 0 else None
+    try:
+        after_time = datetime.fromisoformat(after.replace("Z", "+00:00"))
+        old_parsed = datetime.fromisoformat(old_time.replace("Z", "+00:00"))
+        timer_reset = after_time > old_parsed
+    except Exception:
+        timer_reset = after != old_time
+    record("Portal message: last_customer_update_at updated", timer_reset,
+           f"old={old_time} after={after}")
+
+
+def test_internal_status_no_reset(ctx):
+    """Test 16c: Internal status change does NOT reset timer."""
+    print("\n── Test 16c: Internal status change does NOT reset timer ──")
+    claim_id = ctx["claim2_id"]
+
+    # Set timer to a known old value
+    old_time = (datetime.now(timezone.utc) - timedelta(days=25)).isoformat()
+    api("PATCH", f"/claims?id=eq.{claim_id}",
+        headers=admin_headers(),
+        body={"last_customer_update_at": old_time})
+
+    # Insert a status change in claim_status_history (staff action, no email sent)
     api("POST", "/claim_status_history",
         headers=admin_headers(),
         body={
             "claim_id": claim_id,
             "field_name": "status",
-            "from_status": "Waiting",
-            "to_status": "In Progress",
+            "from_status": "In Progress",
+            "to_status": "Waiting",
             "source": "staff",
             "actor_name": "Test Staff",
-            "reason": "Status changed by staff",
+            "reason": "Internal status change — no email sent",
         })
 
-    # Check timer was reset
+    # Check timer was NOT reset
     status, resp = api("GET", f"/claims?id=eq.{claim_id}&select=last_customer_update_at",
         headers=admin_headers())
-    after_status = resp[0]["last_customer_update_at"] if isinstance(resp, list) and len(resp) > 0 else None
-    try:
-        after_status_time = datetime.fromisoformat(after_status.replace("Z", "+00:00"))
-        old_time_parsed = datetime.fromisoformat(old_time.replace("Z", "+00:00"))
-        status_reset_timer = after_status_time > old_time_parsed
-    except Exception:
-        status_reset_timer = after_status != old_time
-    record("Customer comm resets timer: status change also resets timer", status_reset_timer,
-           f"old={old_time} after_status={after_status}")
+    after = resp[0]["last_customer_update_at"] if isinstance(resp, list) and len(resp) > 0 else None
+    timer_unchanged = after == old_time or after == old_time.replace("+00:00", "Z")
+    record("Internal status change: timer unchanged", timer_unchanged,
+           f"old={old_time} after={after}")
+
+
+def test_assignment_priority_review_no_reset(ctx):
+    """Test 16d: Assignment, priority, and review actions do NOT reset timer."""
+    print("\n── Test 16d: Assignment/priority/review action does NOT reset timer ──")
+    claim_id = ctx["claim2_id"]
+
+    # Set timer to a known old value
+    old_time = (datetime.now(timezone.utc) - timedelta(days=28)).isoformat()
+    api("PATCH", f"/claims?id=eq.{claim_id}",
+        headers=admin_headers(),
+        body={"last_customer_update_at": old_time})
+
+    # Insert assignment change
+    api("POST", "/claim_status_history",
+        headers=admin_headers(),
+        body={
+            "claim_id": claim_id,
+            "field_name": "agent",
+            "from_status": None,
+            "to_status": "agent_smith",
+            "source": "staff",
+            "actor_name": "Test Staff",
+            "reason": "Assigned to agent",
+        })
+
+    # Insert priority change
+    api("POST", "/claim_status_history",
+        headers=admin_headers(),
+        body={
+            "claim_id": claim_id,
+            "field_name": "priority",
+            "from_status": None,
+            "to_status": "high",
+            "source": "staff",
+            "actor_name": "Test Staff",
+            "reason": "Priority changed",
+        })
+
+    # Insert review action
+    api("POST", "/claim_status_history",
+        headers=admin_headers(),
+        body={
+            "claim_id": claim_id,
+            "field_name": "review",
+            "from_status": None,
+            "to_status": "reviewed",
+            "source": "staff",
+            "actor_name": "Test Staff",
+            "reason": "Review completed",
+        })
+
+    # Check timer was NOT reset
+    status, resp = api("GET", f"/claims?id=eq.{claim_id}&select=last_customer_update_at",
+        headers=admin_headers())
+    after = resp[0]["last_customer_update_at"] if isinstance(resp, list) and len(resp) > 0 else None
+    timer_unchanged = after == old_time or after == old_time.replace("+00:00", "Z")
+    record("Assignment/priority/review: timer unchanged", timer_unchanged,
+           f"old={old_time} after={after}")
+
+
+def test_failed_email_no_reset(ctx):
+    """Test 16e: Failed customer email does NOT reset timer."""
+    print("\n── Test 16e: Failed customer email does NOT reset timer ──")
+    claim_id = ctx["claim2_id"]
+
+    # Set timer to 35 days ago
+    old_time = (datetime.now(timezone.utc) - timedelta(days=35)).isoformat()
+    api("PATCH", f"/claims?id=eq.{claim_id}",
+        headers=admin_headers(),
+        body={"last_customer_update_at": old_time})
+
+    # Simulate a failed email: the edge function tries to send but fails,
+    # so it does NOT call mark_30_day_update_sent and does NOT insert a
+    # communication record. The timer should remain unchanged.
+
+    # Verify the claim is in the update list (it's overdue)
+    status, resp = api("POST", "/rpc/get_claims_needing_30_day_update",
+        headers=admin_headers(),
+        body={})
+    claims_needing = resp if isinstance(resp, list) else []
+    claim_in_list_before = any(c.get("claim_id") == claim_id for c in claims_needing)
+    record("Failed email: claim appears in update list (overdue)", claim_in_list_before,
+           f"claims={[c.get('claim_ref') for c in claims_needing]}")
+
+    # Do NOT call mark_30_day_update_sent (simulating email send failure)
+    # Check timer is still old
+    status, resp = api("GET", f"/claims?id=eq.{claim_id}&select=last_customer_update_at",
+        headers=admin_headers())
+    after = resp[0]["last_customer_update_at"] if isinstance(resp, list) and len(resp) > 0 else None
+    timer_unchanged = after == old_time or after == old_time.replace("+00:00", "Z")
+    record("Failed email: timer unchanged (no communication inserted)", timer_unchanged,
+           f"old={old_time} after={after}")
+
+    # Verify claim is STILL in the update list (timer not reset)
+    status, resp = api("POST", "/rpc/get_claims_needing_30_day_update",
+        headers=admin_headers(),
+        body={})
+    claims_needing = resp if isinstance(resp, list) else []
+    claim_still_in_list = any(c.get("claim_id") == claim_id for c in claims_needing)
+    record("Failed email: claim still in update list (not falsely marked updated)",
+           claim_still_in_list, f"still_in_list={claim_still_in_list}")
 
 
 def test_english_fallback(ctx):
@@ -923,6 +1067,10 @@ def main():
         test_no_duplicate_30_day(ctx)
         test_internal_note_no_reset(ctx)
         test_customer_comm_resets_timer(ctx)
+        test_portal_comm_resets_timer(ctx)
+        test_internal_status_no_reset(ctx)
+        test_assignment_priority_review_no_reset(ctx)
+        test_failed_email_no_reset(ctx)
         test_english_fallback(ctx)
     except Exception as e:
         print(f"\nERROR: {e}")

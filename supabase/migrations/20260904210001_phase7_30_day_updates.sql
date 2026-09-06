@@ -8,8 +8,9 @@
 --
 -- Key principles:
 --   • Only ACTIVE claims (not Resolved/Escalated) need 30-day updates
---   • Internal notes do NOT reset the timer (last_customer_update_at only
---     changes on outbound customer communications and status changes)
+--   • Internal notes and status changes do NOT reset the timer
+--     (last_customer_update_at only changes on outbound customer
+--     communications recorded in claim_communications)
 --   • Duplicate prevention: checks last_customer_update_at before sending
 --   • Language: uses claim.preferred_language with English fallback
 -- ═══════════════════════════════════════════════════════════════════════════

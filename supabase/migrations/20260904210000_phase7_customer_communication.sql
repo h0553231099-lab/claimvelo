@@ -270,30 +270,13 @@ CREATE TRIGGER claim_communications_log_timeline
   AFTER INSERT ON claim_communications
   FOR EACH ROW EXECUTE FUNCTION log_communication_timeline();
 
--- ── 8. Trigger: status changes also reset the 30-day timer ───────────────────
--- When a staff member changes the claim status, a status-change email is sent
--- to the customer, so the 30-day timer should reset. Internal notes/overrides
--- do NOT reset the timer (they use field_name 'override', not 'status').
-CREATE OR REPLACE FUNCTION update_timer_on_status_change()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF NEW.field_name = 'status' AND NEW.source = 'staff' THEN
-    UPDATE claims
-    SET last_customer_update_at = now()
-    WHERE id = NEW.claim_id;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS claim_status_history_timer ON claim_status_history;
-CREATE TRIGGER claim_status_history_timer
-  AFTER INSERT ON claim_status_history
-  FOR EACH ROW EXECUTE FUNCTION update_timer_on_status_change();
+-- ── 8. No status-change timer reset ───────────────────────────────────────────
+-- Internal operational status changes (status, assignment, priority, review)
+-- do NOT reset the 30-day customer communication timer. Only actual
+-- customer-facing communication (outbound email/portal message recorded in
+-- claim_communications) resets the timer via the
+-- claim_communications_update_timer trigger.
+-- See migration 20260904210002 for the fix that removed this trigger.
 
 -- ── 9. Add 'customer_email' to claim_status_history field_name ───────────────
 -- The field_name column is text (no CHECK constraint), so no migration needed.
